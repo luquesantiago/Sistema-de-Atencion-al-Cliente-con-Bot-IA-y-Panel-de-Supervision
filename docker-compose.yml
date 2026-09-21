@@ -23,12 +23,19 @@ services:
       start_period: 60s
 
   backend:
-    image: node:24-slim
+    build: ./backend                      # node:24-slim + OpenSSL (lo necesita Prisma), ver backend/Dockerfile
     user: node                            # evita que los archivos generados queden como root
     working_dir: /app
     command: sh -c "npm install && npm run dev"
     environment:
+      # La CLI de Prisma (migrate, studio) usa la URL.
       DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@db:3306/${MYSQL_DATABASE}
+      # La app se conecta con el adaptador de Prisma para MySQL, que no acepta URLs mysql://.
+      DATABASE_HOST: db
+      DATABASE_PORT: 3306
+      DATABASE_USER: ${MYSQL_USER}
+      DATABASE_PASSWORD: ${MYSQL_PASSWORD}
+      DATABASE_NAME: ${MYSQL_DATABASE}
       PORT: 3000
     ports:
       - "3000:3000"
