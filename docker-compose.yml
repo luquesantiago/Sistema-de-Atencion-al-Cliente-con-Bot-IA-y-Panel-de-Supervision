@@ -9,7 +9,8 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      TZ: America/Argentina/Buenos_Aires
+      # Sin TZ a propósito: MySQL corre en UTC, igual que las fechas que escribe
+      # Prisma. La hora argentina se usa solo para mostrar (decisión 21/09/2026).
     ports:
       - "3307:3306"
     volumes:
