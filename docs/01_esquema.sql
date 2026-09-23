@@ -426,7 +426,8 @@ CREATE TABLE estado_solicitud (
 -- se cierre el caso, el asistente sigue sin responder y lo que escribe el
 -- cliente queda en ese caso (RF-DER-03). `id_cliente` queda NULL hasta que
 -- la persona se identifica. `asistente_suspendido` implementa la regla de
--- que el bot deja de responder tras una derivación.
+-- que el bot deja de responder tras una derivación, hasta que se cierre el
+-- caso.
 CREATE TABLE conversacion (
   id_conversacion      INT UNSIGNED NOT NULL AUTO_INCREMENT,
   id_telefono          INT UNSIGNED NOT NULL,

@@ -1,6 +1,6 @@
 # Requisitos funcionales — Caso 8
 
-Copia de la tabla de requisitos del documento de análisis (`Caso8_Analisis_y_Propuesta.docx`, versión del 21/09/2026). El documento es la fuente oficial: si cambia, hay que actualizar esta copia.
+Copia de la tabla de requisitos del documento de análisis (`Caso8_Analisis_y_Propuesta.docx`, versión del 23/09/2026). El documento es la fuente oficial: si cambia, hay que actualizar esta copia.
 
 Los IDs llevan el prefijo del módulo. Citarlos en commits y pull requests.
 
@@ -29,7 +29,7 @@ Los IDs llevan el prefijo del módulo. Citarlos en commits y pull requests.
 |---|---|---|
 | RF-DER-01 | Un sistema que reconozca cuándo una consulta excede lo que puede resolver —una emergencia, un reclamo, una situación compleja— y la derive a una persona avisando al equipo. | CASO-008 (vivienda inundada) y CASO-006 (reclamo por cobro indebido) fueron respondidos por el bot. Roberto Castaño: «cuando la consulta es complicada, que el bot derive y nos avise, no que intente resolver todo él solo». |
 | RF-DER-02 | Un sistema que asigne un responsable a cada caso derivado y permita seguir su estado hasta el cierre. | 7 de los 12 casos no tienen funcionario asignado, y los responsables se escriben en texto libre («Graciela», «graciela», «ROBERTO»). Roberto Castaño: «No tenemos forma de saber si una consulta (…) fue resuelta o quedó en el aire». |
-| RF-DER-03 | Un sistema que, una vez derivado un caso, haga que el asistente deje de responder por completo en esa conversación hasta que un operador lo retome. | Entrevista del 16/09/2026: un caso derivado implica que el bot deja de responder hasta que el operador lo retoma. |
+| RF-DER-03 | Un sistema que, una vez derivado un caso, haga que el asistente deje de responder por completo en esa conversación hasta que se cierre el caso. | Entrevista del 16/09/2026: un caso derivado implica que el bot deja de responder hasta que el operador lo retoma. Equipo (23/09/2026): hasta el cierre del caso. |
 | RF-DER-04 | Un sistema en el que el asistente responda a toda hora y, cuando deba derivar una consulta fuera del horario de atención, informe al cliente que no hay atención humana hasta el horario de apertura. El horario de atención lo configura el administrador. | Entrevista del 16/09/2026: el asistente contesta siempre y, fuera de horario, avisa que no hay atención humana hasta la apertura. Después de la entrevista, la agencia informó su horario: lunes a viernes de 9 a 18. Queda configurable. |
 
 ## Módulo 4 — Verificación y alertas
