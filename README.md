@@ -85,9 +85,9 @@ Las reglas de negocio, las decisiones abiertas y las convenciones de código est
 ## Cómo trabajamos
 
 - Nadie pushea a `main`: cada tarea va en una rama `feature/<tema>` y entra por pull request.
-- Cada integrante commitea su propio trabajo; la cátedra evalúa la participación por el historial de commits.
+- Cada integrante commitea su propio trabajo.
 - En el commit o el PR se citan los requisitos que toca (por ejemplo `RF-DER-03`).
-- Antes de abrir el PR, actualizar la rama con `main` (la cátedra recomienda rebase).
+- Antes de abrir el PR, actualizar la rama con `main`.
 - Si usás OpenCode, lee solo `AGENTS.md` y las skills de `.agents/skills/`.
 
 ## Entregas
