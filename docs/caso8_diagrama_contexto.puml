@@ -1,0 +1,113 @@
+@startuml caso8_diagrama_contexto
+' =====================================================================
+' Diagrama de Contexto (DFD nivel 0) - Notacion Yourdon/DeMarco
+' Caso 8 - Sistema de Atencion al Cliente con Bot IA y Panel de Supervision
+' Cliente: Seguros Castano | PPP 1 - UNLa - Grupo 11
+' Cada flecha (F1..F28) representa una interaccion con el sistema.
+' =====================================================================
+
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 13
+skinparam ArrowColor #333333
+skinparam ArrowFontSize 12
+skinparam nodesep 160
+skinparam ranksep 110
+
+skinparam rectangle {
+  BackgroundColor #F2F2F2
+  BorderColor #333333
+  BorderThickness 1.5
+  FontStyle bold
+}
+
+skinparam usecase {
+  BackgroundColor #DCE9F7
+  BorderColor #1F4E79
+  BorderThickness 2
+  FontStyle bold
+}
+
+' ---------- Proceso unico: el sistema ----------
+usecase "**0**\nSistema de Atención al Cliente\ncon Bot IA y Panel de Supervisión" as SIS
+
+' ---------- Entidades externas ----------
+rectangle "Cliente\n(asegurado / cliente nuevo)" as CLI
+rectangle "Operador\n(Graciela, Diego)" as OPE
+rectangle "Administrador\n(Roberto)" as ADM
+rectangle "API de WhatsApp Business" as WA
+rectangle "Proveedor de IA\n(modelo de lenguaje)" as IA
+
+' ---------- Flujos: Cliente ----------
+CLI -down-> SIS : F1
+CLI -down-> SIS : F2
+CLI -down-> SIS : F3
+SIS -up-> CLI : F4
+SIS -up-> CLI : F5
+SIS -up-> CLI : F6
+SIS -up-> CLI : F7
+
+' ---------- Flujos: API de WhatsApp Business ----------
+WA -right-> SIS : F8
+WA -right-> SIS : F9
+SIS -left-> WA : F10
+
+' ---------- Flujos: Proveedor de IA ----------
+SIS -left-> IA : F11
+IA -up-> SIS : F12
+
+' ---------- Flujos: Operador ----------
+OPE -left-> SIS : F13
+OPE -left-> SIS : F14
+OPE -left-> SIS : F15
+OPE -left-> SIS : F16
+OPE -left-> SIS : F17
+OPE -left-> SIS : F18
+SIS -right-> OPE : F19
+SIS -right-> OPE : F20
+SIS -right-> OPE : F21
+SIS -right-> OPE : F22
+
+' ---------- Flujos: Administrador ----------
+ADM -up-> SIS : F23
+ADM -up-> SIS : F24
+ADM -up-> SIS : F25
+SIS -down-> ADM : F26
+SIS -down-> ADM : F27
+SIS -down-> ADM : F28
+
+' ---------- Referencia de flujos ----------
+legend right
+|= # |= Flujo de datos |= Sentido |
+| F1 | Consulta de rutina (DNI + pregunta) | Cliente → Sistema |
+| F2 | Datos de contacto como cliente nuevo | Cliente → Sistema |
+| F3 | Pedido de acción contractual (baja, modificación, alta de conductor) | Cliente → Sistema |
+| F4 | Respuesta verificada | Sistema → Cliente |
+| F5 | Aviso de derivación a un operador / fuera de horario | Sistema → Cliente |
+| F6 | Acuse del pedido recibido y en gestión | Sistema → Cliente |
+| F7 | Corrección de una respuesta ya enviada | Sistema → Cliente |
+| F8 | Mensaje entrante del cliente | WhatsApp → Sistema |
+| F9 | Estado de entrega del mensaje | WhatsApp → Sistema |
+| F10 | Mensaje a enviar al cliente | Sistema → WhatsApp |
+| F11 | Consulta del cliente + datos de cartera autorizados | Sistema → Proveedor de IA |
+| F12 | Respuesta generada e intención detectada | Proveedor de IA → Sistema |
+| F13 | Credenciales de acceso | Operador → Sistema |
+| F14 | Toma del caso derivado | Operador → Sistema |
+| F15 | Respuesta corregida y autorizada para envío | Operador → Sistema |
+| F16 | Confirmación del alta de un cliente nuevo | Operador → Sistema |
+| F17 | Cierre del caso con constancia | Operador → Sistema |
+| F18 | Aprobación o rechazo de solicitud de acción | Operador → Sistema |
+| F19 | Aviso de caso derivado y asignación | Sistema → Operador |
+| F20 | Bandeja de revisión priorizada con alertas | Sistema → Operador |
+| F21 | Conversación completa y respuesta retenida | Sistema → Operador |
+| F22 | Solicitud de acción pendiente de aprobación | Sistema → Operador |
+| F23 | Credenciales de acceso | Administrador → Sistema |
+| F24 | Configuración (horario de atención, usuarios y perfiles) | Administrador → Sistema |
+| F25 | Aprobación o rechazo de solicitud de acción | Administrador → Sistema |
+| F26 | Métricas de gestión (diaria, mensual, anual) | Sistema → Administrador |
+| F27 | Registro de auditoría | Sistema → Administrador |
+| F28 | Alertas de riesgo | Sistema → Administrador |
+endlegend
+
+@enduml

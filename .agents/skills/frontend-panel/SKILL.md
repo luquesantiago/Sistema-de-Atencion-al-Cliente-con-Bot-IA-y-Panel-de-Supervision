@@ -1,3 +1,8 @@
+---
+name: frontend-panel
+description: Guía visual y de UX del panel de supervisión (Dashboard, Bandeja de Atención, Trámites por Aprobar, Base de Clientes). Cubre colores, estados, accesibilidad y responsive. Usar al construir o modificar pantallas, componentes, tablas, modales o el login del frontend.
+---
+
 # Skill: Frontend del panel
 
 ## Cuándo usarla

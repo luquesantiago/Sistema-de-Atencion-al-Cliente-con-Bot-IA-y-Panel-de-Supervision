@@ -1,0 +1,445 @@
+@startuml caso8_der
+' =====================================================================
+' Modelo Entidad-Relacion - Caso 8
+' Sistema de Atencion al Cliente con Bot IA y Panel de Supervision
+' Seguros Castano - PPP 1 - UNLa - Grupo 11
+' Convenciones: nombres en espanol, ids autoincrementales, bajas logicas (campo "activo"),
+' referencias siempre por id, estados y tipos en catalogos.
+' <<UK1>> marca las columnas de una misma restriccion unica compuesta.
+' Ultima revision: 21/09/2026 (noche): catalogo tipo_consulta y caso.id_tipo_consulta
+' =====================================================================
+
+hide circle
+skinparam linetype ortho
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam defaultFontSize 12
+skinparam nodesep 35
+skinparam ranksep 55
+skinparam class {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+}
+skinparam package {
+  BackgroundColor #FAFAFA
+  BorderColor #999999
+  FontStyle bold
+}
+
+package "Cartera" #F7FAFD {
+
+  entity "cliente" as cliente {
+    * id_cliente : INT <<PK>>
+    --
+    dni : VARCHAR <<UK>>
+    apellido : VARCHAR
+    nombre : VARCHAR
+    cuit : CHAR(11) <<UK>>
+    razon_social : VARCHAR
+    * fecha_alta : DATETIME
+    * activo : BOOLEAN
+  }
+
+  entity "telefono" as telefono {
+    * id_telefono : INT <<PK>>
+    --
+    * numero : VARCHAR <<UK>>
+    * activo : BOOLEAN
+  }
+
+  entity "cliente_telefono" as cliente_telefono {
+    * id_cliente : INT <<PK,FK>>
+    * id_telefono : INT <<PK,FK>>
+    --
+    * fecha_alta : DATETIME
+  }
+
+  entity "compania_aseguradora" as compania {
+    * id_compania : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+    * activo : BOOLEAN
+  }
+
+  entity "moneda" as moneda {
+    * id_moneda : INT <<PK>>
+    --
+    * codigo : CHAR(3) <<UK>>
+    * nombre : VARCHAR <<UK>>
+  }
+
+  entity "ramo" as ramo {
+    * id_ramo : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+    * activo : BOOLEAN
+  }
+
+  entity "plan" as plan {
+    * id_plan : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+    descripcion : VARCHAR
+    * activo : BOOLEAN
+  }
+
+  entity "bien_asegurado" as bien {
+    * id_bien : INT <<PK>>
+    --
+    * descripcion : VARCHAR
+    patente_matricula : VARCHAR <<UK>>
+    direccion : VARCHAR
+    marca : VARCHAR
+    modelo : VARCHAR
+    anio : INT
+    * activo : BOOLEAN
+  }
+
+  entity "estado_poliza" as estado_poliza {
+    * id_estado_poliza : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+  }
+
+  entity "poliza" as poliza {
+    * id_poliza : INT <<PK>>
+    --
+    * numero_poliza : VARCHAR <<UK1>>
+    * id_cliente : INT <<FK>>
+    * id_compania : INT <<FK,UK1>>
+    * id_ramo : INT <<FK>>
+    id_bien : INT <<FK>>
+    * id_estado_poliza : INT <<FK>>
+    * id_moneda : INT <<FK>>
+    * fecha_inicio : DATE
+    * fecha_vencimiento : DATE
+    prima_mensual : DECIMAL
+    observaciones : TEXT
+    * fecha_alta : DATETIME
+    * activo : BOOLEAN
+  }
+
+  entity "cobertura" as cobertura {
+    * id_cobertura : INT <<PK>>
+    --
+    * id_poliza : INT <<FK>>
+    * id_plan : INT <<FK>>
+    descripcion : VARCHAR
+    suma_asegurada : DECIMAL
+    * activo : BOOLEAN
+  }
+
+  entity "beneficiario" as beneficiario {
+    * id_beneficiario : INT <<PK>>
+    --
+    * id_poliza : INT <<FK>>
+    * nombre_completo : VARCHAR
+    vinculo : VARCHAR
+    porcentaje : DECIMAL
+    * activo : BOOLEAN
+  }
+
+  entity "cuota" as cuota {
+    * id_cuota : INT <<PK>>
+    --
+    * id_poliza : INT <<FK,UK1>>
+    * numero_cuota : INT <<UK1>>
+    * fecha_vencimiento : DATE
+    * importe : DECIMAL
+    fecha_pago : DATE
+  }
+
+  entity "estado_siniestro" as estado_siniestro {
+    * id_estado_siniestro : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+  }
+
+  entity "siniestro" as siniestro {
+    * id_siniestro : INT <<PK>>
+    --
+    * numero_siniestro : VARCHAR <<UK>>
+    * id_poliza : INT <<FK>>
+    * id_estado_siniestro : INT <<FK>>
+    * fecha_ocurrencia : DATE
+    * fecha_registro : DATETIME
+    descripcion : TEXT
+    * activo : BOOLEAN
+  }
+
+  entity "conductor" as conductor {
+    * id_conductor : INT <<PK>>
+    --
+    * dni : VARCHAR <<UK>>
+    * apellido : VARCHAR
+    * nombre : VARCHAR
+    * activo : BOOLEAN
+  }
+
+  entity "poliza_conductor" as poliza_conductor {
+    * id_poliza : INT <<PK,FK>>
+    * id_conductor : INT <<PK,FK>>
+    --
+    * fecha_alta : DATETIME
+  }
+}
+
+package "Seguridad y configuracion" #FDFAF7 {
+
+  entity "rol" as rol {
+    * id_rol : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+  }
+
+  entity "usuario" as usuario {
+    * id_usuario : INT <<PK>>
+    --
+    * id_rol : INT <<FK>>
+    * nombre_usuario : VARCHAR <<UK>>
+    * contrasena_hash : VARCHAR
+    * nombre : VARCHAR
+    * apellido : VARCHAR
+    * fecha_alta : DATETIME
+    * activo : BOOLEAN
+  }
+
+  entity "parametro_configuracion" as parametro {
+    * id_parametro : INT <<PK>>
+    --
+    * clave : VARCHAR <<UK>>
+    * valor : VARCHAR
+    descripcion : VARCHAR
+  }
+
+  entity "horario_atencion" as horario {
+    * id_horario : INT <<PK>>
+    --
+    * dia_semana : INT <<UK>>
+    * hora_apertura : TIME
+    * hora_cierre : TIME
+  }
+}
+
+package "Atencion" #F8FDF7 {
+
+  entity "conversacion" as conversacion {
+    * id_conversacion : INT <<PK>>
+    --
+    * id_telefono : INT <<FK>>
+    id_cliente : INT <<FK>>
+    * fecha_inicio : DATETIME
+    fecha_fin : DATETIME
+    * asistente_suspendido : BOOLEAN
+  }
+
+  entity "caso" as caso {
+    * id_caso : INT <<PK>>
+    --
+    * id_conversacion : INT <<FK>>
+    id_tipo_consulta : INT <<FK>>
+    id_usuario_asignado : INT <<FK>>
+    id_nivel_riesgo : INT <<FK>>
+    * fecha_apertura : DATETIME
+    fecha_derivacion : DATETIME
+    fecha_toma : DATETIME
+    fecha_cierre : DATETIME
+    motivo_derivacion : VARCHAR
+  }
+
+  entity "origen_mensaje" as origen_mensaje {
+    * id_origen_mensaje : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+  }
+
+  entity "tipo_consulta" as tipo_consulta {
+    * id_tipo_consulta : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+  }
+
+  entity "mensaje" as mensaje {
+    * id_mensaje : INT <<PK>>
+    --
+    * id_caso : INT <<FK>>
+    * id_origen_mensaje : INT <<FK>>
+    * contenido : TEXT
+    * fecha_hora : DATETIME
+  }
+
+  entity "estado_prospecto" as estado_prospecto {
+    * id_estado_prospecto : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+  }
+
+  entity "prospecto" as prospecto {
+    * id_prospecto : INT <<PK>>
+    --
+    * id_caso : INT <<FK,UK>>
+    id_cliente : INT <<FK>>
+    id_telefono : INT <<FK>>
+    * id_estado_prospecto : INT <<FK>>
+    nombre_declarado : VARCHAR
+    dni_declarado : VARCHAR
+    observaciones : TEXT
+    * fecha_registro : DATETIME
+  }
+}
+
+package "Verificacion y supervision" #FDF7FB {
+
+  entity "respuesta" as respuesta {
+    * id_respuesta : INT <<PK>>
+    --
+    * id_mensaje_consulta : INT <<FK>>
+    id_respuesta_origen : INT <<FK>>
+    id_usuario : INT <<FK>>
+    id_mensaje_enviado : INT <<FK,UK>>
+    * contenido : TEXT
+    * fecha_hora : DATETIME
+  }
+
+  entity "resultado_verificacion" as resultado_verificacion {
+    * id_resultado_verificacion : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+  }
+
+  entity "verificacion" as verificacion {
+    * id_verificacion : INT <<PK>>
+    --
+    * id_respuesta : INT <<FK,UK>>
+    * id_resultado_verificacion : INT <<FK>>
+    * id_nivel_riesgo : INT <<FK>>
+    detalle : TEXT
+    * fecha_hora : DATETIME
+  }
+
+  entity "nivel_riesgo" as nivel_riesgo {
+    * id_nivel_riesgo : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+    * orden : INT <<UK>>
+  }
+
+  entity "tipo_alerta" as tipo_alerta {
+    * id_tipo_alerta : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+    * id_nivel_riesgo_default : INT <<FK>>
+  }
+
+  entity "alerta" as alerta {
+    * id_alerta : INT <<PK>>
+    --
+    * id_caso : INT <<FK>>
+    id_respuesta : INT <<FK>>
+    * id_tipo_alerta : INT <<FK>>
+    * id_nivel_riesgo : INT <<FK>>
+    id_usuario_atencion : INT <<FK>>
+    * fecha_hora : DATETIME
+    fecha_atencion : DATETIME
+  }
+
+  entity "auditoria" as auditoria {
+    * id_auditoria : INT <<PK>>
+    --
+    id_usuario : INT <<FK>>
+    * entidad : VARCHAR
+    * id_registro : INT
+    * accion : VARCHAR
+    detalle : TEXT
+    * fecha_hora : DATETIME
+  }
+}
+
+package "Acciones criticas" #FDFDF4 {
+
+  entity "tipo_accion" as tipo_accion {
+    * id_tipo_accion : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+  }
+
+  entity "estado_solicitud" as estado_solicitud {
+    * id_estado_solicitud : INT <<PK>>
+    --
+    * nombre : VARCHAR <<UK>>
+  }
+
+  entity "solicitud_accion" as solicitud {
+    * id_solicitud : INT <<PK>>
+    --
+    * id_caso : INT <<FK>>
+    id_poliza : INT <<FK>>
+    * id_tipo_accion : INT <<FK>>
+    * id_estado_solicitud : INT <<FK>>
+    id_usuario_decision : INT <<FK>>
+    detalle : TEXT
+    fundamento : TEXT
+    * fecha_solicitud : DATETIME
+    fecha_decision : DATETIME
+  }
+}
+
+' ---------- Relaciones: cartera ----------
+cliente ||--o{ cliente_telefono
+telefono ||--o{ cliente_telefono
+cliente ||--o{ poliza
+compania ||--o{ poliza
+moneda ||--o{ poliza
+ramo ||--o{ poliza
+bien |o--o{ poliza
+estado_poliza ||--o{ poliza
+poliza ||--o{ cobertura
+plan ||--o{ cobertura
+poliza ||--o{ beneficiario
+poliza ||--o{ cuota
+poliza ||--o{ siniestro
+estado_siniestro ||--o{ siniestro
+poliza ||--o{ poliza_conductor
+conductor ||--o{ poliza_conductor
+
+' ---------- Relaciones: seguridad ----------
+rol ||--o{ usuario
+
+' ---------- Relaciones: atencion ----------
+telefono ||--o{ conversacion
+cliente |o--o{ conversacion
+conversacion ||--o{ caso
+tipo_consulta |o--o{ caso
+usuario |o--o{ caso
+caso ||--o{ mensaje
+origen_mensaje ||--o{ mensaje
+caso ||--o| prospecto
+cliente |o--o{ prospecto
+telefono |o--o{ prospecto
+estado_prospecto ||--o{ prospecto
+
+' ---------- Relaciones: verificacion y supervision ----------
+mensaje ||--o{ respuesta : consulta
+mensaje |o--o| respuesta : enviado
+respuesta |o--o{ respuesta : corrige
+usuario |o--o{ respuesta
+respuesta ||--o| verificacion
+resultado_verificacion ||--o{ verificacion
+nivel_riesgo ||--o{ verificacion
+nivel_riesgo |o--o{ caso
+nivel_riesgo ||--o{ tipo_alerta
+nivel_riesgo ||--o{ alerta
+caso ||--o{ alerta
+respuesta |o--o{ alerta
+tipo_alerta ||--o{ alerta
+usuario |o--o{ alerta
+usuario |o--o{ auditoria
+
+' ---------- Relaciones: acciones criticas ----------
+caso ||--o{ solicitud
+poliza |o--o{ solicitud
+tipo_accion ||--o{ solicitud
+estado_solicitud ||--o{ solicitud
+usuario |o--o{ solicitud
+
+@enduml
