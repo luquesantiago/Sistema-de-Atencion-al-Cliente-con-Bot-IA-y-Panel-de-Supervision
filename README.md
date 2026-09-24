@@ -67,6 +67,8 @@ docker compose exec backend npx tsc --noEmit
 ├── db/init/           # scripts que MySQL corre al crear la base
 ├── docs/              # documentación de diseño del Hito 0
 ├── .agents/skills/    # skills para asistentes de IA
+├── .opencode/         # agentes y comandos de OpenCode
+├── openspec/          # specs y cambios planificados con OpenSpec (opcional)
 ├── AGENTS.md          # reglas del proyecto para asistentes de IA
 └── docker-compose.yml
 ```
@@ -88,7 +90,8 @@ Las reglas de negocio, las decisiones abiertas y las convenciones de código est
 - Cada integrante commitea su propio trabajo.
 - En el commit o el PR se citan los requisitos que toca (por ejemplo `RF-DER-03`).
 - Antes de abrir el PR, actualizar la rama con `main`.
-- Si usás OpenCode, lee solo `AGENTS.md` y las skills de `.agents/skills/`.
+- Si usás OpenCode, toma las reglas de `AGENTS.md`, las skills de `.agents/skills/` y los agentes y comandos de `.opencode/`.
+- Planificar una tarea con OpenSpec antes de programarla es opcional; la guía está en [`openspec/README.md`](openspec/README.md).
 
 ## Entregas
 

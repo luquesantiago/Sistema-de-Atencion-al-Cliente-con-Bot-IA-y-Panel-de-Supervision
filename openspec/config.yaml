@@ -1,0 +1,29 @@
+schema: spec-driven
+
+context: |
+  Language: Spanish (Argentina)
+  All artifacts must be written in Spanish (Argentina).
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Proyecto: sistema de atención al cliente por WhatsApp con asistente de IA y panel de supervisión para Seguros Castaño.
+  Fuentes del proyecto:
+  - AGENTS.md: reglas de negocio, convenciones, comandos de verificación y decisiones abiertas.
+  - docs/requisitos.md: los 27 requisitos funcionales, con IDs por módulo (RF-CAR, RF-ATE, RF-DER, RF-VER, RF-SUP, RF-APR).
+  - docs/caso8_der.md, docs/01_esquema.sql y docs/02_catalogos.sql: modelo de datos acordado.
+  - docs/caso8_tabla_de_eventos.md: eventos de negocio.
+  Lo que no esté en esas fuentes no se inventa: se deja como pregunta abierta.
+
+rules:
+  proposal:
+    - Citar los IDs de docs/requisitos.md que cubre el cambio (por ejemplo RF-DER-04). No inventar IDs.
+    - Si el cambio depende de una de las "Decisiones abiertas" de AGENTS.md, listarla como pregunta abierta sin cerrarla.
+  specs:
+    - "Usar solo estas capacidades, una por módulo de docs/requisitos.md: cartera, atencion-automatizada, derivacion-seguimiento, verificacion-alertas, panel-supervision, aprobacion-acciones-criticas."
+    - Escribir en español el texto de cada requirement y de cada scenario. En inglés quedan solo los encabezados de OpenSpec, WHEN/THEN y SHALL/MUST.
+    - "En cada requirement, la oración con SHALL/MUST termina con el RF del que sale. Ejemplo: El sistema SHALL ... (RF-DER-04)."
+    - No agregar comportamientos, valores ni textos que no salgan de las fuentes del proyecto.
+  design:
+    - No agregar tablas ni columnas fuera del DER. Si hacen falta, plantearlo como pregunta abierta.
+  tasks:
+    - Cada tarea indica cómo se verifica, con los comandos de verificación de AGENTS.md.
+    - Toda regla crítica nueva lleva una prueba del caso permitido y del caso retenido o derivado.
