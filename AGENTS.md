@@ -16,7 +16,7 @@ La cartera de clientes y pólizas es la fuente de verdad. El bot informa, pero n
 
 Incluye gestión de clientes, teléfonos, prospectos, pólizas, coberturas, vencimientos, situación de pago, siniestros, conversaciones, derivaciones, verificación de respuestas, alertas, aprobación de acciones críticas, métricas, perfiles de acceso y auditoría.
 
-El asistente opera únicamente por WhatsApp. La atención humana funciona de lunes a viernes de 9 a 18, configurable; el asistente puede contestar siempre, pero fuera de ese horario debe informar que no hay atención humana hasta la apertura.
+El asistente opera únicamente por WhatsApp. La atención humana funciona de lunes a viernes de 9 a 18, configurable. El asistente contesta siempre; si deriva fuera de ese horario, el cliente recibe el mensaje de derivación habitual, sin aviso de que no hay atención humana, y el caso queda pendiente hasta la apertura. El tiempo para alertar un caso derivado sin tomar corre solo dentro del horario de atención.
 
 La comunicación con el cliente debe ser natural, clara y cordial. Mientras la agencia no confirme la forma de presentación del asistente (ver Decisiones abiertas): no anunciar que responde una inteligencia artificial, pero nunca afirmar que es una persona si el cliente lo pregunta. Esto no autoriza a inventar información ni a ocultar una derivación: cuando una consulta deba pasar a una persona, informar que será atendida por un miembro del equipo.
 

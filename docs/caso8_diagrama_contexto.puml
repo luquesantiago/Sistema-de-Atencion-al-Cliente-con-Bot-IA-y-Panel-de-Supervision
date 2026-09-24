@@ -84,7 +84,7 @@ legend right
 | F2 | Datos de contacto como cliente nuevo | Cliente → Sistema |
 | F3 | Pedido de acción contractual (baja, modificación, alta de conductor) | Cliente → Sistema |
 | F4 | Respuesta verificada | Sistema → Cliente |
-| F5 | Aviso de derivación a un operador / fuera de horario | Sistema → Cliente |
+| F5 | Aviso de derivación a un operador | Sistema → Cliente |
 | F6 | Acuse del pedido recibido y en gestión | Sistema → Cliente |
 | F7 | Corrección de una respuesta ya enviada | Sistema → Cliente |
 | F8 | Mensaje entrante del cliente | WhatsApp → Sistema |
