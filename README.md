@@ -59,6 +59,23 @@ docker compose exec frontend npm run build
 docker compose exec backend npx tsc --noEmit
 ```
 
+## Base de datos y migraciones
+
+El esquema de MySQL se maneja con migraciones SQL escritas a mano (SQL-first), en `backend/prisma/migrations`. `backend/prisma/schema.prisma` no se escribe a mano: se genera desde la base.
+
+- Las migraciones pendientes se aplican solas cuando arranca el backend. Después de un `git pull` que trae migraciones nuevas: `docker compose restart backend`.
+- Para cambiar la base:
+  1. Crear la carpeta `backend/prisma/migrations/<AAAAMMDDHHMMSS>_<nombre>/` (fecha y hora en UTC) con un `migration.sql` que tenga el SQL del cambio.
+  2. Aplicarla y regenerar el schema y el cliente:
+     ```bash
+     docker compose exec backend npx prisma migrate deploy
+     docker compose exec backend npx prisma db pull
+     docker compose exec backend npx prisma generate
+     ```
+  3. Commitear juntos la migración y `schema.prisma`.
+- No usar `prisma migrate dev` y no editar una migración que ya está en `main`: el cambio va en una migración nueva.
+- Si el backend no arranca por una migración (en los logs aparece P3005, P3009 o P3018), en desarrollo se arregla borrando la base, con lo que se pierden los datos de prueba: `docker compose down -v` y volver a levantar.
+
 ## Estructura
 
 ```
@@ -77,7 +94,7 @@ En [`docs/`](docs/):
 
 - [`requisitos.md`](docs/requisitos.md): los 27 requisitos funcionales (RF-CAR, RF-ATE, RF-DER, RF-VER, RF-SUP, RF-APR) con su origen en el material del cliente.
 - [`caso8_der.md`](docs/caso8_der.md): DER, convenciones de la base y decisiones de modelado. Diagrama en [`caso8_der.svg`](docs/caso8_der.svg).
-- [`01_esquema.sql`](docs/01_esquema.sql) y [`02_catalogos.sql`](docs/02_catalogos.sql): esquema de referencia en MySQL.
+- [`01_esquema.sql`](docs/01_esquema.sql) y [`02_catalogos.sql`](docs/02_catalogos.sql): esquema en MySQL como quedó en el Hito 0. El vigente está en `backend/prisma/migrations`.
 - [`caso8_tabla_de_eventos.md`](docs/caso8_tabla_de_eventos.md) y [`caso8_diagrama_contexto.puml`](docs/caso8_diagrama_contexto.puml): eventos de negocio y diagrama de contexto.
 
 Las reglas de negocio, las decisiones abiertas y las convenciones de código están resumidas en [`AGENTS.md`](AGENTS.md).

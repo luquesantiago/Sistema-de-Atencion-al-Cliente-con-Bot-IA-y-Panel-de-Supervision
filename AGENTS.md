@@ -48,7 +48,7 @@ No implementar emisión ni cotización de pólizas, integración con compañías
 
 - Frontend: React 19 + TypeScript + Vite, en `frontend/`.
 - Backend: Node.js + TypeScript + Express, en `backend/`.
-- Persistencia: MySQL 8.4 + Prisma 7, con Docker Compose.
+- Persistencia: MySQL 8.4 + Prisma 7, con Docker Compose. El esquema es SQL-first: cada cambio de la base es una migración SQL escrita a mano en `backend/prisma/migrations`, y `schema.prisma` se regenera con `prisma db pull`. El flujo está en la skill `backend-datos`.
 - Todo corre en Docker Compose (`db`, `backend`, `frontend`) con recarga automática: Node y las dependencias viven en los contenedores, no hace falta instalarlos en la máquina.
 - El repo se clona dentro de WSL, no en una carpeta de Windows: la recarga automática falla en montajes de Windows.
 - La aplicación debe trabajar con fechas almacenadas en UTC y convertirlas a hora argentina solo para mostrar.
@@ -125,7 +125,7 @@ En `docs/`. Es la referencia para lo que ya está acordado; si el código tiene 
 
 - `requisitos.md`: los 27 requisitos funcionales con su origen en el material del cliente. Es copia del documento de análisis, que sigue siendo la fuente oficial.
 - `caso8_der.md` (+ `.puml`, `.svg`, `.png`): DER, convenciones de la base y decisiones de modelado.
-- `01_esquema.sql` y `02_catalogos.sql`: esquema de referencia en MySQL, alineado uno a uno con el DER. No se corren solos al levantar Docker.
+- `01_esquema.sql` y `02_catalogos.sql`: esquema en MySQL alineado uno a uno con el DER, como quedó en el Hito 0. No se corren: el esquema vigente está en `backend/prisma/migrations`, sin la tabla `auditoria`, que queda para el MVP 2.
 - `caso8_tabla_de_eventos.md` y `caso8_diagrama_contexto.puml`: eventos de negocio y diagrama de contexto (DFD nivel 0).
 
 ## Skills del proyecto

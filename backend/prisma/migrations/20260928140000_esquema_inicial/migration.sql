@@ -2,8 +2,13 @@
 -- Caso 8 - Sistema de Atención al Cliente con Bot IA y Panel de Supervisión
 -- Seguros Castaño - PPP 1, UNLa, Grupo 11
 --
--- Esquema de base de datos. Motor: MySQL 8.4 LTS.
--- Corresponde uno a uno con el DER (caso8_der.puml).
+-- Migración inicial: esquema de la base. Motor: MySQL 8.4 LTS.
+-- Sale de docs/01_esquema.sql (Hito 0) con dos diferencias:
+--   - Sin CREATE DATABASE ni USE: la base la crea el contenedor db y
+--     Prisma corre la migración sobre la base de DATABASE_URL.
+--   - Sin la tabla `auditoria` ni sus triggers: quedan para el MVP 2
+--     (decisión del 28/09/2026).
+-- Desde esta migración, el esquema vigente es el de backend/prisma/migrations.
 -- Convenciones: nombres en español, ids autoincrementales, bajas lógicas
 -- mediante el campo `activo` en las entidades maestras. Toda referencia
 -- entre tablas se hace por id, y los estados y tipos van en tablas
@@ -13,10 +18,6 @@
 -- que CURRENT_TIMESTAMP y NOW() coincidan con lo que escribe Prisma, que
 -- siempre escribe en UTC. La hora argentina se usa solo para mostrar y
 -- para comparar con `horario_atencion`.
--- Última revisión: 21/09/2026, noche (tipo de consulta, fechas en UTC,
--- sesión con caso derivado y baja de póliza).
--- Foto del Hito 0: el esquema vigente está en backend/prisma/migrations
--- (sin la tabla `auditoria` ni sus triggers, que quedan para el MVP 2).
 -- =====================================================================
 
 -- El script declara su codificación. Sin esta línea, el cliente mysql del
@@ -24,12 +25,6 @@
 -- guardan mal: 'cotización' queda como 'cotizaciÃ³n' (probado el
 -- 21/09/2026 con docker exec y con docker-entrypoint-initdb.d).
 SET NAMES utf8mb4;
-
-CREATE DATABASE IF NOT EXISTS seguros_castano
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_0900_ai_ci;
-
-USE seguros_castano;
 
 -- =====================================================================
 -- SEGURIDAD Y CONFIGURACIÓN
@@ -586,23 +581,6 @@ CREATE TABLE alerta (
   CONSTRAINT ck_alerta_atencion  CHECK ((fecha_atencion IS NULL) = (id_usuario_atencion IS NULL))
 ) ENGINE = InnoDB;
 
--- Registro con valor probatorio. `id_usuario` NULL = lo hizo el asistente.
--- Solo admite inserciones: los triggers del final del script rechazan
--- cualquier UPDATE o DELETE.
-CREATE TABLE auditoria (
-  id_auditoria INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  id_usuario   INT UNSIGNED NULL,
-  entidad      VARCHAR(50)  NOT NULL,
-  id_registro  INT UNSIGNED NOT NULL,
-  accion       VARCHAR(50)  NOT NULL,
-  detalle      TEXT         NULL,
-  fecha_hora   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (id_auditoria),
-  KEY ix_auditoria_entidad (entidad, id_registro),
-  KEY ix_auditoria_fecha (fecha_hora),
-  CONSTRAINT fk_auditoria_usuario FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
-) ENGINE = InnoDB;
-
 -- =====================================================================
 -- ACCIONES CRÍTICAS
 -- =====================================================================
@@ -635,24 +613,3 @@ CREATE TABLE solicitud_accion (
     (fecha_decision IS NULL) = (id_usuario_decision IS NULL)
     AND (fecha_decision IS NULL OR fundamento IS NOT NULL))
 ) ENGINE = InnoDB;
-
--- =====================================================================
--- AUDITORÍA INALTERABLE (RF-SUP-06)
--- =====================================================================
-
--- Rechazan cualquier UPDATE o DELETE sobre `auditoria`, venga de quien
--- venga. TRUNCATE y DROP no pasan por triggers, y un usuario con el permiso
--- TRIGGER puede borrar estos triggers y después modificar la auditoría
--- (probado el 21/09/2026 con los permisos del compose). En producción el
--- usuario de la aplicación no debe tener DROP, TRIGGER ni ALTER.
--- Ojo: con el log binario activo (el default de MySQL 8.4), crear triggers
--- exige privilegios de administrador. Si el script lo corre el usuario de
--- la aplicación, MySQL tiene que arrancar con --disable-log-bin (alcanza en
--- desarrollo); si lo corre root, no hace falta nada.
-CREATE TRIGGER trg_auditoria_no_modificar
-  BEFORE UPDATE ON auditoria FOR EACH ROW
-  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'La auditoría no se puede modificar';
-
-CREATE TRIGGER trg_auditoria_no_borrar
-  BEFORE DELETE ON auditoria FOR EACH ROW
-  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'La auditoría no se puede borrar';

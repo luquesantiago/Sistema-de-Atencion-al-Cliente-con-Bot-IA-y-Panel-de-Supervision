@@ -27,7 +27,9 @@ services:
     build: ./backend                      # node:24-slim + OpenSSL (lo necesita Prisma), ver backend/Dockerfile
     user: node                            # evita que los archivos generados queden como root
     working_dir: /app
-    command: sh -c "npm install && npm run dev"
+    # Aplica las migraciones pendientes antes de arrancar. Si una falla, el
+    # backend no arranca y el error queda en los logs.
+    command: sh -c "npm install && npx prisma migrate deploy && npm run dev"
     environment:
       # La CLI de Prisma (migrate, studio) usa la URL.
       DATABASE_URL: mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@db:3306/${MYSQL_DATABASE}

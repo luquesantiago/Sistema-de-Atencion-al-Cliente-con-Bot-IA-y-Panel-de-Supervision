@@ -1,9 +1,7 @@
 -- =====================================================================
 -- Caso 8 - Carga inicial de catálogos y parámetros
--- Ejecutar después de 01_esquema.sql.
--- Última revisión: 21/09/2026, noche.
--- Foto del Hito 0: la carga vigente está en la migración de catálogos de
--- backend/prisma/migrations.
+-- Sale de docs/02_catalogos.sql (Hito 0), sin el USE: Prisma corre esta
+-- migración sobre la base de DATABASE_URL, después de la del esquema.
 -- =====================================================================
 
 -- El script declara su codificación. Sin esta línea, el cliente mysql del
@@ -11,8 +9,6 @@
 -- guardan mal: 'cotización' queda como 'cotizaciÃ³n' (probado el
 -- 21/09/2026 con docker exec y con docker-entrypoint-initdb.d).
 SET NAMES utf8mb4;
-
-USE seguros_castano;
 
 -- ---------------------------------------------------------------------
 -- Cartera

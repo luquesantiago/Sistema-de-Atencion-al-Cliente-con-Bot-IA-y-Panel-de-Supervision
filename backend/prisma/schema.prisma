@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,474 @@ generator client {
 
 datasource db {
   provider = "mysql"
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model alerta {
+  id_alerta           Int          @id @default(autoincrement()) @db.UnsignedInt
+  id_caso             Int          @db.UnsignedInt
+  id_respuesta        Int?         @db.UnsignedInt
+  id_tipo_alerta      Int          @db.UnsignedInt
+  id_nivel_riesgo     Int          @db.UnsignedInt
+  id_usuario_atencion Int?         @db.UnsignedInt
+  fecha_hora          DateTime     @default(now()) @db.DateTime(0)
+  fecha_atencion      DateTime?    @db.DateTime(0)
+  caso                caso         @relation(fields: [id_caso], references: [id_caso], onDelete: NoAction, onUpdate: NoAction, map: "fk_alerta_caso")
+  nivel_riesgo        nivel_riesgo @relation(fields: [id_nivel_riesgo], references: [id_nivel_riesgo], onDelete: NoAction, onUpdate: NoAction, map: "fk_alerta_nivel")
+  respuesta           respuesta?   @relation(fields: [id_respuesta], references: [id_respuesta], onDelete: NoAction, onUpdate: NoAction, map: "fk_alerta_respuesta")
+  tipo_alerta         tipo_alerta  @relation(fields: [id_tipo_alerta], references: [id_tipo_alerta], onDelete: NoAction, onUpdate: NoAction, map: "fk_alerta_tipo")
+  usuario             usuario?     @relation(fields: [id_usuario_atencion], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction, map: "fk_alerta_usuario")
+
+  @@index([id_nivel_riesgo], map: "fk_alerta_nivel")
+  @@index([id_respuesta], map: "fk_alerta_respuesta")
+  @@index([id_tipo_alerta], map: "fk_alerta_tipo")
+  @@index([id_usuario_atencion], map: "fk_alerta_usuario")
+  @@index([id_caso], map: "ix_alerta_caso")
+  @@index([fecha_atencion, id_nivel_riesgo], map: "ix_alerta_pendiente")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model beneficiario {
+  id_beneficiario Int      @id @default(autoincrement()) @db.UnsignedInt
+  id_poliza       Int      @db.UnsignedInt
+  nombre_completo String   @db.VarChar(200)
+  vinculo         String?  @db.VarChar(100)
+  porcentaje      Decimal? @db.Decimal(5, 2)
+  activo          Boolean  @default(true)
+  poliza          poliza   @relation(fields: [id_poliza], references: [id_poliza], onDelete: NoAction, onUpdate: NoAction, map: "fk_beneficiario_poliza")
+
+  @@index([id_poliza], map: "ix_beneficiario_poliza")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model bien_asegurado {
+  id_bien           Int      @id @default(autoincrement()) @db.UnsignedInt
+  descripcion       String   @db.VarChar(255)
+  patente_matricula String?  @unique(map: "uk_bien_patente_matricula") @db.VarChar(20)
+  direccion         String?  @db.VarChar(255)
+  marca             String?  @db.VarChar(100)
+  modelo            String?  @db.VarChar(100)
+  anio              Int?     @db.UnsignedSmallInt
+  activo            Boolean  @default(true)
+  poliza            poliza[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model caso {
+  id_caso             Int                @id @default(autoincrement()) @db.UnsignedInt
+  id_conversacion     Int                @db.UnsignedInt
+  id_tipo_consulta    Int?               @db.UnsignedInt
+  id_usuario_asignado Int?               @db.UnsignedInt
+  id_nivel_riesgo     Int?               @db.UnsignedInt
+  fecha_apertura      DateTime           @default(now()) @db.DateTime(0)
+  fecha_derivacion    DateTime?          @db.DateTime(0)
+  fecha_toma          DateTime?          @db.DateTime(0)
+  fecha_cierre        DateTime?          @db.DateTime(0)
+  motivo_derivacion   String?            @db.VarChar(255)
+  alerta              alerta[]
+  conversacion        conversacion       @relation(fields: [id_conversacion], references: [id_conversacion], onDelete: NoAction, onUpdate: NoAction, map: "fk_caso_conversacion")
+  nivel_riesgo        nivel_riesgo?      @relation(fields: [id_nivel_riesgo], references: [id_nivel_riesgo], onDelete: NoAction, onUpdate: NoAction, map: "fk_caso_nivel_riesgo")
+  tipo_consulta       tipo_consulta?     @relation(fields: [id_tipo_consulta], references: [id_tipo_consulta], onDelete: NoAction, onUpdate: NoAction, map: "fk_caso_tipo_consulta")
+  usuario             usuario?           @relation(fields: [id_usuario_asignado], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction, map: "fk_caso_usuario")
+  mensaje             mensaje[]
+  prospecto           prospecto?
+  solicitud_accion    solicitud_accion[]
+
+  @@index([id_nivel_riesgo], map: "fk_caso_nivel_riesgo")
+  @@index([id_tipo_consulta], map: "fk_caso_tipo_consulta")
+  @@index([id_usuario_asignado], map: "fk_caso_usuario")
+  @@index([fecha_apertura], map: "ix_caso_apertura")
+  @@index([fecha_cierre], map: "ix_caso_cierre")
+  @@index([id_conversacion], map: "ix_caso_conversacion")
+  @@index([fecha_derivacion, fecha_toma], map: "ix_caso_derivacion_sin_tomar")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cliente {
+  id_cliente       Int                @id @default(autoincrement()) @db.UnsignedInt
+  dni              String?            @unique(map: "uk_cliente_dni") @db.VarChar(8)
+  apellido         String?            @db.VarChar(100)
+  nombre           String?            @db.VarChar(100)
+  cuit             String?            @unique(map: "uk_cliente_cuit") @db.Char(11)
+  razon_social     String?            @db.VarChar(200)
+  fecha_alta       DateTime           @default(now()) @db.DateTime(0)
+  activo           Boolean            @default(true)
+  cliente_telefono cliente_telefono[]
+  conversacion     conversacion[]
+  poliza           poliza[]
+  prospecto        prospecto[]
+}
+
+model cliente_telefono {
+  id_cliente  Int      @db.UnsignedInt
+  id_telefono Int      @db.UnsignedInt
+  fecha_alta  DateTime @default(now()) @db.DateTime(0)
+  cliente     cliente  @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_cliente_telefono_cliente")
+  telefono    telefono @relation(fields: [id_telefono], references: [id_telefono], onDelete: NoAction, onUpdate: NoAction, map: "fk_cliente_telefono_telefono")
+
+  @@id([id_cliente, id_telefono])
+  @@index([id_telefono], map: "ix_cliente_telefono_telefono")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cobertura {
+  id_cobertura   Int      @id @default(autoincrement()) @db.UnsignedInt
+  id_poliza      Int      @db.UnsignedInt
+  id_plan        Int      @db.UnsignedInt
+  descripcion    String?  @db.VarChar(255)
+  suma_asegurada Decimal? @db.Decimal(14, 2)
+  activo         Boolean  @default(true)
+  plan           plan     @relation(fields: [id_plan], references: [id_plan], onDelete: NoAction, onUpdate: NoAction, map: "fk_cobertura_plan")
+  poliza         poliza   @relation(fields: [id_poliza], references: [id_poliza], onDelete: NoAction, onUpdate: NoAction, map: "fk_cobertura_poliza")
+
+  @@index([id_plan], map: "fk_cobertura_plan")
+  @@index([id_poliza], map: "ix_cobertura_poliza")
+}
+
+model compania_aseguradora {
+  id_compania Int      @id @default(autoincrement()) @db.UnsignedInt
+  nombre      String   @unique(map: "uk_compania_nombre") @db.VarChar(150)
+  activo      Boolean  @default(true)
+  poliza      poliza[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model conductor {
+  id_conductor     Int                @id @default(autoincrement()) @db.UnsignedInt
+  dni              String             @unique(map: "uk_conductor_dni") @db.VarChar(8)
+  apellido         String             @db.VarChar(100)
+  nombre           String             @db.VarChar(100)
+  activo           Boolean            @default(true)
+  poliza_conductor poliza_conductor[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model conversacion {
+  id_conversacion      Int       @id @default(autoincrement()) @db.UnsignedInt
+  id_telefono          Int       @db.UnsignedInt
+  id_cliente           Int?      @db.UnsignedInt
+  fecha_inicio         DateTime  @default(now()) @db.DateTime(0)
+  fecha_fin            DateTime? @db.DateTime(0)
+  asistente_suspendido Boolean   @default(false)
+  caso                 caso[]
+  cliente              cliente?  @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_conversacion_cliente")
+  telefono             telefono  @relation(fields: [id_telefono], references: [id_telefono], onDelete: NoAction, onUpdate: NoAction, map: "fk_conversacion_telefono")
+
+  @@index([id_cliente], map: "fk_conversacion_cliente")
+  @@index([id_telefono, fecha_fin], map: "ix_conversacion_telefono_fin")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model cuota {
+  id_cuota          Int       @id @default(autoincrement()) @db.UnsignedInt
+  id_poliza         Int       @db.UnsignedInt
+  numero_cuota      Int       @db.UnsignedSmallInt
+  fecha_vencimiento DateTime  @db.Date
+  importe           Decimal   @db.Decimal(12, 2)
+  fecha_pago        DateTime? @db.Date
+  poliza            poliza    @relation(fields: [id_poliza], references: [id_poliza], onDelete: NoAction, onUpdate: NoAction, map: "fk_cuota_poliza")
+
+  @@unique([id_poliza, numero_cuota], map: "uk_cuota_poliza_numero")
+}
+
+model estado_poliza {
+  id_estado_poliza Int      @id @default(autoincrement()) @db.UnsignedInt
+  nombre           String   @unique(map: "uk_estado_poliza_nombre") @db.VarChar(50)
+  poliza           poliza[]
+}
+
+model estado_prospecto {
+  id_estado_prospecto Int         @id @default(autoincrement()) @db.UnsignedInt
+  nombre              String      @unique(map: "uk_estado_prospecto_nombre") @db.VarChar(50)
+  prospecto           prospecto[]
+}
+
+model estado_siniestro {
+  id_estado_siniestro Int         @id @default(autoincrement()) @db.UnsignedInt
+  nombre              String      @unique(map: "uk_estado_siniestro_nombre") @db.VarChar(50)
+  siniestro           siniestro[]
+}
+
+model estado_solicitud {
+  id_estado_solicitud Int                @id @default(autoincrement()) @db.UnsignedInt
+  nombre              String             @unique(map: "uk_estado_solicitud_nombre") @db.VarChar(50)
+  solicitud_accion    solicitud_accion[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model horario_atencion {
+  id_horario    Int      @id @default(autoincrement()) @db.UnsignedInt
+  dia_semana    Int      @unique(map: "uk_horario_dia") @db.UnsignedTinyInt
+  hora_apertura DateTime @db.Time(0)
+  hora_cierre   DateTime @db.Time(0)
+}
+
+model mensaje {
+  id_mensaje        Int            @id @default(autoincrement()) @db.UnsignedInt
+  id_caso           Int            @db.UnsignedInt
+  id_origen_mensaje Int            @db.UnsignedInt
+  contenido         String         @db.Text
+  fecha_hora        DateTime       @default(now())
+  caso              caso           @relation(fields: [id_caso], references: [id_caso], onDelete: NoAction, onUpdate: NoAction, map: "fk_mensaje_caso")
+  origen_mensaje    origen_mensaje @relation(fields: [id_origen_mensaje], references: [id_origen_mensaje], onDelete: NoAction, onUpdate: NoAction, map: "fk_mensaje_origen")
+  respuestas        respuesta[]    @relation("respuesta_id_mensaje_consultaTomensaje")
+  respuesta_enviada respuesta?     @relation("respuesta_id_mensaje_enviadoTomensaje")
+
+  @@index([id_origen_mensaje], map: "fk_mensaje_origen")
+  @@index([id_caso, fecha_hora], map: "ix_mensaje_caso_fecha")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model moneda {
+  id_moneda Int      @id @default(autoincrement()) @db.UnsignedInt
+  codigo    String   @unique(map: "uk_moneda_codigo") @db.Char(3)
+  nombre    String   @unique(map: "uk_moneda_nombre") @db.VarChar(50)
+  poliza    poliza[]
+}
+
+model nivel_riesgo {
+  id_nivel_riesgo Int            @id @default(autoincrement()) @db.UnsignedInt
+  nombre          String         @unique(map: "uk_nivel_riesgo_nombre") @db.VarChar(50)
+  orden           Int            @unique(map: "uk_nivel_riesgo_orden") @db.UnsignedTinyInt
+  alerta          alerta[]
+  caso            caso[]
+  tipo_alerta     tipo_alerta[]
+  verificacion    verificacion[]
+}
+
+model origen_mensaje {
+  id_origen_mensaje Int       @id @default(autoincrement()) @db.UnsignedInt
+  nombre            String    @unique(map: "uk_origen_mensaje_nombre") @db.VarChar(50)
+  mensaje           mensaje[]
+}
+
+model parametro_configuracion {
+  id_parametro Int     @id @default(autoincrement()) @db.UnsignedInt
+  clave        String  @unique(map: "uk_parametro_clave") @db.VarChar(100)
+  valor        String  @db.VarChar(255)
+  descripcion  String? @db.VarChar(255)
+}
+
+model plan {
+  id_plan     Int         @id @default(autoincrement()) @db.UnsignedInt
+  nombre      String      @unique(map: "uk_plan_nombre") @db.VarChar(100)
+  descripcion String?     @db.VarChar(255)
+  activo      Boolean     @default(true)
+  cobertura   cobertura[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model poliza {
+  id_poliza            Int                  @id @default(autoincrement()) @db.UnsignedInt
+  numero_poliza        String               @db.VarChar(50)
+  id_cliente           Int                  @db.UnsignedInt
+  id_compania          Int                  @db.UnsignedInt
+  id_ramo              Int                  @db.UnsignedInt
+  id_bien              Int?                 @db.UnsignedInt
+  id_estado_poliza     Int                  @db.UnsignedInt
+  id_moneda            Int                  @db.UnsignedInt
+  fecha_inicio         DateTime             @db.Date
+  fecha_vencimiento    DateTime             @db.Date
+  prima_mensual        Decimal?             @db.Decimal(12, 2)
+  observaciones        String?              @db.Text
+  fecha_alta           DateTime             @default(now()) @db.DateTime(0)
+  activo               Boolean              @default(true)
+  beneficiario         beneficiario[]
+  cobertura            cobertura[]
+  cuota                cuota[]
+  bien_asegurado       bien_asegurado?      @relation(fields: [id_bien], references: [id_bien], onDelete: NoAction, onUpdate: NoAction, map: "fk_poliza_bien")
+  cliente              cliente              @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_poliza_cliente")
+  compania_aseguradora compania_aseguradora @relation(fields: [id_compania], references: [id_compania], onDelete: NoAction, onUpdate: NoAction, map: "fk_poliza_compania")
+  estado_poliza        estado_poliza        @relation(fields: [id_estado_poliza], references: [id_estado_poliza], onDelete: NoAction, onUpdate: NoAction, map: "fk_poliza_estado")
+  moneda               moneda               @relation(fields: [id_moneda], references: [id_moneda], onDelete: NoAction, onUpdate: NoAction, map: "fk_poliza_moneda")
+  ramo                 ramo                 @relation(fields: [id_ramo], references: [id_ramo], onDelete: NoAction, onUpdate: NoAction, map: "fk_poliza_ramo")
+  poliza_conductor     poliza_conductor[]
+  siniestro            siniestro[]
+  solicitud_accion     solicitud_accion[]
+
+  @@unique([id_compania, numero_poliza], map: "uk_poliza_compania_numero")
+  @@index([id_bien], map: "fk_poliza_bien")
+  @@index([id_estado_poliza], map: "fk_poliza_estado")
+  @@index([id_moneda], map: "fk_poliza_moneda")
+  @@index([id_ramo], map: "fk_poliza_ramo")
+  @@index([id_cliente], map: "ix_poliza_cliente")
+  @@index([fecha_vencimiento], map: "ix_poliza_vencimiento")
+}
+
+model poliza_conductor {
+  id_poliza    Int       @db.UnsignedInt
+  id_conductor Int       @db.UnsignedInt
+  fecha_alta   DateTime  @default(now()) @db.DateTime(0)
+  conductor    conductor @relation(fields: [id_conductor], references: [id_conductor], onDelete: NoAction, onUpdate: NoAction, map: "fk_poliza_conductor_conductor")
+  poliza       poliza    @relation(fields: [id_poliza], references: [id_poliza], onDelete: NoAction, onUpdate: NoAction, map: "fk_poliza_conductor_poliza")
+
+  @@id([id_poliza, id_conductor])
+  @@index([id_conductor], map: "ix_poliza_conductor_conductor")
+}
+
+model prospecto {
+  id_prospecto        Int              @id @default(autoincrement()) @db.UnsignedInt
+  id_caso             Int              @unique(map: "uk_prospecto_caso") @db.UnsignedInt
+  id_cliente          Int?             @db.UnsignedInt
+  id_telefono         Int?             @db.UnsignedInt
+  id_estado_prospecto Int              @db.UnsignedInt
+  nombre_declarado    String?          @db.VarChar(200)
+  dni_declarado       String?          @db.VarChar(15)
+  observaciones       String?          @db.Text
+  fecha_registro      DateTime         @default(now()) @db.DateTime(0)
+  caso                caso             @relation(fields: [id_caso], references: [id_caso], onDelete: NoAction, onUpdate: NoAction, map: "fk_prospecto_caso")
+  cliente             cliente?         @relation(fields: [id_cliente], references: [id_cliente], onDelete: NoAction, onUpdate: NoAction, map: "fk_prospecto_cliente")
+  estado_prospecto    estado_prospecto @relation(fields: [id_estado_prospecto], references: [id_estado_prospecto], onDelete: NoAction, onUpdate: NoAction, map: "fk_prospecto_estado")
+  telefono            telefono?        @relation(fields: [id_telefono], references: [id_telefono], onDelete: NoAction, onUpdate: NoAction, map: "fk_prospecto_telefono")
+
+  @@index([id_cliente], map: "fk_prospecto_cliente")
+  @@index([id_estado_prospecto], map: "fk_prospecto_estado")
+  @@index([id_telefono], map: "fk_prospecto_telefono")
+}
+
+model ramo {
+  id_ramo Int      @id @default(autoincrement()) @db.UnsignedInt
+  nombre  String   @unique(map: "uk_ramo_nombre") @db.VarChar(50)
+  activo  Boolean  @default(true)
+  poliza  poliza[]
+}
+
+model respuesta {
+  id_respuesta        Int           @id @default(autoincrement()) @db.UnsignedInt
+  id_mensaje_consulta Int           @db.UnsignedInt
+  id_respuesta_origen Int?          @db.UnsignedInt
+  id_usuario          Int?          @db.UnsignedInt
+  id_mensaje_enviado  Int?          @unique(map: "uk_respuesta_mensaje_enviado") @db.UnsignedInt
+  contenido           String        @db.Text
+  fecha_hora          DateTime      @default(now()) @db.DateTime(0)
+  alerta              alerta[]
+  mensaje_consulta    mensaje       @relation("respuesta_id_mensaje_consultaTomensaje", fields: [id_mensaje_consulta], references: [id_mensaje], onDelete: NoAction, onUpdate: NoAction, map: "fk_respuesta_consulta")
+  mensaje_enviado     mensaje?      @relation("respuesta_id_mensaje_enviadoTomensaje", fields: [id_mensaje_enviado], references: [id_mensaje], onDelete: NoAction, onUpdate: NoAction, map: "fk_respuesta_enviado")
+  respuesta_origen    respuesta?    @relation("respuestaTorespuesta", fields: [id_respuesta_origen], references: [id_respuesta], onDelete: NoAction, onUpdate: NoAction, map: "fk_respuesta_origen")
+  correcciones        respuesta[]   @relation("respuestaTorespuesta")
+  usuario             usuario?      @relation(fields: [id_usuario], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction, map: "fk_respuesta_usuario")
+  verificacion        verificacion?
+
+  @@index([id_respuesta_origen], map: "fk_respuesta_origen")
+  @@index([id_usuario], map: "fk_respuesta_usuario")
+  @@index([id_mensaje_consulta], map: "ix_respuesta_consulta")
+}
+
+model resultado_verificacion {
+  id_resultado_verificacion Int            @id @default(autoincrement()) @db.UnsignedInt
+  nombre                    String         @unique(map: "uk_resultado_verificacion_nombre") @db.VarChar(50)
+  verificacion              verificacion[]
+}
+
+model rol {
+  id_rol  Int       @id @default(autoincrement()) @db.UnsignedInt
+  nombre  String    @unique(map: "uk_rol_nombre") @db.VarChar(50)
+  usuario usuario[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model siniestro {
+  id_siniestro        Int              @id @default(autoincrement()) @db.UnsignedInt
+  numero_siniestro    String           @unique(map: "uk_siniestro_numero") @db.VarChar(50)
+  id_poliza           Int              @db.UnsignedInt
+  id_estado_siniestro Int              @db.UnsignedInt
+  fecha_ocurrencia    DateTime         @db.Date
+  fecha_registro      DateTime         @default(now()) @db.DateTime(0)
+  descripcion         String?          @db.Text
+  activo              Boolean          @default(true)
+  estado_siniestro    estado_siniestro @relation(fields: [id_estado_siniestro], references: [id_estado_siniestro], onDelete: NoAction, onUpdate: NoAction, map: "fk_siniestro_estado")
+  poliza              poliza           @relation(fields: [id_poliza], references: [id_poliza], onDelete: NoAction, onUpdate: NoAction, map: "fk_siniestro_poliza")
+
+  @@index([id_estado_siniestro], map: "fk_siniestro_estado")
+  @@index([id_poliza], map: "ix_siniestro_poliza")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model solicitud_accion {
+  id_solicitud        Int              @id @default(autoincrement()) @db.UnsignedInt
+  id_caso             Int              @db.UnsignedInt
+  id_poliza           Int?             @db.UnsignedInt
+  id_tipo_accion      Int              @db.UnsignedInt
+  id_estado_solicitud Int              @db.UnsignedInt
+  id_usuario_decision Int?             @db.UnsignedInt
+  detalle             String?          @db.Text
+  fundamento          String?          @db.Text
+  fecha_solicitud     DateTime         @default(now()) @db.DateTime(0)
+  fecha_decision      DateTime?        @db.DateTime(0)
+  caso                caso             @relation(fields: [id_caso], references: [id_caso], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_caso")
+  estado_solicitud    estado_solicitud @relation(fields: [id_estado_solicitud], references: [id_estado_solicitud], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_estado")
+  poliza              poliza?          @relation(fields: [id_poliza], references: [id_poliza], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_poliza")
+  tipo_accion         tipo_accion      @relation(fields: [id_tipo_accion], references: [id_tipo_accion], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_tipo")
+  usuario             usuario?         @relation(fields: [id_usuario_decision], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction, map: "fk_solicitud_usuario")
+
+  @@index([id_poliza], map: "fk_solicitud_poliza")
+  @@index([id_tipo_accion], map: "fk_solicitud_tipo")
+  @@index([id_usuario_decision], map: "fk_solicitud_usuario")
+  @@index([id_caso], map: "ix_solicitud_caso")
+  @@index([id_estado_solicitud], map: "ix_solicitud_estado")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model telefono {
+  id_telefono      Int                @id @default(autoincrement()) @db.UnsignedInt
+  numero           String             @unique(map: "uk_telefono_numero") @db.VarChar(15)
+  activo           Boolean            @default(true)
+  cliente_telefono cliente_telefono[]
+  conversacion     conversacion[]
+  prospecto        prospecto[]
+}
+
+model tipo_accion {
+  id_tipo_accion   Int                @id @default(autoincrement()) @db.UnsignedInt
+  nombre           String             @unique(map: "uk_tipo_accion_nombre") @db.VarChar(100)
+  solicitud_accion solicitud_accion[]
+}
+
+model tipo_alerta {
+  id_tipo_alerta          Int          @id @default(autoincrement()) @db.UnsignedInt
+  nombre                  String       @unique(map: "uk_tipo_alerta_nombre") @db.VarChar(100)
+  id_nivel_riesgo_default Int          @db.UnsignedInt
+  alerta                  alerta[]
+  nivel_riesgo            nivel_riesgo @relation(fields: [id_nivel_riesgo_default], references: [id_nivel_riesgo], onDelete: NoAction, onUpdate: NoAction, map: "fk_tipo_alerta_nivel")
+
+  @@index([id_nivel_riesgo_default], map: "fk_tipo_alerta_nivel")
+}
+
+model tipo_consulta {
+  id_tipo_consulta Int    @id @default(autoincrement()) @db.UnsignedInt
+  nombre           String @unique(map: "uk_tipo_consulta_nombre") @db.VarChar(50)
+  caso             caso[]
+}
+
+model usuario {
+  id_usuario       Int                @id @default(autoincrement()) @db.UnsignedInt
+  id_rol           Int                @db.UnsignedInt
+  nombre_usuario   String             @unique(map: "uk_usuario_nombre_usuario") @db.VarChar(50)
+  contrasena_hash  String             @db.VarChar(255)
+  nombre           String             @db.VarChar(100)
+  apellido         String             @db.VarChar(100)
+  fecha_alta       DateTime           @default(now()) @db.DateTime(0)
+  activo           Boolean            @default(true)
+  alerta           alerta[]
+  caso             caso[]
+  respuesta        respuesta[]
+  solicitud_accion solicitud_accion[]
+  rol              rol                @relation(fields: [id_rol], references: [id_rol], onDelete: NoAction, onUpdate: NoAction, map: "fk_usuario_rol")
+
+  @@index([id_rol], map: "fk_usuario_rol")
+}
+
+model verificacion {
+  id_verificacion           Int                    @id @default(autoincrement()) @db.UnsignedInt
+  id_respuesta              Int                    @unique(map: "uk_verificacion_respuesta") @db.UnsignedInt
+  id_resultado_verificacion Int                    @db.UnsignedInt
+  id_nivel_riesgo           Int                    @db.UnsignedInt
+  detalle                   String?                @db.Text
+  fecha_hora                DateTime               @default(now()) @db.DateTime(0)
+  nivel_riesgo              nivel_riesgo           @relation(fields: [id_nivel_riesgo], references: [id_nivel_riesgo], onDelete: NoAction, onUpdate: NoAction, map: "fk_verificacion_nivel")
+  respuesta                 respuesta              @relation(fields: [id_respuesta], references: [id_respuesta], onDelete: NoAction, onUpdate: NoAction, map: "fk_verificacion_respuesta")
+  resultado_verificacion    resultado_verificacion @relation(fields: [id_resultado_verificacion], references: [id_resultado_verificacion], onDelete: NoAction, onUpdate: NoAction, map: "fk_verificacion_resultado")
+
+  @@index([id_nivel_riesgo], map: "fk_verificacion_nivel")
+  @@index([id_resultado_verificacion], map: "fk_verificacion_resultado")
 }

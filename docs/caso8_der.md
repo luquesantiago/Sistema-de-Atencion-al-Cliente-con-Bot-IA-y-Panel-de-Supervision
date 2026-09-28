@@ -15,7 +15,7 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`. Última revisión: 21/09/2026 (noc
 - **Formatos normalizados que exige la base**: DNI de 7 u 8 dígitos, CUIT de 11 dígitos, teléfono de 10 a 15 dígitos, patente o matrícula en mayúsculas y sin espacios ni guiones. El formato previsto del teléfono es E.164 sin el «+» (con código de país), pero la base no exige el código de país ni el 9 de los celulares: los normaliza el backend y la regla del 9 está pendiente.
 - **Fechas y horas en UTC.** El servidor MySQL corre en UTC para que `CURRENT_TIMESTAMP` y `NOW()` coincidan con Prisma, que siempre escribe en UTC. La hora argentina se usa solo para mostrar y para comparar con `horario_atencion`, cuyas horas están en hora argentina. «Hoy», por ejemplo para saber si una póliza venció, es la fecha de Argentina.
 - En el diagrama, `<<UK1>>` marca las columnas de una misma restricción única compuesta.
-- Motor previsto: MySQL 8.4 con Prisma. La decisión Prisma-first vs SQL-first quedó abierta. Los scripts empiezan con `SET NAMES utf8mb4` para que los textos con tilde se guarden bien aunque se corran con el cliente `mysql` del contenedor.
+- Motor: MySQL 8.4 con Prisma, en modo SQL-first (28/09/2026): el esquema vigente está en las migraciones de `backend/prisma/migrations` y `schema.prisma` se regenera con `prisma db pull`. Los scripts empiezan con `SET NAMES utf8mb4` para que los textos con tilde se guarden bien aunque se corran con el cliente `mysql` del contenedor.
 
 ## Entidades por módulo
 
@@ -68,7 +68,7 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`. Última revisión: 21/09/2026 (noc
 | `nivel_riesgo` | Catálogo con campo `orden`, que es lo que ordena la bandeja de revisión por gravedad. |
 | `tipo_alerta` | Catálogo de alertas, cada una con su nivel de riesgo por defecto. |
 | `alerta` | Alerta concreta sobre un caso o una respuesta, con quién la atendió y cuándo. |
-| `auditoria` | Registro inalterable: entidad afectada, id del registro, acción, usuario y fecha. Dos triggers rechazan cualquier UPDATE o DELETE. |
+| `auditoria` | Registro inalterable: entidad afectada, id del registro, acción, usuario y fecha. Dos triggers rechazan cualquier UPDATE o DELETE. Queda para el MVP 2: la base no la crea hasta entonces (28/09/2026). |
 
 ### Acciones críticas
 | Entidad | Para qué está |
