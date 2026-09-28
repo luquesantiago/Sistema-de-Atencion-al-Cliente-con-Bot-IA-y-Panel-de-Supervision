@@ -83,6 +83,14 @@ No implementar emisión ni cotización de pólizas, integración con compañías
 4. Verificar primero el slice afectado y después ejecutar las comprobaciones globales disponibles.
 5. Actualizar documentación o decisiones abiertas cuando el cambio modifique el comportamiento acordado.
 
+## Especificaciones con OpenSpec (opcional)
+
+Algunas tareas se planifican con OpenSpec antes de programarlas. Usarlo no es obligatorio: una tarea sin change se trabaja como siempre. La guía está en `openspec/README.md`.
+
+- `openspec/changes/<nombre>/` tiene la propuesta, las specs, el diseño y las tareas de un cambio en curso. Si la tarea que te pidieron tiene un change, leerlo antes de tocar código, seguir sus tareas y marcarlas en `tasks.md` al terminarlas.
+- `openspec/specs/` describe el comportamiento ya implementado, una spec por módulo de `docs/requisitos.md`. No se edita a mano: se actualiza al archivar un change.
+- En OpenCode se usa con los comandos `/opsx-*` y los agentes `spec` (planifica, solo escribe en `openspec/`) y `revisor-spec` (revisa un change, solo lectura).
+
 ## Git (obligatorio por la consigna)
 
 - No commitear ni pushear a `main`. Trabajar en una rama `feature/<tema>` y abrir un pull request.
