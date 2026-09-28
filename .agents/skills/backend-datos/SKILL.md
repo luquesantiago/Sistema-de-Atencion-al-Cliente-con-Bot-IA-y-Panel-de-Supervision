@@ -18,8 +18,9 @@ Usar al tocar Express, Prisma, el esquema MySQL, migraciones, endpoints, integra
 
 ```bash
 docker compose exec backend npx tsc --noEmit
+docker compose exec backend npx prisma migrate deploy
+docker compose exec backend npx prisma db pull
 docker compose exec backend npx prisma generate
-docker compose exec backend npx prisma migrate dev --name <nombre>
 ```
 
 - Si se cambia infraestructura, validar con `docker compose config`.
@@ -32,7 +33,10 @@ docker compose exec backend npx prisma migrate dev --name <nombre>
 - Con `module: nodenext`, los imports relativos llevan extensión `.js` (por ejemplo `./generated/prisma/client.js`).
 - `SELECT 1` con `$queryRaw` devuelve `BigInt`, y `res.json` no puede serializarlo.
 - Los scripts SQL que se corren con el cliente `mysql` del contenedor tienen que empezar con `SET NAMES utf8mb4;`: si no, los textos con tilde se guardan mal.
-- Con el log binario activo (default de MySQL 8.4), el usuario `app` no puede crear triggers (ERROR 1419). Los triggers de auditoría se crean como root, no dentro de una migración corrida con `app`.
+- La tabla `auditoria` y sus triggers no están en la base hasta el MVP 2 (decisión del 28/09/2026): no crearla ni escribir en ella antes. Cuando se agregue, hay que resolver antes que, con el log binario activo (default de MySQL 8.4), el usuario `app` no puede crear triggers (ERROR 1419).
+- `migrate deploy` no revisa las migraciones ya aplicadas: si se edita una, en las bases que ya la tenían el cambio no se aplica y no avisa nada.
+- Si una migración falla (P3018), queda marcada como fallida y las siguientes no se aplican (P3009) hasta resolverla. MySQL no deshace el DDL de una migración a medias: en desarrollo, corregir el SQL y recrear la base con `docker compose down -v`.
+- `migrate deploy` sobre una base con tablas pero sin historial de migraciones da P3005 (por ejemplo, si alguien corrió `docs/01_esquema.sql` a mano). En desarrollo se resuelve con `docker compose down -v`.
 
 ## Diseño
 
@@ -64,10 +68,17 @@ docker compose exec backend npx prisma migrate dev --name <nombre>
 
 ## Prisma y migraciones
 
-- El modelo acordado es el DER del Hito 0: `docs/caso8_der.md` y el SQL de referencia `docs/01_esquema.sql` y `docs/02_catalogos.sql`. No inventar tablas ni columnas que no estén ahí; si hace falta una nueva, proponerla y actualizar el DER.
-- Esos scripts son de referencia: no están en `db/init/`, así que no se corren solos al crear el contenedor `db`.
-- Todavía no está decidido si el esquema se mantiene desde `schema.prisma` con `migrate` o desde el SQL con `db pull`. No generar la migración de todo el modelo sin acordarlo con el equipo.
-- Cambiar primero el modelo conceptual y luego el schema.
+- El esquema vigente está en las migraciones de `backend/prisma/migrations`. El DER (`docs/caso8_der.md`) y los SQL de `docs/` son la foto del Hito 0: no se corren. No inventar tablas ni columnas; si hace falta una nueva, proponerla y actualizar el DER.
+- Flujo SQL-first (decisión del 28/09/2026). Para cambiar la base:
+  1. Crear a mano la carpeta `backend/prisma/migrations/<AAAAMMDDHHMMSS>_<nombre>/` con un `migration.sql` que tenga el SQL del cambio (fecha y hora en UTC, para que quede después de las anteriores).
+  2. Aplicarla con `npx prisma migrate deploy`.
+  3. Regenerar `schema.prisma` con `npx prisma db pull` y el cliente con `npx prisma generate`.
+  4. Commitear juntos la migración y `schema.prisma`.
+- `schema.prisma` no se edita a mano, salvo los nombres de las relaciones que `db pull` genera solo (por ejemplo `mensaje_consulta`, `respuesta_origen`, `correcciones`): `db pull` respeta los nombres cambiados.
+- No usar `prisma migrate dev`: genera y aplica migraciones propias a partir de `schema.prisma`, que en este flujo es un archivo generado.
+- No editar una migración que ya está en `main`: el cambio va en una migración nueva.
+- Las migraciones pendientes se aplican solas al levantar el backend (`docker compose restart backend` después de traer migraciones nuevas).
+- Los CHECK de la base no aparecen en `schema.prisma` (Prisma no los representa): los sigue controlando MySQL.
 - Toda migración debe ser revisable y compatible con datos existentes o acompañarse de una estrategia de importación.
 - La importación histórica no modifica la planilla original. Los registros irresolubles, como los duplicados y las pólizas POL-00126 y POL-00131 del VW Gol, se omiten y quedan listados para carga manual.
 - No almacenar secretos ni datos reales de clientes en fixtures, logs de desarrollo o migraciones.
