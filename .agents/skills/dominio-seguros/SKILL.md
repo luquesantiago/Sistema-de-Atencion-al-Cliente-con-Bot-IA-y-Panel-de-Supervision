@@ -37,7 +37,7 @@ Pedir DNI en cada identificación. Ante DNI desconocido, preguntar si es cliente
 
 Registrar el motivo de toda derivación y el operador responsable cuando exista. Comunicar la derivación con una frase como: "Su pregunta será derivada a un miembro de nuestro equipo especializado, quien podrá ayudarlo con mayor detalle". Después de ese mensaje, el asistente no responde más en esa conversación hasta que se cierre el caso; lo que escriba el cliente queda en el mismo caso para el operador. No mencionar bots, IA, errores internos ni tiempos de respuesta no confirmados.
 
-Fuera del horario de atención humana (lunes a viernes de 9 a 18, configurable) el asistente responde igual e informa que no hay atención humana hasta la apertura.
+Fuera del horario de atención humana (lunes a viernes de 9 a 18, configurable) el asistente responde igual. Si deriva, manda el mensaje de derivación habitual, sin avisar que no hay atención humana, y el caso queda pendiente hasta la apertura. El tiempo para alertar un caso derivado sin tomar corre solo dentro del horario.
 
 ## Criterios de implementación
 
@@ -57,6 +57,6 @@ Fuera del horario de atención humana (lunes a viernes de 9 a 18, configurable) 
 - Consulta rutinaria respaldada por cartera.
 - Dato ausente, siniestro o cotización que deriva sin responder.
 - Mensaje del cliente después de una derivación: el asistente no responde y el mensaje queda en el caso.
-- Consulta fuera de horario: se responde e informa que no hay atención humana hasta la apertura.
+- Consulta derivada fuera de horario: el cliente recibe el mensaje de derivación habitual, sin aviso de horario, y la alerta de caso sin tomar no salta antes de la apertura.
 - Baja, modificación o alta de conductor retenida hasta aprobación.
 - Reembolso registrado como aviso, sin mutar una póliza.

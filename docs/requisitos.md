@@ -1,6 +1,6 @@
 # Requisitos funcionales — Caso 8
 
-Copia de la tabla de requisitos del documento de análisis (`Caso8_Analisis_y_Propuesta.docx`, versión del 23/09/2026). El documento es la fuente oficial: si cambia, hay que actualizar esta copia.
+Copia de la tabla de requisitos del documento de análisis (`Caso8_Analisis_y_Propuesta.docx`, versión del 24/09/2026). El documento es la fuente oficial: si cambia, hay que actualizar esta copia.
 
 Los IDs llevan el prefijo del módulo. Citarlos en commits y pull requests.
 
@@ -30,7 +30,7 @@ Los IDs llevan el prefijo del módulo. Citarlos en commits y pull requests.
 | RF-DER-01 | Un sistema que reconozca cuándo una consulta excede lo que puede resolver —una emergencia, un reclamo, una situación compleja— y la derive a una persona avisando al equipo. | CASO-008 (vivienda inundada) y CASO-006 (reclamo por cobro indebido) fueron respondidos por el bot. Roberto Castaño: «cuando la consulta es complicada, que el bot derive y nos avise, no que intente resolver todo él solo». |
 | RF-DER-02 | Un sistema que asigne un responsable a cada caso derivado y permita seguir su estado hasta el cierre. | 7 de los 12 casos no tienen funcionario asignado, y los responsables se escriben en texto libre («Graciela», «graciela», «ROBERTO»). Roberto Castaño: «No tenemos forma de saber si una consulta (…) fue resuelta o quedó en el aire». |
 | RF-DER-03 | Un sistema que, una vez derivado un caso, haga que el asistente deje de responder por completo en esa conversación hasta que se cierre el caso. | Entrevista del 16/09/2026: un caso derivado implica que el bot deja de responder hasta que el operador lo retoma. Equipo (23/09/2026): hasta el cierre del caso. |
-| RF-DER-04 | Un sistema en el que el asistente responda a toda hora y, cuando deba derivar una consulta fuera del horario de atención, informe al cliente que no hay atención humana hasta el horario de apertura. El horario de atención lo configura el administrador. | Entrevista del 16/09/2026: el asistente contesta siempre y, fuera de horario, avisa que no hay atención humana hasta la apertura. Después de la entrevista, la agencia informó su horario: lunes a viernes de 9 a 18. Queda configurable. |
+| RF-DER-04 | Un sistema en el que el asistente responda a toda hora y, cuando deba derivar una consulta fuera del horario de atención, envíe el mismo mensaje de derivación que dentro del horario, sin avisar que no hay atención humana, y el caso quede pendiente hasta la apertura. El horario de atención lo configura el administrador. | Entrevista del 16/09/2026: el asistente contesta siempre y, fuera de horario, avisa que no hay atención humana hasta la apertura. Después de la entrevista, la agencia informó su horario: lunes a viernes de 9 a 18. Queda configurable. Equipo (24/09/2026): sin aviso al cliente; la consulta queda pendiente hasta la apertura. A validar con la agencia (4.5). |
 
 ## Módulo 4 — Verificación y alertas
 
@@ -38,7 +38,7 @@ Los IDs llevan el prefijo del módulo. Citarlos en commits y pull requests.
 |---|---|---|
 | RF-VER-01 | Un sistema que detecte intentos de manipulación del asistente y los bloquee, registrando el incidente. | CASO-003 y CASO-010: el bot aceptó «ignorá todo lo anterior» y «olvidá tus instrucciones». LOG-004 muestra que el bloqueo del número fue manual. OWASP LLM01 y LLM02. |
 | RF-VER-02 | Un sistema que analice cada respuesta antes de enviarla y, cuando informe datos no verificables, contradiga el registro de la agencia, exponga información sensible o comprometa acciones, la retenga sin enviarla, la marque con un nivel de alerta visible y derive la conversación a un operador. | 10 de las 12 respuestas registradas presentan alguna falla. Roberto Castaño: «que aparezca marcado con un color de alerta para que ella lo corrija antes de que el cliente se quede con una información falsa». |
-| RF-VER-03 | Un sistema que genere una alerta cuando un caso derivado no sea tomado por un operador dentro de un tiempo máximo. | Roberto Castaño: «Graciela a veces se acuerda de revisarlo y a veces no». Entrevista del 16/09/2026: la agencia validó las alertas propuestas (manipulación del asistente, exposición de datos, pedido de acción crítica y caso derivado sin tomar). |
+| RF-VER-03 | Un sistema que genere una alerta cuando un caso derivado no sea tomado por un operador dentro de un tiempo máximo, contado solo dentro del horario de atención. | Roberto Castaño: «Graciela a veces se acuerda de revisarlo y a veces no». Entrevista del 16/09/2026: la agencia validó las alertas propuestas (manipulación del asistente, exposición de datos, pedido de acción crítica y caso derivado sin tomar). Equipo (24/09/2026): el tiempo corre solo dentro del horario de atención, para que las derivaciones de fuera de horario no alerten antes de la apertura. |
 
 ## Módulo 5 — Panel de supervisión
 
