@@ -80,7 +80,7 @@ SELECT r.id_rol, 'operador', '$2b$10$...', 'Operador', 'Prueba' FROM rol r WHERE
     "pip install --quiet bcrypt && python -c \"import bcrypt; print(bcrypt.hashpw(b'1234', bcrypt.gensalt(rounds=10, prefix=b'2b')).decode())\""
   ```
 
-  Imprime el literal a pegar: 60 caracteres, con la forma `$2b$10$` y 53 de sal y hash codificados. Sale distinto en cada corrida (la sal es aleatoria): lo importante es que todos los hashes pegados validen «1234`.
+  Imprime el literal a pegar: 60 caracteres, con la forma `$2b$10$` y 53 de sal y hash codificados. Sale distinto en cada corrida (la sal es aleatoria): lo importante es que todos los hashes pegados validen «1234».
   - Ojo: el coste hay que pasarlo explícito. En Python el default de `bcrypt.gensalt` es 12, no 10; el 10 viene de `bcryptjs`.
   - Alternativa: `docker run --rm httpd:2.4-alpine htpasswd -nbB operador 1234`. Devuelve el hash con prefijo `$2y$`; se prefiere el comando anterior porque deja explícitos el prefijo `$2b$` y el coste.
 - MySQL no calcula bcrypt: el hash va como literal en el `INSERT`.

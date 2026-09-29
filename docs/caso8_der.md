@@ -1,7 +1,7 @@
 # DER — Caso 8: Sistema de Atención al Cliente con Bot IA y Panel de Supervisión
 
 Seguros Castaño — PPP 1, UNLa, Grupo 11. Entregable del Hito 0.
-Diagrama: `caso8_der.puml`, actualizado el 29/09/2026. El `.png` y el `.svg` se regeneran después del merge. Los cambios del 28/09/2026 (sección al final) están en este documento.
+Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 29/09/2026 (suma `caso.id_poliza`). Los cambios del 28/09/2026 están en la sección del final.
 
 ## Convenciones aplicadas
 
