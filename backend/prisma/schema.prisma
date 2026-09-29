@@ -62,6 +62,7 @@ model caso {
   id_caso             Int                @id @default(autoincrement()) @db.UnsignedInt
   id_conversacion     Int                @db.UnsignedInt
   id_tipo_consulta    Int?               @db.UnsignedInt
+  id_poliza           Int?               @db.UnsignedInt
   id_usuario_asignado Int?               @db.UnsignedInt
   id_nivel_riesgo     Int?               @db.UnsignedInt
   fecha_apertura      DateTime           @default(now()) @db.DateTime(0)
@@ -72,6 +73,7 @@ model caso {
   alerta              alerta[]
   conversacion        conversacion       @relation(fields: [id_conversacion], references: [id_conversacion], onDelete: NoAction, onUpdate: NoAction, map: "fk_caso_conversacion")
   nivel_riesgo        nivel_riesgo?      @relation(fields: [id_nivel_riesgo], references: [id_nivel_riesgo], onDelete: NoAction, onUpdate: NoAction, map: "fk_caso_nivel_riesgo")
+  poliza              poliza?            @relation(fields: [id_poliza], references: [id_poliza], onDelete: NoAction, onUpdate: NoAction, map: "fk_caso_poliza")
   tipo_consulta       tipo_consulta?     @relation(fields: [id_tipo_consulta], references: [id_tipo_consulta], onDelete: NoAction, onUpdate: NoAction, map: "fk_caso_tipo_consulta")
   usuario             usuario?           @relation(fields: [id_usuario_asignado], references: [id_usuario], onDelete: NoAction, onUpdate: NoAction, map: "fk_caso_usuario")
   mensaje             mensaje[]
@@ -85,6 +87,7 @@ model caso {
   @@index([fecha_cierre], map: "ix_caso_cierre")
   @@index([id_conversacion], map: "ix_caso_conversacion")
   @@index([fecha_derivacion, fecha_toma], map: "ix_caso_derivacion_sin_tomar")
+  @@index([id_poliza], map: "fk_caso_poliza")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -278,6 +281,7 @@ model poliza {
   fecha_alta           DateTime             @default(now()) @db.DateTime(0)
   activo               Boolean              @default(true)
   beneficiario         beneficiario[]
+  caso                 caso[]
   cobertura            cobertura[]
   cuota                cuota[]
   bien_asegurado       bien_asegurado?      @relation(fields: [id_bien], references: [id_bien], onDelete: NoAction, onUpdate: NoAction, map: "fk_poliza_bien")
