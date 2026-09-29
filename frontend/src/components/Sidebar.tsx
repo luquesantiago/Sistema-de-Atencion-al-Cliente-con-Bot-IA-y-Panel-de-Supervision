@@ -35,7 +35,8 @@ export default function Sidebar({ activo, onNavegar }: SidebarProps) {
       </ul>
 
       <div className="panel__pie">
-        <p>Sesión sin iniciar</p>
+        <p>Todo se atribuye al usuario de prueba operador.</p>
+        <p>La atención humana atiende de lunes a viernes de 9 a 18.</p>
       </div>
     </nav>
   )

@@ -9,7 +9,7 @@ export default function TramitesAprobar({ modulo }: { modulo: Modulo }) {
 
       <EstadoPanel
         titulo="No hay trámites pendientes de aprobación"
-        descripcion="Cada baja, modificación de contrato o alta de conductor se muestra con el motivo, el estado actual y la autoridad requerida. Al aprobar se registra quién, cuándo y por qué."
+        descripcion="Cada pedido se muestra con el motivo, el estado actual y la autoridad requerida. El cambio de teléfono es un dato de cartera y no una acción crítica, así que no genera la alerta de pedido de acción crítica. Al decidir se registra quién, cuándo y con qué fundamento."
         acciones={
           <span className="chip chip--neutro">
             Autorizan: Administrador y Operadores habilitados

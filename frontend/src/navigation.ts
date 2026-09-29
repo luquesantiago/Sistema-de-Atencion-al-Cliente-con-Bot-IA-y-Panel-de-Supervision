@@ -20,13 +20,13 @@ export const MODULOS: readonly Modulo[] = [
     id: 'bandeja',
     nombre: 'Bandeja de Atención',
     descripcion:
-      'Conversaciones derivadas, con prioridad, responsable y tiempo de espera.',
+      'Casos derivados: tomar el caso, ver la conversación completa, contestarle al cliente y cerrarlo, con prioridad, responsable y tiempo de espera.',
   },
   {
     id: 'tramites',
     nombre: 'Trámites por Aprobar',
     descripcion:
-      'Bajas, modificaciones de contrato y altas de conductor pendientes de aprobación.',
+      'Cambios de teléfono, bajas, modificaciones de póliza y altas de conductor pendientes de aprobación.',
   },
   {
     id: 'clientes',
