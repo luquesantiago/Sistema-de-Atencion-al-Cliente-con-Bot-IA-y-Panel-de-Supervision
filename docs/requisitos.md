@@ -1,6 +1,6 @@
 # Requisitos funcionales — Caso 8
 
-Copia de la tabla de requisitos del documento de análisis (`Caso8_Analisis_y_Propuesta.docx`, versión del 24/09/2026). El documento es la fuente oficial: si cambia, hay que actualizar esta copia.
+Copia de la tabla de requisitos del documento de análisis (`Caso8_Analisis_y_Propuesta.docx`, versión del 24/09/2026). El documento es la fuente oficial: si cambia, hay que actualizar esta copia. RF-CAR-05 (28/09/2026) se sumó acá antes que al documento: falta pasarlo al docx.
 
 Los IDs llevan el prefijo del módulo. Citarlos en commits y pull requests.
 
@@ -12,6 +12,7 @@ Los IDs llevan el prefijo del módulo. Citarlos en commits y pull requests.
 | RF-CAR-02 | Un sistema que registre los vencimientos, el estado de cada póliza y la situación de pago, de modo que exista una respuesta cierta a las preguntas más frecuentes. | CASO-001 (saldo) y CASO-004 (vencimiento). La planilla no registra cuotas ni pagos: la mora de POL-00128 figura en texto libre. Roberto Castaño: «¿cuánto me falta pagar?», «¿cuándo vence mi póliza?». |
 | RF-CAR-03 | Un sistema que identifique a cada cliente por su DNI y registre sus teléfonos de contacto, admitiendo que un cliente tenga varios teléfonos y que un mismo teléfono pertenezca a varios clientes: el teléfono sirve para contactar, no para identificar. | La planilla no almacena ningún teléfono de cliente. El número de CASO-003 es el mismo que el de CASO-001 y CASO-011, escrito con otro formato, y nada permitió advertirlo. Entrevista del 16/09/2026: la agencia fijó el DNI como dato de identificación y confirmó que hay teléfonos compartidos entre clientes. |
 | RF-CAR-04 | Un sistema que registre los siniestros con numeración propia y su estado de avance. | CASO-008: el bot informó el siniestro inventado SIN-2024-99887; LOG-007 registra el real, SIN-2024-00045. No existe hoja de siniestros en el material entregado. |
+| RF-CAR-05 | Un sistema que, cuando un cliente se identifica con su DNI desde un número de WhatsApp que no tiene registrado, le ofrezca registrarlo como teléfono de contacto y, si acepta, deje el pedido pendiente hasta que un operador lo apruebe o lo rechace; al aprobarlo, el operador elige qué números anteriores de ese cliente se desvinculan, sin afectar a otros clientes que compartan esos números. | La planilla no almacena ningún teléfono de cliente (ver RF-CAR-03). Entrevista del 16/09/2026: la agencia confirmó que un cliente puede tener varios teléfonos y que hay teléfonos compartidos entre clientes. Equipo (28/09/2026): el pedido se aprueba como en RF-APR-03. A validar con la agencia (4.5). |
 
 ## Módulo 2 — Atención automatizada
 

@@ -8,9 +8,10 @@ context: |
   Proyecto: sistema de atención al cliente por WhatsApp con asistente de IA y panel de supervisión para Seguros Castaño.
   Fuentes del proyecto:
   - AGENTS.md: reglas de negocio, convenciones, comandos de verificación y decisiones abiertas.
-  - docs/requisitos.md: los 27 requisitos funcionales, con IDs por módulo (RF-CAR, RF-ATE, RF-DER, RF-VER, RF-SUP, RF-APR).
-  - docs/caso8_der.md, docs/01_esquema.sql y docs/02_catalogos.sql: modelo de datos acordado.
+  - docs/requisitos.md: los 28 requisitos funcionales, con IDs por módulo (RF-CAR, RF-ATE, RF-DER, RF-VER, RF-SUP, RF-APR).
+  - docs/caso8_der.md: modelo de datos acordado. El esquema vigente está en backend/prisma/migrations; docs/01_esquema.sql y docs/02_catalogos.sql son la foto del Hito 0.
   - docs/caso8_tabla_de_eventos.md: eventos de negocio.
+  - docs/migracion.md: reglas de la migración de la planilla histórica y de los usuarios.
   Lo que no esté en esas fuentes no se inventa: se deja como pregunta abierta.
 
 rules:
@@ -22,6 +23,7 @@ rules:
     - Escribir en español el texto de cada requirement y de cada scenario. En inglés quedan solo los encabezados de OpenSpec, WHEN/THEN y SHALL/MUST.
     - "En cada requirement, la oración con SHALL/MUST termina con el RF del que sale. Ejemplo: El sistema SHALL ... (RF-DER-04)."
     - No agregar comportamientos, valores ni textos que no salgan de las fuentes del proyecto.
+    - "Excepción: los textos de las plantillas del asistente los propone el change, con el tono de AGENTS.md, y el equipo los revisa en el PR."
   design:
     - No agregar tablas ni columnas fuera del DER. Si hacen falta, plantearlo como pregunta abierta.
   tasks:
