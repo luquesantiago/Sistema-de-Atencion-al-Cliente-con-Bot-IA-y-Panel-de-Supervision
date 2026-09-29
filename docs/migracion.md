@@ -39,7 +39,7 @@ Reglas para importar a la base los datos históricos de la agencia (Parcial 1). 
 - **De prueba:** `admin` (rol administrador, «Admin Prueba») y `operador` (rol operador, «Operador Prueba»), con contraseña 1234. Van en una migración SQL, así existen en todas las bases aunque no se haya corrido la migración de la planilla: el panel del Parcial 1 atribuye todo a `operador`. El repo es público: antes de producción se borran o se les cambia la contraseña.
 - **Históricos:** el script de la planilla crea a Roberto Castaño (administrador, usuario `roberto`) y a Graciela Castaño (operador, usuario `graciela`) desactivados, con una contraseña al azar que nadie conoce. No pueden entrar al sistema: solo figuran como responsables de sus casos y como quienes atendieron sus alertas. Cuando se creen los usuarios permanentes, se activan esos mismos registros. El apellido de Graciela es un supuesto (en la carta es hija de Roberto).
 - Diego no se carga ahora porque no figura en la planilla.
-- El algoritmo de hash lo elige quien programe la migración de usuarios. El login del Parcial 2 usa el mismo.
+- El algoritmo de hash es bcrypt, con prefijo `$2b$` y coste 10, fijado como literal en la migración `20260929204929_caso_poliza_cambio_telefono_usuarios_prueba`. El login del Parcial 2 usa el mismo.
 
 ## A tener en cuenta
 

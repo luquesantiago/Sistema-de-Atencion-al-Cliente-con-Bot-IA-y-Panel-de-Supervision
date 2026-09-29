@@ -1,0 +1,42 @@
+# Tasks
+
+## 1. Migración SQL
+
+- [x] 1.1 Crear a mano la carpeta `backend/prisma/migrations/<AAAAMMDDHHMMSS>_caso_poliza_cambio_telefono_usuarios_prueba/`, con `<AAAAMMDDHHMMSS>` igual a la hora UTC real del momento (posterior a `20260928140100`), y su `migration.sql` con el mismo orden que las dos migraciones existentes: bloque de comentario al principio (de qué sale y de cuándo), después `SET NAMES utf8mb4;`, después el `ALTER TABLE caso ADD COLUMN id_poliza INT UNSIGNED NULL AFTER id_tipo_consulta, ADD CONSTRAINT fk_caso_poliza FOREIGN KEY (id_poliza) REFERENCES poliza (id_poliza);` (sin `KEY` explícito). Verificar: `git status --short backend/prisma/migrations` muestra una sola carpeta nueva y ninguna modificación en `20260928140000_esquema_inicial/` ni en `20260928140100_catalogos/`
+- [x] 1.2 En el mismo `migration.sql`, agregar los dos `INSERT INTO tipo_accion (nombre) VALUES ('cambio de teléfono');` y `INSERT INTO tipo_consulta (nombre) VALUES ('cambio de teléfono');`, con la tilde intacta. Verificar: `grep -n "cambio de teléfono" backend/prisma/migrations/*caso_poliza*/migration.sql` devuelve las dos líneas
+- [x] 1.3 Generar el hash bcrypt de `1234` con el comando de `design.md` (contenedor python descartable, prefijo `$2b$`, coste 10 explícito; **no** agregar `bcrypt` ni `bcryptjs` a `backend/package.json`) y pegar el literal en los dos `INSERT INTO usuario`, con `id_rol` por subconsulta `SELECT ... FROM rol r WHERE r.nombre = 'administrador'` / `'operador'`, y los valores `nombre` = 'Admin' / 'Operador' y `apellido` = 'Prueba'. Verificar: `git diff --stat backend/package.json backend/package-lock.json` no muestra cambios y el `migration.sql` no tiene los ids de rol escritos a pelo
+
+## 2. Aplicar la migración y regenerar Prisma
+
+- [x] 2.1 Con el stack levantado, `docker compose restart backend` y revisar los logs: tienen que decir «All migrations have been successfully applied» y el backend tiene que volver a levantar. Verificar: `docker compose logs backend | tail -30` sin errores de Prisma (P3009, P3018)
+- [x] 2.2 `docker compose exec backend npx prisma db pull` y después `docker compose exec backend npx prisma generate`. Verificar: en el `git diff` de `backend/prisma/schema.prisma` solo aparecen cambios en `model caso` (la columna `id_poliza`, la relación `poliza` y el `@@index` con `map: "fk_caso_poliza"`) y en `model poliza` (la relación inversa `caso caso[]`); si el diff toca otro modelo, se deshace y se revisa
+- [x] 2.3 `docker compose exec backend npx tsc --noEmit`. Verificar: termina sin errores
+
+## 3. Verificar la base
+
+Todos los `SELECT` se corren sobre el contenedor `db`, que ya tiene `MYSQL_USER`, `MYSQL_PASSWORD` y `MYSQL_DATABASE` en su entorno. Van con `--default-character-set=utf8mb4` porque sin eso el cliente `mysql` del contenedor lee la salida como latin1 y «cambio de teléfono» se ve como `cambio de telÃ©fono` sin que el dato esté mal (ver `.claude/skills/backend-datos/SKILL.md`).
+
+- [x] 3.1 `docker compose exec db sh -c 'mysql --default-character-set=utf8mb4 -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "SHOW CREATE TABLE caso\G"'`. Verificar: aparecen la columna `id_poliza` con `DEFAULT NULL` y `int unsigned`, la constraint `fk_caso_poliza` y el índice `fk_caso_poliza`
+- [x] 3.2 `docker compose exec db sh -c 'mysql --default-character-set=utf8mb4 -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "SELECT * FROM tipo_accion ORDER BY id_tipo_accion; SELECT * FROM tipo_consulta ORDER BY id_tipo_consulta"'` (un solo `-e` con las dos sentencias separadas por `;`: el cliente concatena varios `-e` y da error de sintaxis). Verificar: los dos listados muestran «cambio de teléfono» con la tilde bien y los valores anteriores siguen intactos
+- [x] 3.3 `docker compose exec db sh -c 'mysql --default-character-set=utf8mb4 -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "SELECT u.nombre_usuario, u.nombre, u.apellido, r.nombre AS rol, u.activo, LEFT(u.contrasena_hash, 7) AS prefijo_hash, CHAR_LENGTH(u.contrasena_hash) AS largo_hash FROM usuario u JOIN rol r ON r.id_rol = u.id_rol ORDER BY u.nombre_usuario"'`. Verificar: dos filas, `admin` con rol administrador y `operador` con rol operador, los dos con `activo` en 1, prefijo `$2b$10$` y largo 60
+- [x] 3.4 Confirmar que el literal pegado en la migración es el bcrypt de `1234` (si se copió mal, el login del Parcial 2 no entra y nadie se entera hasta ese momento):
+
+  ```bash
+  HASHES=$(docker compose exec -T db sh -c 'mysql --default-character-set=utf8mb4 -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -N -B -e "SELECT contrasena_hash FROM usuario WHERE nombre_usuario IN (\"admin\",\"operador\") ORDER BY nombre_usuario"')
+  docker run --rm -e HASHES="$HASHES" python:3-alpine sh -c "pip install --quiet bcrypt && python -c \"import os,bcrypt; hs=os.environ['HASHES'].split(); print('OK: los 2 hashes validan 1234' if len(hs)==2 and all(bcrypt.checkpw(b'1234', h.encode()) for h in hs) else 'FALLA: revisar el literal')\""
+  ```
+
+  Verificar: imprime «OK: los 2 hashes validan 1234». Es un contenedor descartable: no agrega dependencias al repo. Para confirmar además que el archivo tiene el mismo literal que la base: `grep -cE '\$2b\$10\$[./A-Za-z0-9]{53}' backend/prisma/migrations/*caso_poliza*/migration.sql` devuelve 2 (60 caracteres cada hash)
+
+## 4. Documentación
+
+- [x] 4.1 En `docs/caso8_der.puml`, agregar `id_poliza : INT <<FK>>` en la entidad `caso`, después de `id_tipo_consulta` y sin `*` (es opcional), la relación `poliza |o--o{ caso` en el bloque «Relaciones: atencion», y actualizar la línea «Ultima revision» del encabezado con la fecha de hoy. Verificar: `git diff docs/caso8_der.puml` muestra las tres cosas y ninguna otra
+- [x] 4.2 En `docs/caso8_der.md`, corregir las dos frases que quedaron viejas (la de la línea 4, ya hecha, y la introducción de «Decisiones tomadas el 28/09/2026») y la fecha de revisión de la línea 4, para que digan que el diagrama está al día, qué quedó en qué migración (el nombre real de la carpeta de la tarea 1.1) y la fecha de hoy. La introducción queda en presente y sin «este change»: el `.md` lo lee gente que no usa OpenSpec, por ejemplo «Están en este documento, en el `.puml` y en la migración `<carpeta>` de `backend/prisma/migrations`». Se termina después de la 1.1. Verificar: `grep -n "en el diagrama" docs/caso8_der.md` no devuelve nada (cubre las dos frases) y `grep -n "revisado el 21/09/2026" docs/caso8_der.md` tampoco; `grep -n "id_poliza" docs/caso8_der.md` sigue mostrando la decisión 1
+- [x] 4.3 Regenerar `docs/caso8_der.png` y `docs/caso8_der.svg` desde el `.puml`. Es una tarea manual de alguien que tenga PlantUML y Java: este change no los instala. Verificar: abrir `docs/caso8_der.png` y ver que la entidad `caso` muestra `id_poliza` y que la relación con `poliza` está dibujada. Si en la máquina no hay PlantUML, la tarea queda para antes de la entrega y se sube solo el `.puml`
+- [x] 4.4 En `docs/migracion.md`, sección «Usuarios», reemplazar la frase que deja el algoritmo a elección de quien programe la migración por el valor elegido en este change: bcrypt, prefijo `$2b$`, coste 10, dejando asentado que el login del Parcial 2 usa el mismo. Verificar: `grep -n "bcrypt" docs/migracion.md` devuelve la línea con el algoritmo y el prefijo, y la sección sigue nombrando `admin` y `operador` con contraseña `1234`
+- [x] 4.5 En `AGENTS.md`, sección «Documentación de diseño (Hito 0)», corregir la frase que dice que los cambios del 28/09 «están en el .md y todavía no en el diagrama», para que diga que ya están en el `.puml` y en las migraciones. Verificar: `grep -n "todavía no en el diagrama" AGENTS.md` no devuelve nada y `grep -n "caso8_der" AGENTS.md` sigue listando los tres archivos
+
+## 5. Comprobaciones finales
+
+- [x] 5.1 `git status --short` y `git diff --stat`: solo la carpeta de migración nueva, `backend/prisma/schema.prisma`, `docs/caso8_der.puml`, `docs/caso8_der.md`, el render de 4.3 si se hizo, `docs/migracion.md`, `AGENTS.md` y este change en `openspec/`. Ni `backend/package.json` ni `docs/01_esquema.sql` ni `docs/02_catalogos.sql` (la foto del Hito 0 no se corre ni se actualiza)
+- [x] 5.2 `docker compose exec frontend npm run lint` y `docker compose exec frontend npm run build`, como comprobaciones globales de AGENTS.md. Verificar: terminan sin errores; este change no toca `frontend/`, así que no deberían cambiar

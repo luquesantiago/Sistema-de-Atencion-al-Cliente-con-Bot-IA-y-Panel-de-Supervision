@@ -172,7 +172,7 @@ No cerrar por código sin confirmación del cliente. Si una tarea depende de alg
 En `docs/`. Es la referencia para lo que ya está acordado; si el código tiene que apartarse de ella, preguntar antes.
 
 - `requisitos.md`: los 28 requisitos funcionales con su origen en el material del cliente. Es copia del documento de análisis, que sigue siendo la fuente oficial (RF-CAR-05 todavía no está en el documento).
-- `caso8_der.md` (+ `.puml`, `.svg`, `.png`): DER, convenciones de la base y decisiones de modelado. Los cambios del 28/09 están en el `.md` y todavía no en el diagrama.
+- `caso8_der.md` (+ `.puml`, `.svg`, `.png`): DER, convenciones de la base y decisiones de modelado. Los cambios del 28/09 están en el `.md`, en el `.puml` y en las migraciones.
 - `01_esquema.sql` y `02_catalogos.sql`: esquema en MySQL alineado uno a uno con el DER, como quedó en el Hito 0. No se corren: el esquema vigente está en `backend/prisma/migrations`, sin la tabla `auditoria`, que queda para el MVP 2.
 - `caso8_tabla_de_eventos.md` y `caso8_diagrama_contexto.puml`: eventos de negocio y diagrama de contexto (DFD nivel 0).
 - `migracion.md`: reglas de la migración de la planilla histórica y de los usuarios.

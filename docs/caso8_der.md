@@ -1,7 +1,7 @@
 # DER — Caso 8: Sistema de Atención al Cliente con Bot IA y Panel de Supervisión
 
 Seguros Castaño — PPP 1, UNLa, Grupo 11. Entregable del Hito 0.
-Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 21/09/2026 (noche). Los cambios del 28/09/2026 (sección al final) están en este documento y todavía no en el diagrama ni en las migraciones.
+Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 29/09/2026 (suma `caso.id_poliza`). Los cambios del 28/09/2026 están en la sección del final.
 
 ## Convenciones aplicadas
 
@@ -149,7 +149,7 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 21/09/2026 (noche). Lo
 
 ## Decisiones tomadas el 28/09/2026
 
-Todavía no están en el diagrama ni en las migraciones: van en una migración nueva (flujo SQL-first de `backend/prisma/migrations`).
+Están en este documento, en el `.puml` y en la migración `20260929204929_caso_poliza_cambio_telefono_usuarios_prueba` de `backend/prisma/migrations`.
 
 1. **Póliza del caso**: `caso.id_poliza`, opcional, con FK a `poliza`. La migración de la planilla carga solo los vínculos seguros (ver `migracion.md`).
 2. **Cambio de teléfono (RF-CAR-05)**: se registra en `solicitud_accion` con el tipo «cambio de teléfono», sin columnas nuevas. El número nuevo sale de la conversación del caso, y lo que se vinculó y desvinculó queda en `detalle` al aplicar el cambio. Es un dato de cartera, no una acción crítica: no genera la alerta «Pedido de acción crítica».

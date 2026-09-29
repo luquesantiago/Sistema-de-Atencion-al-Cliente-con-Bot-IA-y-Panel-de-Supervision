@@ -6,7 +6,7 @@
 ' Convenciones: nombres en espanol, ids autoincrementales, bajas logicas (campo "activo"),
 ' referencias siempre por id, estados y tipos en catalogos.
 ' <<UK1>> marca las columnas de una misma restriccion unica compuesta.
-' Ultima revision: 21/09/2026 (noche): catalogo tipo_consulta y caso.id_tipo_consulta
+' Ultima revision: 29/09/2026: caso.id_poliza (FK opcional a poliza)
 ' =====================================================================
 
 hide circle
@@ -238,6 +238,7 @@ package "Atencion" #F8FDF7 {
     --
     * id_conversacion : INT <<FK>>
     id_tipo_consulta : INT <<FK>>
+    id_poliza : INT <<FK>>
     id_usuario_asignado : INT <<FK>>
     id_nivel_riesgo : INT <<FK>>
     * fecha_apertura : DATETIME
@@ -410,6 +411,7 @@ telefono ||--o{ conversacion
 cliente |o--o{ conversacion
 conversacion ||--o{ caso
 tipo_consulta |o--o{ caso
+poliza |o--o{ caso
 usuario |o--o{ caso
 caso ||--o{ mensaje
 origen_mensaje ||--o{ mensaje
