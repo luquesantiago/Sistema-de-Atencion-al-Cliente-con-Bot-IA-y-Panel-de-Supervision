@@ -1,7 +1,7 @@
 # DER — Caso 8: Sistema de Atención al Cliente con Bot IA y Panel de Supervisión
 
 Seguros Castaño — PPP 1, UNLa, Grupo 11. Entregable del Hito 0.
-Diagrama: `caso8_der.puml` / `.png` / `.svg`. Última revisión: 21/09/2026 (noche).
+Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 21/09/2026 (noche). Los cambios del 28/09/2026 (sección al final) están en este documento y todavía no en el diagrama ni en las migraciones.
 
 ## Convenciones aplicadas
 
@@ -52,7 +52,7 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`. Última revisión: 21/09/2026 (noc
 | Entidad | Para qué está |
 |---|---|
 | `conversacion` | **Sesión** de WhatsApp con un número (FK a `telefono`). Termina (`fecha_fin`) tras el tiempo de inactividad configurado; el próximo mensaje abre una conversación nueva y el asistente vuelve a pedir el DNI. Si tiene un caso derivado sin cerrar, la inactividad no la cierra: sigue abierta hasta que se cierre el caso, el asistente sigue sin responder y lo que escribe el cliente queda en ese caso. Guarda si el asistente está suspendido. El cliente es nulo hasta que la persona se identifica. |
-| `caso` | **Uno por consulta**, con varios mensajes hasta resolverse. Lleva el tipo de consulta (nulo mientras no se conoce), responsable asignado, nivel de riesgo y las fechas de apertura, derivación, toma y cierre; el estado se deduce de esas fechas. |
+| `caso` | **Uno por consulta**, con varios mensajes hasta resolverse. Lleva el tipo de consulta (nulo mientras no se conoce), responsable asignado, nivel de riesgo, la póliza del caso cuando se sabe (`id_poliza`, opcional, 28/09/2026) y las fechas de apertura, derivación, toma y cierre; el estado se deduce de esas fechas. |
 | `mensaje` | Cada mensaje del caso, con su origen. La fecha guarda milisegundos para ordenar la conversación. |
 | `origen_mensaje` | Catálogo: cliente, asistente, operador. |
 | `tipo_consulta` | Catálogo de tipos de consulta que detecta el asistente (flujo F12 del diagrama de contexto). Normaliza la columna `tipo_consulta_detectado` de la planilla. |
@@ -73,13 +73,14 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`. Última revisión: 21/09/2026 (noc
 ### Acciones críticas
 | Entidad | Para qué está |
 |---|---|
-| `solicitud_accion` | Pedido de baja, modificación o alta de conductor en estado pendiente. Nunca la origina el sistema como cambio directo. Al decidirse registra quién, cuándo y con qué fundamento. |
-| `tipo_accion` | **Catálogo fijo en tabla**: baja de póliza, modificación de póliza, alta de conductor. |
+| `solicitud_accion` | Pedido de baja, modificación o alta de conductor en estado pendiente. Nunca la origina el sistema como cambio directo. Al decidirse registra quién, cuándo y con qué fundamento. También guarda el pedido de cambio de teléfono (RF-CAR-05, 28/09/2026), que se aprueba igual pero no es una acción crítica: al aplicarlo, el sistema anota en `detalle` qué número vinculó y cuáles desvinculó. |
+| `tipo_accion` | **Catálogo fijo en tabla**: baja de póliza, modificación de póliza, alta de conductor y cambio de teléfono (28/09/2026). |
 | `estado_solicitud` | Catálogo: pendiente, aprobada, rechazada, aplicada. |
 
 ## Datos que se calculan en lugar de guardarse
 
-- **Estado del caso**: cerrado si tiene `fecha_cierre`; en atención si tiene `fecha_toma`; derivado si tiene `fecha_derivacion`; si no, abierto. Reabrir un caso es vaciar `fecha_cierre`.
+- **Estado del caso**: cerrado si tiene `fecha_cierre`; en atención si tiene `fecha_toma`; derivado si tiene `fecha_derivacion`; si no, abierto. Reabrir un caso es vaciar `fecha_cierre`. Quién cerró tampoco se guarda aparte: solo cierra el responsable. Los casos que cierra el sistema al terminar una conversación por inactividad quedan sin responsable, y el de un cambio de teléfono lo cierra quien decide el pedido, que queda como responsable (28/09/2026).
+- **Número nuevo de un cambio de teléfono**: es el teléfono de la conversación del caso de la solicitud (solicitud → caso → conversación → teléfono). No se guarda aparte (28/09/2026).
 - **Vigencia de la póliza**: está vencida cuando `fecha_vencimiento` es anterior a hoy (fecha de Argentina, no la del servidor en UTC). La cartera activa son las pólizas en estado «activa» que no vencieron y tienen `activo = true`.
 - **Tipo de respuesta**: generada por el asistente si `id_usuario` es nulo; escrita por un operador si no lo es; corrección si tiene `id_respuesta_origen`. Si se envió o no, lo dice `id_mensaje_enviado`.
 
@@ -105,7 +106,7 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`. Última revisión: 21/09/2026 (noc
 - **estado_siniestro**: registrado, en gestión, cerrado.
 - **rol**: administrador, operador.
 - **origen_mensaje**: cliente, asistente, operador.
-- **tipo_consulta**: saldo, vencimiento, estado de póliza, cobertura, siniestro, cotización, baja, modificación, reclamo, saludo. En la migración, «siniestro_urgente» se carga como siniestro; PROMPT_INJECTION no es un tipo de consulta (lo cubre la alerta «Intento de manipulación del asistente»). «Estado de póliza» sale de RF-ATE-01.
+- **tipo_consulta**: saldo, vencimiento, estado de póliza, cobertura, siniestro, cotización, baja, modificación, reclamo, saludo y cambio de teléfono (28/09/2026). En la migración, «siniestro_urgente» se carga como siniestro; PROMPT_INJECTION no es un tipo de consulta (lo cubre la alerta «Intento de manipulación del asistente»). «Estado de póliza» sale de RF-ATE-01.
 - **estado_prospecto**: pendiente, confirmado, descartado.
 - **resultado_verificacion**: aprobada, retenida.
 - **nivel_riesgo** (orden 1 = más grave): 1 crítico, 2 alto, 3 medio, 4 bajo.
@@ -118,7 +119,7 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`. Última revisión: 21/09/2026 (noc
   | Pedido de acción crítica | medio |
   | Pedido de reembolso (aviso al equipo) | medio |
   | Caso derivado sin tomar | medio |
-- **tipo_accion**: baja de póliza, modificación de póliza, alta de conductor.
+- **tipo_accion**: baja de póliza, modificación de póliza, alta de conductor y cambio de teléfono (28/09/2026).
 - **estado_solicitud**: pendiente, aprobada, rechazada, aplicada.
 - **horario_atencion**: lunes a viernes de 9 a 18, según informó la agencia.
 - **parametro_configuracion**: `max_intentos_dni` = 3; `minutos_max_caso_sin_tomar` = 60 y `minutos_inactividad_sesion` = 30 (provisorios).
@@ -145,6 +146,15 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`. Última revisión: 21/09/2026 (noc
 2. Las fechas se guardan en UTC. La hora argentina se usa solo para mostrar y para comparar con el horario de atención.
 3. Una baja de póliza aprobada cambia el estado a «dada de baja». `activo = false` queda solo para registros cargados por error.
 4. El tipo de consulta va en un catálogo propio (`tipo_consulta`) con FK en `caso`, con los valores depurados de la planilla.
+
+## Decisiones tomadas el 28/09/2026
+
+Todavía no están en el diagrama ni en las migraciones: van en una migración nueva (flujo SQL-first de `backend/prisma/migrations`).
+
+1. **Póliza del caso**: `caso.id_poliza`, opcional, con FK a `poliza`. La migración de la planilla carga solo los vínculos seguros (ver `migracion.md`).
+2. **Cambio de teléfono (RF-CAR-05)**: se registra en `solicitud_accion` con el tipo «cambio de teléfono», sin columnas nuevas. El número nuevo sale de la conversación del caso, y lo que se vinculó y desvinculó queda en `detalle` al aplicar el cambio. Es un dato de cartera, no una acción crítica: no genera la alerta «Pedido de acción crítica».
+3. **Catálogos**: «cambio de teléfono» se suma a `tipo_accion` y a `tipo_consulta`.
+4. **Usuarios de prueba e históricos**: sin cambios en el modelo; cómo se cargan está en `migracion.md`.
 
 ## Decisiones del equipo que conviene confirmar
 

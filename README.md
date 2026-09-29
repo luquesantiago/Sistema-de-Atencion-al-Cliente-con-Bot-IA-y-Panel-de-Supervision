@@ -15,6 +15,8 @@ El sistema tiene tres partes conectadas:
 | Frontend | React 19 + TypeScript + Vite 8 |
 | Backend | Node.js 24 + TypeScript + Express 5 |
 | Base de datos | MySQL 8.4 + Prisma 7 |
+| Mensajería | WhatsApp con OpenWA |
+| IA del asistente | Groq (`openai/gpt-oss-20b`) |
 | Entorno | Docker Compose |
 
 ## Qué necesitás
@@ -39,8 +41,6 @@ docker compose up -d --build
 | Frontend | http://localhost:5173 |
 | Backend | http://localhost:3000 |
 | MySQL | `localhost:3307` (usuario, contraseña y base del `.env`) |
-
-> Estado a septiembre de 2026: en `main` el backend todavía no tiene punto de entrada (`backend/src/index.ts`), así que la API no responde.
 
 Comandos útiles:
 
@@ -80,10 +80,10 @@ El esquema de MySQL se maneja con migraciones SQL escritas a mano (SQL-first), e
 
 ```
 ├── frontend/          # panel de supervisión (Vite + React)
-├── backend/           # API, Prisma y (más adelante) integración con WhatsApp e IA
+├── backend/           # API, Prisma, WhatsApp e IA
 ├── db/init/           # scripts que MySQL corre al crear la base
 ├── docs/              # documentación de diseño del Hito 0
-├── .agents/skills/    # skills para asistentes de IA
+├── .claude/skills/    # skills para asistentes de IA (OpenCode y Claude Code)
 ├── .opencode/         # agentes y comandos de OpenCode
 ├── openspec/          # specs y cambios planificados con OpenSpec (opcional)
 ├── AGENTS.md          # reglas del proyecto para asistentes de IA
@@ -94,10 +94,11 @@ El esquema de MySQL se maneja con migraciones SQL escritas a mano (SQL-first), e
 
 En [`docs/`](docs/):
 
-- [`requisitos.md`](docs/requisitos.md): los 27 requisitos funcionales (RF-CAR, RF-ATE, RF-DER, RF-VER, RF-SUP, RF-APR) con su origen en el material del cliente.
+- [`requisitos.md`](docs/requisitos.md): los 28 requisitos funcionales (RF-CAR, RF-ATE, RF-DER, RF-VER, RF-SUP, RF-APR) con su origen en el material del cliente.
 - [`caso8_der.md`](docs/caso8_der.md): DER, convenciones de la base y decisiones de modelado. Diagrama en [`caso8_der.svg`](docs/caso8_der.svg).
 - [`01_esquema.sql`](docs/01_esquema.sql) y [`02_catalogos.sql`](docs/02_catalogos.sql): esquema en MySQL como quedó en el Hito 0. El vigente está en `backend/prisma/migrations`.
 - [`caso8_tabla_de_eventos.md`](docs/caso8_tabla_de_eventos.md) y [`caso8_diagrama_contexto.puml`](docs/caso8_diagrama_contexto.puml): eventos de negocio y diagrama de contexto.
+- [`migracion.md`](docs/migracion.md): reglas de la migración de la planilla histórica y de los usuarios. El Excel limpio no está en el repo.
 
 Las reglas de negocio, las decisiones abiertas y las convenciones de código están resumidas en [`AGENTS.md`](AGENTS.md).
 
@@ -107,7 +108,8 @@ Las reglas de negocio, las decisiones abiertas y las convenciones de código est
 - Cada integrante commitea su propio trabajo.
 - En el commit o el PR se citan los requisitos que toca (por ejemplo `RF-DER-03`).
 - Antes de abrir el PR, actualizar la rama con `main`.
-- Si usás OpenCode, toma las reglas de `AGENTS.md`, las skills de `.agents/skills/` y los agentes y comandos de `.opencode/`.
+- Si usás OpenCode, toma las reglas de `AGENTS.md`, las skills de `.claude/skills/` y los agentes y comandos de `.opencode/`.
+- Si usás Claude Code, toma las reglas de `AGENTS.md` y las skills de `.claude/skills/`. No crees un `CLAUDE.md` (tampoco con `/init`): si existe, Claude Code deja de leer `AGENTS.md`.
 - Planificar una tarea con OpenSpec antes de programarla es opcional; la guía está en [`openspec/README.md`](openspec/README.md).
 
 ## Entregas

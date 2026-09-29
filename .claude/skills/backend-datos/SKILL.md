@@ -1,6 +1,6 @@
 ---
 name: backend-datos
-description: Backend y base de datos del proyecto. Cubre Express 5, Prisma 7, el esquema MySQL 8.4, migraciones, endpoints, webhooks de WhatsApp, migración de la planilla histórica y persistencia de auditoría, con los comandos Docker y los problemas ya conocidos. Usar al tocar cualquier archivo de backend/, el schema de Prisma o el servicio db.
+description: Backend y base de datos del proyecto. Cubre Express 5, Prisma 7, el esquema MySQL 8.4, migraciones, endpoints, la conexión con WhatsApp (OpenWA), migración de la planilla histórica y persistencia de auditoría, con los comandos Docker y los problemas ya conocidos. Usar al tocar cualquier archivo de backend/, el schema de Prisma o el servicio db.
 ---
 
 # Skill: Backend y datos
@@ -61,9 +61,9 @@ docker compose exec backend npx prisma generate
 
 - Responder errores con formato consistente y sin filtrar stack traces ni secretos.
 - Distinguir `401` de `403`, validación (`400`), recurso inexistente (`404`) y conflicto de estado (`409`).
-- No aceptar desde el cliente un actor o rol para autorizar una acción.
-- Diseñar idempotencia para webhooks y eventos de WhatsApp.
-- No enviar una respuesta de IA antes de pasar por verificación.
+- No aceptar desde el cliente un actor o rol para autorizar una acción. En el Parcial 1 no hay login: el backend atribuye las acciones del panel al usuario de prueba `operador`.
+- Diseñar idempotencia para los mensajes que llegan de WhatsApp (OpenWA): un mensaje repetido no puede duplicar mensajes ni efectos.
+- No enviar una respuesta de IA antes de pasar por verificación. En el Parcial 1 el LLM solo clasifica la intención y las respuestas salen de plantillas con datos de la base.
 - No generar respuestas automáticas en una conversación con un caso derivado sin cerrar.
 
 ## Prisma y migraciones
@@ -80,5 +80,5 @@ docker compose exec backend npx prisma generate
 - Las migraciones pendientes se aplican solas al levantar el backend (`docker compose restart backend` después de traer migraciones nuevas).
 - Los CHECK de la base no aparecen en `schema.prisma` (Prisma no los representa): los sigue controlando MySQL.
 - Toda migración debe ser revisable y compatible con datos existentes o acompañarse de una estrategia de importación.
-- La importación histórica no modifica la planilla original. Los registros irresolubles, como los duplicados y las pólizas POL-00126 y POL-00131 del VW Gol, se omiten y quedan listados para carga manual.
+- La importación histórica sigue `docs/migracion.md` y no modifica la planilla original. El Excel limpio no está en el repo: el script lo lee desde una carpeta ignorada dentro de `backend/`, porque el contenedor solo monta `./backend`. Los registros irresolubles (columna «migrar» = No, como las pólizas POL-00126 y POL-00131 del VW Gol) se omiten y quedan en la hoja Pendientes para carga manual.
 - No almacenar secretos ni datos reales de clientes en fixtures, logs de desarrollo o migraciones.

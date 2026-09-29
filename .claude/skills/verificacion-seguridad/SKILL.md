@@ -13,7 +13,7 @@ Usar al integrar IA o WhatsApp, filtrar respuestas, definir alertas, manejar rol
 
 Toda respuesta generada se considera no confiable hasta ser contrastada con la cartera. Si no puede probarse el dato, si hay exposición de información personal, intento de manipulación, compromiso de acción o consulta fuera del alcance, retener y derivar. La respuesta retenida no se envía; se guarda como borrador para que el operador la revise.
 
-La IA puede proponer texto o clasificar intención; no puede aprobar, modificar ni ejecutar una acción contractual.
+La IA puede proponer texto o clasificar intención; no puede aprobar, modificar ni ejecutar una acción contractual. En el Parcial 1 solo clasifica la intención: el texto sale de plantillas con datos de la cartera.
 
 Después de una derivación no se generan respuestas automáticas en esa conversación hasta que se cierre el caso.
 
@@ -28,7 +28,7 @@ Los fallos del bot anterior que figuran en la planilla histórica se corresponde
 
 ## Alertas mínimas
 
-Mantener alertas diferenciables para datos falsos o no verificables, exposición de datos personales, manipulación del asistente, solicitud de acción crítica y derivación sin tomar. Cada alerta necesita severidad, motivo, conversación, estado y timestamps.
+Mantener alertas diferenciables para datos falsos o no verificables, exposición de datos personales, manipulación del asistente, solicitud de acción crítica y derivación sin tomar. Cada alerta necesita severidad, motivo, conversación, estado y timestamps. El pedido de cambio de teléfono no genera la alerta de acción crítica.
 
 ## Autorización
 
@@ -36,6 +36,7 @@ Mantener alertas diferenciables para datos falsos o no verificables, exposición
 - Roles: Administrador (Roberto) ve métricas y configura el horario de atención; Operador (Graciela y Diego) atiende y hace el ABM de clientes, pólizas y siniestros.
 - Pueden aprobar trámites críticos Roberto, Graciela y Diego. Graciela puede aprobar casos que ella misma atendió.
 - La UI debe reflejar permisos, pero nunca ser la única barrera.
+- En el Parcial 1 no hay login: el backend atribuye las acciones del panel al usuario de prueba `operador`, nunca al usuario que mande el navegador. En el Parcial 2 lo reemplaza el login.
 - La aprobación debe verificar que el trámite sigue pendiente y registrar actor, fecha, motivo, estado anterior y resultado.
 
 ## Auditoría y privacidad
@@ -45,7 +46,7 @@ Mantener alertas diferenciables para datos falsos o no verificables, exposición
 - Minimizar la exposición de DNI, teléfonos y conversaciones en logs y vistas.
 - Enmascarar datos sensibles cuando el contexto no requiera el valor completo.
 - No usar información real del cliente en pruebas automatizadas ni capturas compartidas.
-- Los tokens de WhatsApp y del proveedor de IA van en `.env`, nunca en el repo.
+- Los tokens de WhatsApp y del proveedor de IA van en `.env`, nunca en el repo. La sesión de WhatsApp Web que guarda OpenWA tampoco se sube: con ella se puede usar ese WhatsApp.
 - Con los permisos actuales del compose, el usuario `app` puede borrar los triggers de auditoría. En producción debería tener solo permisos de datos (pendiente de definir).
 - Considerar la Ley 25.326 y los controles OWASP para aplicaciones con LLM como referencias de diseño.
 
@@ -58,4 +59,4 @@ Mantener alertas diferenciables para datos falsos o no verificables, exposición
 - Solicitud de baja o modificación: queda pendiente y no altera la cartera.
 - Aprobación autorizada y rechazo: ambos dejan trazabilidad completa.
 - Mensaje posterior a una derivación: no se genera respuesta automática.
-- Repetición de webhook: no duplica mensajes ni efectos.
+- Mensaje de WhatsApp repetido: no duplica mensajes ni efectos.
