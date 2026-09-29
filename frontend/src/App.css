@@ -195,6 +195,42 @@
 
 /* Indicadores */
 
+.tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+}
+
+.tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-tarjeta);
+}
+
+.tarjeta__etiqueta {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+}
+
+.tarjeta__valor {
+  font-size: 1.75rem;
+  font-weight: 650;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--texto-tenue);
+}
+
+.tarjeta__nota {
+  font-size: 0.78rem;
+  color: var(--texto-tenue);
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
