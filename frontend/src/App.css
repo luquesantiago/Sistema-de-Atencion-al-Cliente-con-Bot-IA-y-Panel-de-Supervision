@@ -156,6 +156,126 @@
   gap: 8px;
 }
 
+/* Controles */
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio-chico);
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: 0.87rem;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.boton:hover {
+  background: var(--superficie-alterna);
+  border-color: var(--texto-tenue);
+}
+
+.boton--primario {
+  background: var(--primario);
+  border-color: var(--primario);
+  color: #ffffff;
+}
+
+.boton--primario:hover {
+  background: var(--primario-fuerte);
+  border-color: var(--primario-fuerte);
+}
+
+.boton[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Indicadores */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border: 1px solid var(--borde-fuerte);
+  border-radius: 999px;
+  background: var(--superficie-alterna);
+  font-size: 0.78rem;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+.chip--exito {
+  border-color: #b6ddc7;
+  background: var(--exito-suave);
+  color: var(--exito);
+}
+
+.chip--alerta {
+  border-color: #f0d4a4;
+  background: var(--alerta-suave);
+  color: var(--alerta);
+}
+
+.chip--riesgo {
+  border-color: #f2c2bd;
+  background: var(--riesgo-suave);
+  color: var(--riesgo);
+}
+
+.chip--neutro {
+  color: var(--texto-suave);
+}
+
+/* Estados de panel: carga, vacío, error y sin permisos */
+
+.estado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 44px 24px;
+  text-align: center;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-tarjeta);
+}
+
+.estado__icono {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: var(--primario-suave);
+  color: var(--primario);
+}
+
+.estado--alerta .estado__icono {
+  background: var(--alerta-suave);
+  color: var(--alerta);
+}
+
+.estado--riesgo .estado__icono {
+  background: var(--riesgo-suave);
+  color: var(--riesgo);
+}
+
+.estado__titulo {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.estado__texto {
+  max-width: 52ch;
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+}
+
 /* Responsive: la navegación se reordena arriba, sin ocultar módulos */
 
 @media (max-width: 900px) {
