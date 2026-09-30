@@ -97,18 +97,162 @@
   font-weight: 600;
 }
 
+/* Con la sesión cerrada no se navega: los módulos quedan inactivos */
+
+.nav__item[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.nav__item[disabled]:hover {
+  background: transparent;
+  color: var(--nav-texto);
+}
+
 .nav__icono {
   flex: none;
   width: 18px;
   height: 18px;
 }
 
-.panel__pie {
+/* Caja del usuario conectado: avatar, nombre y cargo, y salir */
+
+.panel__usuario {
   margin-top: auto;
-  padding: 12px 10px 0;
-  border-top: 1px solid var(--nav-borde);
-  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px;
+  background: var(--nav-fondo-alto);
+  border: 1px solid var(--nav-borde);
+  border-radius: var(--radio);
+}
+
+.usuario__avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--primario);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.usuario__datos {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.usuario__nombre {
+  overflow: hidden;
+  color: var(--nav-texto-activo);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usuario__rol {
   color: #7f95b0;
+  font-size: 0.75rem;
+}
+
+/* Versión de la caja con la sesión cerrada: candado en vez de iniciales */
+
+.usuario__avatar--cerrado {
+  background: var(--nav-borde);
+  color: var(--nav-texto);
+}
+
+.usuario__entrar {
+  align-self: flex-start;
+  padding: 0;
+  background: none;
+  border: 0;
+  /* Azul claro: el primario da poco contraste sobre el fondo navy */
+  color: #8dbcff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.usuario__entrar:hover {
+  color: #c2d9ff;
+}
+
+.usuario__salir {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radio-chico);
+  color: var(--nav-texto);
+  cursor: pointer;
+}
+
+.usuario__salir:hover {
+  background: var(--nav-fondo);
+  border-color: var(--nav-borde);
+  color: var(--nav-texto-activo);
+}
+
+/* Confirmación del cierre, dentro de la misma caja */
+
+.panel__usuario--confirmacion {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.usuario__pregunta {
+  color: var(--nav-texto-activo);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.usuario__confirmar {
+  display: flex;
+  gap: 8px;
+}
+
+.usuario__accion {
+  flex: 1;
+  padding: 5px 8px;
+  background: var(--nav-fondo);
+  border: 1px solid var(--nav-borde);
+  border-radius: var(--radio-chico);
+  color: var(--nav-texto);
+  font-size: 0.8rem;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.usuario__accion:hover {
+  background: var(--nav-borde);
+  color: var(--nav-texto-activo);
+}
+
+.usuario__accion--riesgo {
+  background: var(--riesgo);
+  border-color: var(--riesgo);
+  color: #ffffff;
+}
+
+.usuario__accion--riesgo:hover {
+  background: #8f1d17;
+  border-color: #8f1d17;
 }
 
 /* Área de trabajo */
