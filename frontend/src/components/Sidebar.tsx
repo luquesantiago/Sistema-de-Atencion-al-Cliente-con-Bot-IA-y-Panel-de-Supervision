@@ -1,18 +1,32 @@
 import { MODULOS, type ModuloPanel } from '../navigation'
 import { IconoModulo } from './iconos'
+import { etiquetaRol, type UsuarioPanel } from '../usuario'
 
 interface SidebarProps {
   activo: ModuloPanel
+  usuario: UsuarioPanel
   onNavegar: (modulo: ModuloPanel) => void
+  onCerrarSesion: () => void
 }
 
-export default function Sidebar({ activo, onNavegar }: SidebarProps) {
+export default function Sidebar({ activo, usuario, onNavegar, onCerrarSesion }: SidebarProps) {
   return (
     <nav className="panel__nav" aria-label="Navegación principal">
       <div className="marca">
         <span className="marca__nombre">Seguros Castaño</span>
         <span className="marca__rol">Panel de supervisión</span>
       </div>
+
+      <section className="perfil" aria-label="Usuario conectado">
+        <span className="perfil__avatar" aria-hidden="true">{usuario.iniciales}</span>
+        <span className="perfil__datos">
+          <span className="perfil__nombre">{usuario.nombre}</span>
+          <span className="perfil__rol">{etiquetaRol(usuario.rol)}</span>
+        </span>
+        <button className="perfil__salir" type="button" onClick={onCerrarSesion}>
+          Cerrar sesión
+        </button>
+      </section>
 
       <ul className="nav__grupo">
         <li className="nav__titulo">Módulos</li>
@@ -35,7 +49,6 @@ export default function Sidebar({ activo, onNavegar }: SidebarProps) {
       </ul>
 
       <div className="panel__pie">
-        <p>Todo se atribuye al usuario de prueba operador.</p>
         <p>La atención humana atiende de lunes a viernes de 9 a 18.</p>
       </div>
     </nav>
