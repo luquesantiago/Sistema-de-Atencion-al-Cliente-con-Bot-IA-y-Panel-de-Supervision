@@ -10,6 +10,10 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activo, usuario, onNavegar, onCerrarSesion }: SidebarProps) {
+  const modulosVisibles = usuario.rol === 'administrador'
+    ? MODULOS
+    : MODULOS.filter((modulo) => modulo.id !== 'dashboard')
+
   return (
     <nav className="panel__nav" aria-label="Navegación principal">
       <div className="marca">
@@ -30,7 +34,7 @@ export default function Sidebar({ activo, usuario, onNavegar, onCerrarSesion }: 
 
       <ul className="nav__grupo">
         <li className="nav__titulo">Módulos</li>
-        {MODULOS.map((modulo) => {
+        {modulosVisibles.map((modulo) => {
           const seleccionado = modulo.id === activo
           return (
             <li key={modulo.id}>

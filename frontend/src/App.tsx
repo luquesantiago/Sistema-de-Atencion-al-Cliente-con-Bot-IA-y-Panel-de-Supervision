@@ -23,7 +23,7 @@ function App() {
 
   function manejarIngreso(nuevoUsuario: UsuarioPanel) {
     setUsuario(nuevoUsuario)
-    setActivo(nuevoUsuario.rol === 'operador' ? 'bandeja' : 'dashboard')
+    setActivo(nuevoUsuario.rol === 'administrador' ? 'dashboard' : 'bandeja')
   }
 
   if (usuario === null) {

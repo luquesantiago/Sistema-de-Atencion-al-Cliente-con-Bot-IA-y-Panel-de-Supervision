@@ -1,4 +1,4 @@
-export type RolUsuario = 'gerente' | 'operador'
+export type RolUsuario = 'administrador' | 'operador'
 
 export interface UsuarioPanel {
   nombre: string
@@ -11,26 +11,17 @@ export function crearUsuario(nombreIngresado: string): UsuarioPanel {
 
   const usuarioNormalizado = nombreNormalizado.toLocaleLowerCase('es-AR')
 
-  if (usuarioNormalizado === 'roberto' || usuarioNormalizado === 'roberto castaño') {
+  if (usuarioNormalizado === 'admin') {
     return {
-      nombre: 'Roberto Castaño',
-      iniciales: 'RC',
-      rol: 'gerente',
+      nombre: 'Administrador',
+      iniciales: 'AD',
+      rol: 'administrador',
     }
   }
 
-  const nombre = nombreNormalizado
-    .split(' ')
-    .map((parte) => parte.charAt(0).toLocaleUpperCase('es-AR') + parte.slice(1))
-    .join(' ')
-  const partes = nombre.split(' ')
-  const iniciales = partes.length > 1
-    ? `${partes[0].charAt(0)}${partes[partes.length - 1].charAt(0)}`
-    : partes[0].charAt(0)
-
-  return { nombre, iniciales: iniciales.toLocaleUpperCase('es-AR'), rol: 'operador' }
+  return { nombre: 'Operador', iniciales: 'OP', rol: 'operador' }
 }
 
 export function etiquetaRol(rol: RolUsuario): string {
-  return rol === 'gerente' ? 'Gerente' : 'Operador/a'
+  return rol === 'administrador' ? 'Administrador' : 'Operador/a'
 }

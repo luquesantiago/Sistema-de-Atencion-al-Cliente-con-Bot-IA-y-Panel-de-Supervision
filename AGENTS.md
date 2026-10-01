@@ -73,7 +73,7 @@ Reglas del Parcial 1:
 
 - El LLM solo clasifica la intención. Las respuestas salen de plantillas con datos de la base; el motor de verificación (RF-VER-02) todavía no está.
 - Los textos de las plantillas los propone la IA que programa, en el PR, con el tono de «Contexto funcional». El equipo los revisa ahí.
-- Sin login: el backend atribuye todo lo que se hace desde el panel (tomar, responder, aprobar, rechazar y cerrar) al usuario de prueba `operador`. Nunca toma el usuario de lo que manda el navegador. En el Parcial 2 lo reemplaza el login.
+- Login en Frontend: la interfaz incluye la pantalla de inicio de sesión con los usuarios de prueba (`admin` y `operador` / clave `1234`) para simular el acceso según el rol. El backend atribuye todo lo que se hace desde el panel al usuario de prueba `operador` y la autenticación real de servidor se integrará en el Parcial 2.
 - El operador le contesta al cliente desde el panel: el mensaje sale por WhatsApp desde el número del asistente y queda guardado con origen «operador».
 - La migración de la planilla sigue `docs/migracion.md`. El Excel limpio no está en el repo.
 

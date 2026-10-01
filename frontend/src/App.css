@@ -444,6 +444,33 @@
   border-color: #2563eb;
 }
 
+.login__formulario input[aria-invalid='true'],
+.login__formulario input[aria-invalid='true']:focus-visible {
+  border-color: #b3261e;
+}
+
+.login__error {
+  margin: -11px 0 15px;
+  color: #b3261e;
+  font-size: 0.8rem;
+}
+
+.login__ayuda {
+  margin-top: 20px;
+  padding: 10px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.login__ayuda strong {
+  color: var(--texto);
+  font-weight: 650;
+}
+
 .login__boton {
   min-height: 44px;
   margin-top: 4px;

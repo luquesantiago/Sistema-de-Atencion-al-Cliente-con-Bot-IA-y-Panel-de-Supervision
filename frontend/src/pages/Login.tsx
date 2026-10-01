@@ -7,11 +7,27 @@ interface LoginProps {
 
 export default function Login({ onIngresar }: LoginProps) {
   const [nombreUsuario, setNombreUsuario] = useState('')
+  const [contrasena, setContrasena] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [errorUsuario, setErrorUsuario] = useState('')
+  const [errorContrasena, setErrorContrasena] = useState('')
 
   function manejarEnvio(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault()
-    onIngresar(crearUsuario(nombreUsuario))
+    const usuarioNormalizado = nombreUsuario.trim().toLocaleLowerCase('es-AR')
+    const usuarioValido = usuarioNormalizado === 'admin' || usuarioNormalizado === 'operador'
+    const contrasenaValida = contrasena === '1234'
+
+    setErrorUsuario(
+      usuarioValido ? '' : 'Usuario incorrecto. Ingresá admin u operador.',
+    )
+    setErrorContrasena(
+      contrasenaValida ? '' : 'Contraseña incorrecta. La clave de prueba es 1234.',
+    )
+
+    if (!usuarioValido || !contrasenaValida) return
+
+    onIngresar(crearUsuario(usuarioNormalizado))
   }
 
   return (
@@ -34,17 +50,20 @@ export default function Login({ onIngresar }: LoginProps) {
             type="text"
             autoComplete="username"
             list="usuarios-disponibles"
-            pattern=".*\S.*"
-            title="Ingresá un usuario con al menos una letra o número."
             placeholder="Ingresá tu usuario"
             value={nombreUsuario}
-            onChange={(evento) => setNombreUsuario(evento.target.value)}
-            required
+            aria-invalid={errorUsuario !== ''}
+            aria-describedby={errorUsuario ? 'usuario-error' : undefined}
+            onChange={(evento) => {
+              setNombreUsuario(evento.target.value)
+              setErrorUsuario('')
+            }}
           />
           <datalist id="usuarios-disponibles">
-            <option value="roberto" />
-            <option value="graciela" />
+            <option value="admin" />
+            <option value="operador" />
           </datalist>
+          {errorUsuario && <p className="login__error" id="usuario-error" role="alert">{errorUsuario}</p>}
 
           <label htmlFor="contrasena">Contraseña</label>
           <div className="login__password-wrapper">
@@ -54,7 +73,13 @@ export default function Login({ onIngresar }: LoginProps) {
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               placeholder="Ingresá tu contraseña"
-              required
+              value={contrasena}
+              aria-invalid={errorContrasena !== ''}
+              aria-describedby={errorContrasena ? 'contrasena-error' : undefined}
+              onChange={(evento) => {
+                setContrasena(evento.target.value)
+                setErrorContrasena('')
+              }}
             />
             <button
               className="login__password-toggle"
@@ -80,9 +105,11 @@ export default function Login({ onIngresar }: LoginProps) {
               </svg>
             </button>
           </div>
+          {errorContrasena && <p className="login__error" id="contrasena-error" role="alert">{errorContrasena}</p>}
 
           <button className="login__boton" type="submit">Ingresar al Panel</button>
         </form>
+        <p className="login__ayuda">Usuarios de prueba: <strong>admin</strong> u <strong>operador</strong> · Clave: <strong>1234</strong></p>
       </section>
       <footer className="login__pie">© 2026 Seguros Castaño</footer>
     </main>
