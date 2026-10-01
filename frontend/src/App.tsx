@@ -1,16 +1,15 @@
-import { useCallback, useEffect, useState, type ComponentType } from 'react'
-import Sidebar, { type EstadoUsuario } from './components/Sidebar'
-import EstadoPanel from './components/EstadoPanel'
+import { useState, type ComponentType } from 'react'
+import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import BandejaAtencion from './pages/BandejaAtencion'
 import TramitesAprobar from './pages/TramitesAprobar'
 import BaseClientes from './pages/BaseClientes'
+import Login from './pages/Login'
 import { MODULOS, type Modulo, type ModuloPanel } from './navigation'
-import { obtenerUsuarioActual, type UsuarioActual } from './api/usuarios'
+import type { UsuarioPanel } from './usuario'
 import './App.css'
 
-const PAGINAS: Record<ModuloPanel, ComponentType<{ modulo: Modulo }>> = {
-  dashboard: Dashboard,
+const PAGINAS: Record<Exclude<ModuloPanel, 'dashboard'>, ComponentType<{ modulo: Modulo }>> = {
   bandeja: BandejaAtencion,
   tramites: TramitesAprobar,
   clientes: BaseClientes,
@@ -18,37 +17,18 @@ const PAGINAS: Record<ModuloPanel, ComponentType<{ modulo: Modulo }>> = {
 
 function App() {
   const [activo, setActivo] = useState<ModuloPanel>('dashboard')
-  const [usuario, setUsuario] = useState<UsuarioActual | null>(null)
-  const [estadoUsuario, setEstadoUsuario] = useState<EstadoUsuario>('cargando')
-  const [sesionCerrada, setSesionCerrada] = useState(false)
-  const [intento, setIntento] = useState(0)
-
+  const [usuario, setUsuario] = useState<UsuarioPanel | null>(null)
   const modulo = MODULOS.find((item) => item.id === activo) ?? MODULOS[0]
-  const Pagina = PAGINAS[activo]
+  const Pagina = activo === 'dashboard' ? undefined : PAGINAS[activo]
 
-  useEffect(() => {
-    let vigente = true
-    obtenerUsuarioActual()
-      .then((cargado) => {
-        if (!vigente) return
-        setUsuario(cargado)
-        setEstadoUsuario('listo')
-      })
-      .catch(() => {
-        if (!vigente) return
-        setUsuario(null)
-        setEstadoUsuario('error')
-      })
-    return () => {
-      vigente = false
-    }
-  }, [intento])
+  function manejarIngreso(nuevoUsuario: UsuarioPanel) {
+    setUsuario(nuevoUsuario)
+    setActivo(nuevoUsuario.rol === 'administrador' ? 'dashboard' : 'bandeja')
+  }
 
-  const reintentarUsuario = useCallback(() => {
-    // El estado de carga se marca acá (en el evento), no dentro del efecto.
-    setEstadoUsuario('cargando')
-    setIntento((anterior) => anterior + 1)
-  }, [])
+  if (usuario === null) {
+    return <Login onIngresar={manejarIngreso} />
+  }
 
   return (
     <div className="panel">
@@ -58,35 +38,15 @@ function App() {
 
       <Sidebar
         activo={activo}
-        onNavegar={setActivo}
         usuario={usuario}
-        estadoUsuario={estadoUsuario}
-        onReintentarUsuario={reintentarUsuario}
-        onCerrarSesion={() => setSesionCerrada(true)}
-        sesionCerrada={sesionCerrada}
-        onIniciarSesion={() => setSesionCerrada(false)}
+        onNavegar={setActivo}
+        onCerrarSesion={() => setUsuario(null)}
       />
 
       <main className="panel__principal" id="contenido">
-        {sesionCerrada ? (
-          <div className="pagina">
-            <EstadoPanel
-              titulo="Sesión cerrada"
-              descripcion="Cierre de sesión simulado: todavía no existe login en el sistema."
-              acciones={
-                <button
-                  type="button"
-                  className="boton boton--primario"
-                  onClick={() => setSesionCerrada(false)}
-                >
-                  Iniciar sesión
-                </button>
-              }
-            />
-          </div>
-        ) : (
-          <Pagina modulo={modulo} />
-        )}
+        {Pagina === undefined
+          ? <Dashboard modulo={modulo} rol={usuario.rol} onNavegar={setActivo} />
+          : <Pagina modulo={modulo} />}
       </main>
     </div>
   )

@@ -1,103 +1,17 @@
 import { useState } from 'react'
 import { MODULOS, type ModuloPanel } from '../navigation'
-import { IconoCandado, IconoModulo, IconoSalir } from './iconos'
-import type { UsuarioActual } from '../api/usuarios'
-
-/** Estados posibles de la carga del usuario conectado. */
-export type EstadoUsuario = 'cargando' | 'listo' | 'error'
+import { IconoModulo, IconoSalir } from './iconos'
+import { etiquetaRol, type UsuarioPanel } from '../usuario'
 
 interface SidebarProps {
   activo: ModuloPanel
+  usuario: UsuarioPanel
   onNavegar: (modulo: ModuloPanel) => void
-  /** Usuario cargado, o null mientras carga o si falló. */
-  usuario: UsuarioActual | null
-  estadoUsuario: EstadoUsuario
-  onReintentarUsuario: () => void
   onCerrarSesion: () => void
-  /** true mientras el contenido principal muestra «Sesión cerrada». */
-  sesionCerrada: boolean
-  /** Simulado hasta el login del Parcial 2: vuelve a mostrar el panel. */
-  onIniciarSesion: () => void
 }
 
-function iniciales(nombre: string, apellido: string): string {
-  const iniciales = `${nombre.trim().charAt(0)}${apellido.trim().charAt(0)}`
-  return iniciales === '' ? '??' : iniciales.toUpperCase()
-}
-
-/** "operador" → "Operador", para mostrar el cargo con mayúscula. */
-function cargo(rol: string): string {
-  const limpio = rol.trim()
-  return limpio.charAt(0).toUpperCase() + limpio.slice(1)
-}
-
-function CajaUsuario({
-  usuario,
-  estadoUsuario,
-  onReintentarUsuario,
-  onCerrarSesion,
-  sesionCerrada,
-  onIniciarSesion,
-}: Pick<
-  SidebarProps,
-  | 'usuario'
-  | 'estadoUsuario'
-  | 'onReintentarUsuario'
-  | 'onCerrarSesion'
-  | 'sesionCerrada'
-  | 'onIniciarSesion'
->) {
+function CajaUsuario({ usuario, onCerrarSesion }: Pick<SidebarProps, 'usuario' | 'onCerrarSesion'>) {
   const [confirmando, setConfirmando] = useState(false)
-
-  if (sesionCerrada) {
-    return (
-      <div className="panel__usuario">
-        <span className="usuario__avatar usuario__avatar--cerrado" aria-hidden="true">
-          <IconoCandado className="nav__icono" />
-        </span>
-        <div className="usuario__datos">
-          <span className="usuario__nombre">Sesión cerrada</span>
-          <button
-            type="button"
-            className="usuario__entrar"
-            onClick={onIniciarSesion}
-          >
-            Iniciar sesión
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  if (estadoUsuario === 'cargando') {
-    return (
-      <div className="panel__usuario" role="status">
-        <span className="usuario__avatar" aria-hidden="true">
-          …
-        </span>
-        <div className="usuario__datos">
-          <span className="usuario__nombre">Cargando usuario…</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (estadoUsuario === 'error' || usuario === null) {
-    return (
-      <div className="panel__usuario" role="alert">
-        <div className="usuario__datos">
-          <span className="usuario__nombre">No se pudo cargar el usuario</span>
-        </div>
-        <button
-          type="button"
-          className="usuario__accion"
-          onClick={onReintentarUsuario}
-        >
-          Reintentar
-        </button>
-      </div>
-    )
-  }
 
   if (confirmando) {
     return (
@@ -114,8 +28,7 @@ function CajaUsuario({
             className="usuario__accion usuario__accion--riesgo"
             autoFocus
             onClick={() => {
-              // Vuelve a la vista normal: si no, la caja queda pegada en la
-              // confirmación mientras el panel muestra «Sesión cerrada».
+              // Reinicia la confirmación antes de volver al formulario de ingreso.
               setConfirmando(false)
               onCerrarSesion()
             }}
@@ -137,13 +50,13 @@ function CajaUsuario({
   return (
     <div className="panel__usuario">
       <span className="usuario__avatar" aria-hidden="true">
-        {iniciales(usuario.nombre, usuario.apellido)}
+        {usuario.iniciales}
       </span>
       <div className="usuario__datos">
         <span className="usuario__nombre">
-          {usuario.nombre} {usuario.apellido}
+          {usuario.nombre}
         </span>
-        <span className="usuario__rol">{cargo(usuario.rol)}</span>
+        <span className="usuario__rol">{etiquetaRol(usuario.rol)}</span>
       </div>
       <button
         type="button"
@@ -158,16 +71,11 @@ function CajaUsuario({
   )
 }
 
-export default function Sidebar({
-  activo,
-  onNavegar,
-  usuario,
-  estadoUsuario,
-  onReintentarUsuario,
-  onCerrarSesion,
-  sesionCerrada,
-  onIniciarSesion,
-}: SidebarProps) {
+export default function Sidebar({ activo, usuario, onNavegar, onCerrarSesion }: SidebarProps) {
+  const modulosVisibles = usuario.rol === 'administrador'
+    ? MODULOS
+    : MODULOS.filter((modulo) => modulo.id !== 'dashboard')
+
   return (
     <nav className="panel__nav" aria-label="Navegación principal">
       <div className="marca">
@@ -177,7 +85,7 @@ export default function Sidebar({
 
       <ul className="nav__grupo">
         <li className="nav__titulo">Módulos</li>
-        {MODULOS.map((modulo) => {
+        {modulosVisibles.map((modulo) => {
           const seleccionado = modulo.id === activo
           return (
             <li key={modulo.id}>
@@ -185,7 +93,6 @@ export default function Sidebar({
                 type="button"
                 className="nav__item"
                 aria-current={seleccionado ? 'page' : undefined}
-                disabled={sesionCerrada}
                 onClick={() => onNavegar(modulo.id)}
               >
                 <IconoModulo modulo={modulo.id} className="nav__icono" />
@@ -198,11 +105,7 @@ export default function Sidebar({
 
       <CajaUsuario
         usuario={usuario}
-        estadoUsuario={estadoUsuario}
-        onReintentarUsuario={onReintentarUsuario}
         onCerrarSesion={onCerrarSesion}
-        sesionCerrada={sesionCerrada}
-        onIniciarSesion={onIniciarSesion}
       />
     </nav>
   )
