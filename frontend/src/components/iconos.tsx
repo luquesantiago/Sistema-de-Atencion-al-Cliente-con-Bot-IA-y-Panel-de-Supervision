@@ -67,6 +67,16 @@ export function IconoClientes({ className }: IconoProps) {
   )
 }
 
+export function IconoSalir({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <path d="M14.5 8V5.5A1.5 1.5 0 0 0 13 4H6a1.5 1.5 0 0 0-1.5 1.5v13A1.5 1.5 0 0 0 6 20h7a1.5 1.5 0 0 0 1.5-1.5V16" />
+      <path d="M10 12h9.5" />
+      <path d="M17 9.5 19.5 12 17 14.5" />
+    </PanelIcono>
+  )
+}
+
 export function IconoInfo({ className }: IconoProps) {
   return (
     <PanelIcono className={className}>
