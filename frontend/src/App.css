@@ -459,6 +459,124 @@
   font-size: 0.9rem;
 }
 
+/* Bandeja de Atención */
+
+.pagina--bandeja {
+  max-width: none;
+  min-height: 100svh;
+  margin: 0;
+  padding: 24px;
+}
+
+.bandeja-layout {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.bandeja__lista,
+.bandeja__chat {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+}
+
+.bandeja__lista {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.bandeja__lista-cabecera {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 16px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.bandeja__titulo {
+  font-size: 1.2rem;
+  font-weight: 650;
+}
+
+.bandeja__busqueda {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio-chico);
+  background: var(--superficie);
+  color: var(--texto-suave);
+}
+
+.bandeja__busqueda:focus-within {
+  border-color: var(--primario);
+  box-shadow: none;
+}
+
+.bandeja__busqueda-icono {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.bandeja__busqueda input {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--texto);
+  font: inherit;
+  font-size: 0.83rem;
+}
+
+.bandeja__busqueda input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.bandeja__busqueda input::placeholder {
+  color: var(--texto-tenue);
+}
+
+.bandeja__lista-contenido {
+  display: grid;
+  flex: 1;
+  min-height: 180px;
+  place-items: center;
+  padding: 20px;
+}
+
+.bandeja__lista-vacia {
+  max-width: 24ch;
+  color: var(--texto-tenue);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.bandeja__chat {
+  display: grid;
+  place-items: center;
+  padding: 28px;
+}
+
+.bandeja__chat-vacio {
+  max-width: 36ch;
+  color: var(--texto-suave);
+  font-size: 0.95rem;
+  text-align: center;
+}
+
 /* Ingreso */
 
 .login {
@@ -777,6 +895,17 @@
     padding: 20px 16px 40px;
   }
 
+  .pagina--bandeja {
+    min-height: auto;
+    padding: 20px 16px 28px;
+  }
+
+  .bandeja-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(260px, 38svh) minmax(320px, 1fr);
+    gap: 12px;
+  }
+
   .operativo {
     flex-direction: column;
     align-items: stretch;
@@ -787,5 +916,14 @@
 @media (max-width: 480px) {
   .login__tarjeta {
     padding: 28px 22px 24px;
+  }
+
+  .pagina--bandeja {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .bandeja__chat {
+    padding: 20px;
   }
 }
