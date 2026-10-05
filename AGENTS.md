@@ -61,17 +61,20 @@ No implementar emisión ni cotización de pólizas, integración con compañías
 Se muestra una conversación por WhatsApp de punta a punta, con los datos históricos migrados. Mientras la cátedra no diga otra cosa, el Parcial 1 no incluye ABM.
 
 1. Llega un mensaje y el asistente pide el DNI antes de responder cualquier cosa.
-2. Con el DNI validado, si el cliente escribe desde un número que no tiene vinculado, el asistente le ofrece registrarlo (regla 9).
-3. El LLM clasifica la intención con el catálogo `tipo_consulta` (que incluye «cambio de teléfono»). Después del DNI, el asistente responde la consulta del primer mensaje.
+2. Con el DNI validado, si el cliente escribe desde un número que no tiene vinculado, el asistente le ofrece registrarlo (regla 9). No aplica mientras los clientes salgan de los fixtures, que no tienen teléfonos.
+3. El LLM elige la intención de una lista cerrada: el catálogo `tipo_consulta` (que incluye «cambio de teléfono»), más «no es de seguros» y «no sé». Después del DNI, el asistente responde la consulta del primer mensaje.
 4. Según la intención:
    - Vencimiento o estado de la póliza: responde el asistente. Si el cliente tiene varias pólizas, responde todas juntas, una línea por póliza con el número, el ramo y el dato pedido.
    - Saludo o agradecimiento: responde con una plantilla de cortesía, sin derivar.
-   - Cambio de teléfono pedido desde un número ya vinculado: le pide que escriba desde el número nuevo.
-   - Cualquier otra cosa (incluidos baja, siniestro, cotización y lo que no se pueda clasificar): deriva a la bandeja de un operador.
+   - Cambio de teléfono pedido desde un número ya vinculado: le pide que escriba desde el número nuevo. Mientras los clientes salgan de los fixtures, que no tienen teléfonos, se manda a aprobar como una baja.
+   - Baja o modificación (incluida el alta de conductor): le avisa que un miembro del equipo va a revisar el pedido, sin darlo por hecho, y deja de responder en esa conversación.
+   - Lo que no es de seguros: no contesta ni deriva.
+   - Cualquier otra cosa (incluidos siniestro, cotización, saldo, cobertura, reclamo y lo que no se pueda clasificar): deriva a la bandeja de un operador.
 
 Reglas del Parcial 1:
 
-- El LLM solo clasifica la intención. Las respuestas salen de plantillas con datos de la base; el motor de verificación (RF-VER-02) todavía no está.
+- El LLM elige la intención de una lista cerrada (salida estructurada estricta) y vuelve a redactar la plantilla completada con los datos, sin cambiarlos; el código controla que los datos no cambien y, si cambian, deriva. El motor de verificación (RF-VER-02) todavía no está.
+- Mientras la cartera migrada no esté en la base, el asistente trabaja con los clientes ficticios de `backend/fixtures/clientes-ficticios.json` y no lee ni escribe la base. Desvíos provisionales hasta entonces: el DNI validado y el silencio después de derivar duran hasta que se reinicia el backend; el cliente nuevo no se registra como prospecto (se le pide el nombre y se deriva); y el cambio de teléfono se manda a aprobar.
 - Los textos de las plantillas los propone la IA que programa, en el PR, con el tono de «Contexto funcional». El equipo los revisa ahí.
 - Login en Frontend: la interfaz incluye la pantalla de inicio de sesión con los usuarios de prueba (`admin` y `operador` / clave `1234`) para simular el acceso según el rol. El backend atribuye todo lo que se hace desde el panel al usuario de prueba `operador` y la autenticación real de servidor se integrará en el Parcial 2.
 - El operador le contesta al cliente desde el panel: el mensaje sale por WhatsApp desde el número del asistente y queda guardado con origen «operador».
@@ -142,11 +145,12 @@ docker compose exec frontend npm run lint
 docker compose exec frontend npm run build
 docker compose exec backend npx prisma generate
 docker compose exec backend npx tsc --noEmit
+docker compose exec backend npm test
 ```
 
 Si se cambia `docker-compose.yml`, validar con `docker compose config`.
 
-Las pruebas se escriben con Vitest, en el backend y en el frontend. Todavía no está instalado: el primer PR que sume pruebas lo instala y agrega el comando a esta sección. Toda nueva regla crítica debe venir con una prueba de dominio o de integración que demuestre el caso permitido y el caso retenido o derivado.
+Las pruebas se escriben con Vitest, en el backend y en el frontend. En el backend ya está instalado (`npm test`, pruebas en `backend/src/**/*.test.ts`); en el frontend todavía no: el primer PR que sume pruebas ahí lo instala y agrega el comando a esta sección. Toda nueva regla crítica debe venir con una prueba de dominio o de integración que demuestre el caso permitido y el caso retenido o derivado.
 
 ## Decisiones abiertas
 

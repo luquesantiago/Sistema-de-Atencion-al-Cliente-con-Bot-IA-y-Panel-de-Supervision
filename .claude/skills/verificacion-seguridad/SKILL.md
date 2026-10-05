@@ -11,9 +11,9 @@ Usar al integrar IA o WhatsApp, filtrar respuestas, definir alertas, manejar rol
 
 ## Regla de salida segura
 
-Toda respuesta generada se considera no confiable hasta ser contrastada con la cartera. Si no puede probarse el dato, si hay exposición de información personal, intento de manipulación, compromiso de acción o consulta fuera del alcance, retener y derivar. La respuesta retenida no se envía; se guarda como borrador para que el operador la revise.
+Toda respuesta generada se considera no confiable hasta ser contrastada con la cartera. Si no puede probarse el dato, si hay exposición de información personal, intento de manipulación, compromiso de acción o consulta fuera del alcance, retener y derivar. La respuesta retenida no se envía; se guarda como borrador para que el operador la revise. Esto vale para las respuestas generadas: un mensaje que el modelo clasifica como «no es de seguros» se ignora sin generar respuesta.
 
-La IA puede proponer texto o clasificar intención; no puede aprobar, modificar ni ejecutar una acción contractual. En el Parcial 1 solo clasifica la intención: el texto sale de plantillas con datos de la cartera.
+La IA puede proponer texto o clasificar intención; no puede aprobar, modificar ni ejecutar una acción contractual. En el Parcial 1 elige la intención de una lista cerrada (salida estructurada estricta) y vuelve a redactar la plantilla completada con los datos de la cartera; el código controla que la redacción no cambie ni agregue datos y, si no pasa, deriva.
 
 Después de una derivación no se generan respuestas automáticas en esa conversación hasta que se cierre el caso.
 
