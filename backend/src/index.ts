@@ -3,14 +3,18 @@ import { createApp } from './http/app.js'
 import { config } from './infrastructure/config.js'
 import { customerRepositoryFromEnvironment } from './infrastructure/in-memory-customer-repository.js'
 import { OpenAiCompatibleClient } from './infrastructure/openai-compatible-client.js'
-import { MetaWhatsAppClient } from './infrastructure/meta-whatsapp-client.js'
+import { WahaWhatsAppClient } from './infrastructure/waha-whatsapp-client.js'
 
+const whatsapp = new WahaWhatsAppClient(config.whatsappApiUrl, config.whatsappApiKey)
 const processIncomingMessage = new ProcessIncomingMessage(
   customerRepositoryFromEnvironment(),
   new OpenAiCompatibleClient(config.aiApiUrl, config.aiApiKey, config.aiModel),
-  new MetaWhatsAppClient(config.whatsappApiUrl, config.whatsappApiToken, config.whatsappPhoneNumberId),
+  whatsapp,
 )
 
-createApp(processIncomingMessage).listen(config.port, () => {
+createApp(processIncomingMessage, {
+  secret: config.whatsappWebhookSecret,
+  findPhoneByLid: (lid) => whatsapp.findPhoneByLid(lid),
+}).listen(config.port, () => {
   console.log(`Backend listening on port ${config.port}`)
 })

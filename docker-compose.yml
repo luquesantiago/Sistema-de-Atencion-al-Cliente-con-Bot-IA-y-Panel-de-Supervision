@@ -44,8 +44,8 @@ services:
       AI_API_KEY: ${AI_API_KEY}
       AI_MODEL: ${AI_MODEL}
       WHATSAPP_API_URL: ${WHATSAPP_API_URL}
-      WHATSAPP_API_TOKEN: ${WHATSAPP_API_TOKEN}
-      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID}
+      WHATSAPP_API_KEY: ${WHATSAPP_API_KEY}
+      WHATSAPP_WEBHOOK_SECRET: ${WHATSAPP_WEBHOOK_SECRET}
       CUSTOMERS_JSON: ${CUSTOMERS_JSON:-[]}
     ports:
       - "3000:3000"
@@ -66,6 +66,32 @@ services:
       - ./frontend:/app
     depends_on:
       - backend
+
+  # Puente con WhatsApp (WAHA, motor GOWS, sin navegador). No es la API oficial:
+  # usa un WhatsApp personal vinculado con QR y le contesta a cualquiera que le
+  # escriba, así que solo arranca con el perfil y sin restart (ver README).
+  waha:
+    image: devlikeapro/waha:gows-2026.9.2
+    profiles: [whatsapp]
+    user: "1000:1000"                     # la sesión queda del usuario de WSL, no de root
+    ports:
+      - "127.0.0.1:8080:3000"             # dashboard solo local; el 3000 del host es del backend
+    volumes:
+      - ${HOME}/waha-sesion:/app/.sessions  # sesión vinculada: fuera del repo, crearla antes del primer up
+    environment:                          # sin env_file: WAHA lee varias variables WHATSAPP_* del backend
+      WHATSAPP_DEFAULT_ENGINE: GOWS
+      WHATSAPP_START_SESSION: seguros-castano   # la crea si no existe; el backend usa el mismo nombre
+      WAHA_API_KEY: ${WHATSAPP_API_KEY}   # misma clave que usa el backend para llamar a WAHA
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD}
+      WHATSAPP_HOOK_URL: http://backend:3000/webhooks/whatsapp
+      WHATSAPP_HOOK_EVENTS: message       # solo los mensajes entrantes
+      WHATSAPP_HOOK_CUSTOM_HEADERS: X-Webhook-Secret:${WHATSAPP_WEBHOOK_SECRET}
+      WAHA_SESSION_CONFIG_IGNORE_STATUS: "true"
+      WAHA_SESSION_CONFIG_IGNORE_GROUPS: "true"
+      WAHA_SESSION_CONFIG_IGNORE_CHANNELS: "true"
+      WAHA_SESSION_CONFIG_IGNORE_BROADCAST: "true"
+      WAHA_EVENTS_DOWNLOAD_MEDIA: "false"
 
 volumes:
   db_data:

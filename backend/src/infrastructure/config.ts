@@ -12,6 +12,6 @@ export const config = {
   aiApiKey: requiredEnvironment('AI_API_KEY'),
   aiModel: requiredEnvironment('AI_MODEL'),
   whatsappApiUrl: requiredEnvironment('WHATSAPP_API_URL'),
-  whatsappApiToken: requiredEnvironment('WHATSAPP_API_TOKEN'),
-  whatsappPhoneNumberId: requiredEnvironment('WHATSAPP_PHONE_NUMBER_ID'),
+  whatsappApiKey: requiredEnvironment('WHATSAPP_API_KEY'),
+  whatsappWebhookSecret: requiredEnvironment('WHATSAPP_WEBHOOK_SECRET'),
 }

@@ -15,7 +15,7 @@ El sistema tiene tres partes conectadas:
 | Frontend | React 19 + TypeScript + Vite 8 |
 | Backend | Node.js 24 + TypeScript + Express 5 |
 | Base de datos | MySQL 8.4 + Prisma 7 |
-| Mensajería | WhatsApp con OpenWA |
+| Mensajería | WhatsApp con WAHA (motor GOWS, no oficial) |
 | IA del asistente | Groq (`openai/gpt-oss-20b`) |
 | Entorno | Docker Compose |
 
@@ -58,6 +58,34 @@ docker compose exec frontend npm run lint
 docker compose exec frontend npm run build
 docker compose exec backend npx tsc --noEmit
 ```
+
+## WhatsApp (WAHA)
+
+El asistente recibe y contesta por WhatsApp a través de [WAHA](https://waha.devlike.pro/) con el motor GOWS: un servicio no oficial que se conecta a WhatsApp Web por websocket, sin navegador, con un WhatsApp vinculado por QR. No es la API oficial de Meta, que exige verificar el negocio. WAHA le avisa cada mensaje al backend (`POST /webhooks/whatsapp`, con el header `X-Webhook-Secret`) y el backend contesta por la API de WAHA.
+
+El servicio `waha` solo arranca con el perfil `whatsapp`: si no vas a probar WhatsApp, no hace falta levantarlo. El backend igual necesita las variables `WHATSAPP_*` en el `.env`, y si faltan las `WAHA_DASHBOARD_*`, compose avisa en cada comando: para las dos cosas alcanzan los valores de ejemplo de `.env.example`.
+
+Para probarlo:
+
+1. En el `.env`, cambiar los valores de ejemplo de `WHATSAPP_API_KEY`, `WHATSAPP_WEBHOOK_SECRET`, `WAHA_DASHBOARD_USERNAME` y `WAHA_DASHBOARD_PASSWORD`, porque el repo es público. Van sin `:` ni `;`. `WHATSAPP_API_URL` queda en `http://waha:3000`.
+2. Crear la carpeta de la sesión antes del primer arranque (si la crea Docker, queda de root y WAHA no puede escribir en ella):
+   ```bash
+   mkdir -p ~/waha-sesion
+   ```
+3. Levantar el backend y WAHA (el frontend no hace falta):
+   ```bash
+   docker compose up -d db backend
+   docker compose --profile whatsapp up -d waha
+   ```
+4. Entrar a http://localhost:8080/dashboard con el usuario y la contraseña del `.env`. En la sesión `seguros-castano`, escanear el QR con el teléfono (WhatsApp → Dispositivos vinculados). Hay que hacerlo enseguida: los QR duran unos 2 minutos y medio en total desde que arranca la sesión. El QR también sale en la terminal, con `docker compose logs -f --tail 40 waha`.
+   - Si el QR vence, reiniciar **solo la sesión**. El botón para reiniciar o apagar el **servidor** del dashboard apaga el contenedor (el servicio va sin `restart`), y entonces hay que volver a levantarlo con `docker compose --profile whatsapp up -d waha`.
+5. Ver que la sesión quede en `WORKING`. Los eventos se ven en vivo en http://localhost:8080/dashboard/event-monitor, y los mensajes procesados, en `docker compose logs -f backend`.
+6. Al terminar, apagarlo. Mientras está levantado, el asistente le contesta a cualquiera que le escriba a ese número.
+   ```bash
+   docker compose --profile whatsapp stop waha
+   ```
+
+La sesión vinculada queda en `~/waha-sesion`, fuera del repo, y se reanuda sola la próxima vez que se levanta `waha`, sin pedir el QR. No se sube ni se comparte: con ella se puede usar ese WhatsApp.
 
 ## Base de datos y migraciones
 
