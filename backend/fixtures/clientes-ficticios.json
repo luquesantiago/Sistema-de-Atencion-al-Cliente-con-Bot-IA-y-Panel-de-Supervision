@@ -1,0 +1,31 @@
+{
+  "aviso": "Datos ficticios para probar el asistente. No son clientes reales.",
+  "clientes": [
+    {
+      "id": "ficticio-1",
+      "dni": "99000001",
+      "firstName": "Ana",
+      "lastName": "Ficticia",
+      "policies": [
+        { "number": "POL-90001", "ramo": "auto", "status": "activa", "expirationDate": "2027-03-15" },
+        { "number": "POL-90002", "ramo": "hogar", "status": "activa", "expirationDate": "2026-09-01" }
+      ]
+    },
+    {
+      "id": "ficticio-2",
+      "dni": "99000002",
+      "firstName": "Bruno",
+      "lastName": "Ficticio",
+      "policies": [
+        { "number": "POL-90003", "ramo": "moto", "status": "suspendida por mora", "expirationDate": "2026-12-10" }
+      ]
+    },
+    {
+      "id": "ficticio-3",
+      "dni": "99000003",
+      "firstName": "Carla",
+      "lastName": "Ficticia",
+      "policies": []
+    }
+  ]
+}

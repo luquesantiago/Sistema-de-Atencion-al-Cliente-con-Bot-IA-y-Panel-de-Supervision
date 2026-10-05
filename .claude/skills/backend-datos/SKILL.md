@@ -63,7 +63,7 @@ docker compose exec backend npx prisma generate
 - Distinguir `401` de `403`, validación (`400`), recurso inexistente (`404`) y conflicto de estado (`409`).
 - No aceptar desde el cliente un actor o rol para autorizar una acción. En el Parcial 1 no hay login: el backend atribuye las acciones del panel al usuario de prueba `operador`.
 - Diseñar idempotencia para los mensajes que llegan de WhatsApp (WAHA): un mensaje repetido no puede duplicar mensajes ni efectos.
-- No enviar una respuesta de IA antes de pasar por verificación. En el Parcial 1 el LLM solo clasifica la intención y las respuestas salen de plantillas con datos de la base.
+- No enviar una respuesta de IA antes de pasar por verificación. En el Parcial 1 el LLM elige la intención de una lista cerrada y vuelve a redactar la plantilla completada con los datos; el código controla que la redacción no cambie datos y, si no pasa, deriva. Mientras la cartera no esté en la base, los datos salen de `backend/fixtures/clientes-ficticios.json`.
 - No generar respuestas automáticas en una conversación con un caso derivado sin cerrar.
 
 ## Prisma y migraciones
