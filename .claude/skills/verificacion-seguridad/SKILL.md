@@ -46,7 +46,7 @@ Mantener alertas diferenciables para datos falsos o no verificables, exposición
 - Minimizar la exposición de DNI, teléfonos y conversaciones en logs y vistas.
 - Enmascarar datos sensibles cuando el contexto no requiera el valor completo.
 - No usar información real del cliente en pruebas automatizadas ni capturas compartidas.
-- Los tokens de WhatsApp y del proveedor de IA van en `.env`, nunca en el repo. La sesión de WhatsApp Web que guarda OpenWA tampoco se sube: con ella se puede usar ese WhatsApp.
+- Los tokens de WhatsApp y del proveedor de IA van en `.env`, nunca en el repo. La sesión de WhatsApp Web que guarda WAHA tampoco se sube: con ella se puede usar ese WhatsApp.
 - Con los permisos actuales del compose, el usuario `app` puede borrar los triggers de auditoría. En producción debería tener solo permisos de datos (pendiente de definir).
 - Considerar la Ley 25.326 y los controles OWASP para aplicaciones con LLM como referencias de diseño.
 

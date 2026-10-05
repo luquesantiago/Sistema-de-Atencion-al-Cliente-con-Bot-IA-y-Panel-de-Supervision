@@ -27,7 +27,20 @@ export class ProcessIncomingMessage {
       return { status: 'DUPLICATE_IGNORED', responseSent: false }
     }
     this.processedMessageIds.add(message.messageId)
+    // Si el proceso falla, el canal vuelve a mandar el mensaje: se deshace lo que dejó en memoria
+    // para que el reintento arranque como la primera vez.
+    const pendingBefore = this.pendingQuestions.get(message.phone)
+    try {
+      return await this.process(message)
+    } catch (error) {
+      this.processedMessageIds.delete(message.messageId)
+      if (pendingBefore) this.pendingQuestions.set(message.phone, pendingBefore)
+      else this.pendingQuestions.delete(message.phone)
+      throw error
+    }
+  }
 
+  private async process(message: IncomingWhatsAppMessage): Promise<ProcessResult> {
     const dni = normalizeDni(message.dni ?? message.text)
     const pendingQuestion = this.pendingQuestions.get(message.phone)
     if (!dni) {

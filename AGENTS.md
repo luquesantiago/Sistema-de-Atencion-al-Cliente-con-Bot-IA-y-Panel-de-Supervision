@@ -82,7 +82,7 @@ Reglas del Parcial 1:
 - Frontend: React 19 + TypeScript + Vite, en `frontend/`.
 - Backend: Node.js + TypeScript + Express, en `backend/`.
 - Persistencia: MySQL 8.4 + Prisma 7, con Docker Compose. El esquema es SQL-first: cada cambio de la base es una migración SQL escrita a mano en `backend/prisma/migrations`, y `schema.prisma` se regenera con `prisma db pull`. El flujo está en la skill `backend-datos`.
-- Mensajería: WhatsApp con OpenWA (librería no oficial que automatiza WhatsApp Web), no la API oficial de Meta. La sesión de WhatsApp Web que guarda no se sube al repo.
+- Mensajería: WhatsApp con WAHA (WhatsApp HTTP API) y el motor GOWS, un servicio no oficial que se conecta a WhatsApp Web por websocket, sin navegador, con un WhatsApp vinculado por QR. No es la API oficial de Meta, que exige verificar el negocio. Corre en el compose como servicio `waha`, con el perfil `whatsapp`, y avisa cada mensaje al webhook del backend (`/webhooks/whatsapp`). La sesión que guarda no se sube al repo.
 - IA del asistente: Groq con el modelo `openai/gpt-oss-20b` (plan gratuito), por la API compatible con OpenAI. Se configura con `AI_API_URL`, `AI_API_KEY` y `AI_MODEL`.
 - Todo corre en Docker Compose (`db`, `backend`, `frontend`) con recarga automática: Node y las dependencias viven en los contenedores, no hace falta instalarlos en la máquina.
 - El repo se clona dentro de WSL, no en una carpeta de Windows: la recarga automática falla en montajes de Windows.
@@ -164,6 +164,7 @@ No cerrar por código sin confirmación del cliente. Si una tarea depende de alg
 - Cuotas de las pólizas.
 - Si el asistente pide CUIT a los clientes empresa.
 - Tratamiento de datos sensibles.
+- Qué hace el asistente con los audios, las fotos y los archivos sin texto. Mientras tanto, el canal los ignora sin responder y deja una línea en el log del backend; si la foto trae epígrafe, procesa el texto.
 - Minutos para alertar una derivación sin tomar (60, provisorio) y minutos de inactividad que cierran una sesión (30, provisorio).
 - Cómo se cuenta «lo resolvió el asistente» en las métricas (RF-SUP-05). Definirlo antes de programarlas.
 

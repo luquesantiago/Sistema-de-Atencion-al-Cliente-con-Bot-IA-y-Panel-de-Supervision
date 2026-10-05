@@ -1,6 +1,6 @@
 ---
 name: backend-datos
-description: Backend y base de datos del proyecto. Cubre Express 5, Prisma 7, el esquema MySQL 8.4, migraciones, endpoints, la conexión con WhatsApp (OpenWA), migración de la planilla histórica y persistencia de auditoría, con los comandos Docker y los problemas ya conocidos. Usar al tocar cualquier archivo de backend/, el schema de Prisma o el servicio db.
+description: Backend y base de datos del proyecto. Cubre Express 5, Prisma 7, el esquema MySQL 8.4, migraciones, endpoints, la conexión con WhatsApp (WAHA), migración de la planilla histórica y persistencia de auditoría, con los comandos Docker y los problemas ya conocidos. Usar al tocar cualquier archivo de backend/, el schema de Prisma o el servicio db.
 ---
 
 # Skill: Backend y datos
@@ -62,7 +62,7 @@ docker compose exec backend npx prisma generate
 - Responder errores con formato consistente y sin filtrar stack traces ni secretos.
 - Distinguir `401` de `403`, validación (`400`), recurso inexistente (`404`) y conflicto de estado (`409`).
 - No aceptar desde el cliente un actor o rol para autorizar una acción. En el Parcial 1 no hay login: el backend atribuye las acciones del panel al usuario de prueba `operador`.
-- Diseñar idempotencia para los mensajes que llegan de WhatsApp (OpenWA): un mensaje repetido no puede duplicar mensajes ni efectos.
+- Diseñar idempotencia para los mensajes que llegan de WhatsApp (WAHA): un mensaje repetido no puede duplicar mensajes ni efectos.
 - No enviar una respuesta de IA antes de pasar por verificación. En el Parcial 1 el LLM solo clasifica la intención y las respuestas salen de plantillas con datos de la base.
 - No generar respuestas automáticas en una conversación con un caso derivado sin cerrar.
 
