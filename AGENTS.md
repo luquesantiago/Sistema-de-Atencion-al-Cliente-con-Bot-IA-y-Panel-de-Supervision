@@ -78,7 +78,7 @@ Reglas del Parcial 1:
 - Los textos de las plantillas los propone la IA que programa, en el PR, con el tono de «Contexto funcional». El equipo los revisa ahí.
 - Login en Frontend: la interfaz incluye la pantalla de inicio de sesión con los usuarios de prueba (`admin` y `operador` / clave `1234`) para simular el acceso según el rol. El backend atribuye todo lo que se hace desde el panel al usuario de prueba `operador` y la autenticación real de servidor se integrará en el Parcial 2.
 - El operador le contesta al cliente desde el panel: el mensaje sale por WhatsApp desde el número del asistente y queda guardado con origen «operador».
-- La migración de la planilla sigue `docs/migracion.md`. El Excel limpio no está en el repo.
+- La migración de la planilla sigue `docs/migracion.md`. El Excel limpio no está en el repo: se copia a `backend/planilla/` (ignorada) y se carga con `docker compose exec backend npm run migrar-planilla` (script `backend/scripts/migrar-planilla.ts`).
 
 ## Arquitectura y convenciones
 

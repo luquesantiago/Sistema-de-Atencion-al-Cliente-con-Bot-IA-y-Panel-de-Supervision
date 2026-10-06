@@ -5,7 +5,16 @@ Reglas para importar a la base los datos históricos de la agencia (Parcial 1). 
 ## Dónde está el Excel
 
 - No se sube al repo. Está en la carpeta del proyecto en Drive.
-- El script de migración lo lee desde una carpeta dentro de `backend/` que Git ignora. Tiene que estar ahí porque el contenedor del backend solo ve `./backend`: un archivo en otra carpeta (por ejemplo, el Escritorio de Windows) no lo encuentra.
+- Para cargarlo, se copia a `backend/planilla/`, una carpeta que Git ignora. Tiene que estar ahí porque el contenedor del backend solo ve `./backend`: un archivo en otra carpeta (por ejemplo, el Escritorio de Windows) no lo encuentra. Después de cargar se puede borrar de ahí: los datos quedan en la base.
+- El script está en `backend/scripts/migrar-planilla.ts` y se corre sobre una base vacía, recién migrada:
+
+  ```bash
+  cp <carpeta de Drive>/Caso8_seguros_bot_datos_limpios.xlsx backend/planilla/
+  docker compose exec backend npm run migrar-planilla
+  ```
+
+  Para leer otro archivo: `npm run migrar-planilla -- <ruta dentro de backend/>`. Valida toda la planilla antes de escribir y carga todo en una transacción: si algo falla, la base queda como estaba. Si la base ya tiene clientes o los usuarios `roberto` o `graciela`, no escribe nada. Al terminar informa cuántos registros cargó por tabla y qué filas salteó.
+- Los datos quedan en el volumen de Docker de la base: `docker compose stop`, `restart` y `down` (sin `-v`) no los borran. `docker compose down -v` sí: después hay que volver a correr el script.
 - Quien no tenga el Excel no tiene los datos migrados. La demo corre en una máquina que lo tenga.
 
 ## Qué lee el script
@@ -37,9 +46,9 @@ Reglas para importar a la base los datos históricos de la agencia (Parcial 1). 
 ## Usuarios
 
 - **De prueba:** `admin` (rol administrador, «Admin Prueba») y `operador` (rol operador, «Operador Prueba»), con contraseña 1234. Van en una migración SQL, así existen en todas las bases aunque no se haya corrido la migración de la planilla: el panel del Parcial 1 atribuye todo a `operador`. El repo es público: antes de producción se borran o se les cambia la contraseña.
-- **Históricos:** el script de la planilla crea a Roberto Castaño (administrador, usuario `roberto`) y a Graciela Castaño (operador, usuario `graciela`) desactivados, con una contraseña al azar que nadie conoce. No pueden entrar al sistema: solo figuran como responsables de sus casos y como quienes atendieron sus alertas. Cuando se creen los usuarios permanentes, se activan esos mismos registros. El apellido de Graciela es un supuesto (en la carta es hija de Roberto).
+- **Históricos:** el script de la planilla crea a Roberto Castaño (administrador, usuario `roberto`) y a Graciela Castaño (operador, usuario `graciela`) activos, con contraseña `seguros1234` (decisión del equipo, 06/10/2026). Son los responsables de los casos migrados y quienes atendieron sus alertas. El repo es público: antes de producción se les cambia la contraseña. El apellido de Graciela es un supuesto (en la carta es hija de Roberto).
 - Diego no se carga ahora porque no figura en la planilla.
-- El algoritmo de hash es bcrypt, con prefijo `$2b$` y coste 10, fijado como literal en la migración `20260929204929_caso_poliza_cambio_telefono_usuarios_prueba`. El login del Parcial 2 usa el mismo.
+- El algoritmo de hash es bcrypt, con prefijo `$2b$` y coste 10: literal en la migración `20260929204929_caso_poliza_cambio_telefono_usuarios_prueba` para los usuarios de prueba, y generado con `bcryptjs` por el script de la planilla para los históricos. El login del Parcial 2 usa el mismo.
 
 ## A tener en cuenta
 
