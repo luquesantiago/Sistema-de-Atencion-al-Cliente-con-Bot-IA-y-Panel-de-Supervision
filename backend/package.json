@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "test": "vitest run --passWithNoTests",
+    "migrar-planilla": "tsx scripts/migrar-planilla.ts",
     "postinstall": "prisma generate"
   },
   "keywords": [],
@@ -15,7 +16,9 @@
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.10.0",
     "@prisma/client": "^7.10.0",
-    "express": "^5.2.1"
+    "bcryptjs": "^3.0.3",
+    "express": "^5.2.1",
+    "read-excel-file": "^9.3.10"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
