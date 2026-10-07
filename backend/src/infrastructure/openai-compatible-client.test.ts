@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { CustomerStatus } from '../domain/ai-client.js'
 import { intents } from '../domain/intent.js'
 import { OpenAiCompatibleClient } from './openai-compatible-client.js'
 
@@ -56,6 +57,33 @@ describe('classifyIntent', () => {
   it('lanza si la respuesta no trae choices', async () => {
     await expect(clientWith(fakeFetch(200, {})).classifyIntent('x')).rejects.toThrow()
   })
+})
+
+describe('classifyCustomerStatus', () => {
+  it.each<[CustomerStatus, string]>([
+    ['NEW_CUSTOMER', 'Soy nuevo cliente'],
+    ['EXISTING_CUSTOMER', 'Sí, ya soy cliente'],
+    ['UNRELATED', '¿a qué hora atienden?'],
+  ])('devuelve %s en una salida estructurada y contextualizada', async (status, reply) => {
+    const requests: RecordedRequest[] = []
+    const client = clientWith(fakeFetch(200, completion({ tipo: status }), requests))
+
+    await expect(client.classifyCustomerStatus(reply)).resolves.toBe(status)
+
+    const body = requests[0]?.body as {
+      messages: Array<{ role: string; content: string }>
+      response_format: { json_schema: { schema: { properties: { tipo: { enum: string[] } } } } }
+    }
+    expect(body.messages[0]?.content).toContain('¿ya es cliente de Seguros Castaño o sería un cliente nuevo?')
+    expect(body.messages[0]?.content).toContain('«soy nuevo» o «soy nuevo cliente»')
+    expect(body.messages[0]?.content).toContain('una respuesta «sí» o «si» sola confirma')
+    expect(body.response_format.json_schema.schema.properties.tipo.enum).toEqual([
+      'NEW_CUSTOMER',
+      'EXISTING_CUSTOMER',
+      'UNRELATED',
+    ])
+  })
+
 })
 
 describe('rewrite', () => {

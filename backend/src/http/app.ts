@@ -1,5 +1,11 @@
-import express, { type ErrorRequestHandler, type RequestHandler } from 'express'
+import express, { type ErrorRequestHandler, type NextFunction, type RequestHandler, type Response } from 'express'
+import { ManageRequests } from '../application/manage-requests.js'
 import type { ProcessIncomingMessage } from '../application/process-incoming-message.js'
+import {
+  RequestManagementError,
+  type PhoneChangeDecisionInput,
+  type ProspectDecisionInput,
+} from '../domain/request-management.js'
 import { KeyedQueue } from '../infrastructure/keyed-queue.js'
 import { isValidWebhookSecret, maskPhoneForLog, messageKeyForLog, parseWahaWebhook } from '../infrastructure/waha-webhook.js'
 
@@ -8,7 +14,11 @@ export type WhatsAppWebhookOptions = {
   findPhoneByLid: (lid: string) => Promise<string | null>
 }
 
-export function createApp(processIncomingMessage: ProcessIncomingMessage, whatsapp: WhatsAppWebhookOptions) {
+export function createApp(
+  processIncomingMessage: ProcessIncomingMessage,
+  whatsapp: WhatsAppWebhookOptions,
+  manageRequests: ManageRequests,
+) {
   const app = express()
   const senders = new KeyedQueue()
 
@@ -55,10 +65,190 @@ export function createApp(processIncomingMessage: ProcessIncomingMessage, whatsa
   app.use(express.json({ limit: '32kb' }))
 
   app.get('/health', (_request, response) => response.status(200).json({ status: 'ok' }))
+  app.get('/api/tramites/prospectos', async (request, response, next) => {
+    try {
+      const page = parsePage(request.query.limit, request.query.offset)
+      const items = await manageRequests.listPendingProspects(page)
+      response.status(200).json({ items, ...page })
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.get('/api/tramites/cambios-telefono', async (request, response, next) => {
+    try {
+      const page = parsePage(request.query.limit, request.query.offset)
+      const items = await manageRequests.listPendingPhoneChanges(page)
+      response.status(200).json({ items, ...page })
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.post('/api/tramites/prospectos/:id/decision', async (request, response, next) => {
+    try {
+      const input = parseProspectDecision(request.params.id, request.body)
+      const result = await manageRequests.decideProspect(input)
+      response.status(200).json({
+        id: result.id,
+        decision: result.decision,
+        ...(result.clienteId === undefined ? {} : { clienteId: result.clienteId }),
+      })
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.post('/api/tramites/cambios-telefono/:id/decision', async (request, response, next) => {
+    try {
+      const input = parsePhoneChangeDecision(request.params.id, request.body)
+      const result = await manageRequests.decidePhoneChange(input)
+      response.status(200).json({
+        id: result.id,
+        decision: result.decision,
+        notificationSent: result.notificationSent,
+        ...(result.notificationSent ? {} : {
+          warning: 'La decisión quedó registrada, pero no se pudo avisar al cliente por WhatsApp.',
+        }),
+      })
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.post('/api/tramites/cambios-telefono/:id/notificacion', async (request, response, next) => {
+    try {
+      if (request.body !== undefined && Object.keys(parseBody(request.body, [])).length > 0) {
+        throw new RequestManagementError(400, 'VALIDATION_ERROR', 'Este endpoint no acepta campos en el cuerpo.')
+      }
+      const result = await manageRequests.retryPhoneChangeNotification(parseId(request.params.id))
+      response.status(200).json({
+        id: result.id,
+        decision: result.decision,
+        notificationSent: result.notificationSent,
+        ...(result.notificationSent ? {} : {
+          warning: 'La decisión está registrada, pero todavía no se pudo avisar al cliente por WhatsApp.',
+        }),
+      })
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
   const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
+    if (isRecord(error) && error.type === 'entity.parse.failed') {
+      response.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'El cuerpo no contiene JSON válido.' } })
+      return
+    }
+    if (isRecord(error) && error.type === 'entity.too.large') {
+      response.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'El cuerpo supera el tamaño permitido.' } })
+      return
+    }
     console.error(error)
-    response.status(500).json({ error: 'No se pudo procesar el mensaje.' })
+    response.status(500).json({ error: { code: 'INTERNAL_ERROR', message: 'No se pudo procesar la solicitud.' } })
   }
   app.use(errorHandler)
   return app
+}
+
+function parsePage(limitValue: unknown, offsetValue: unknown): { limit: number; offset: number } {
+  const limit = limitValue === undefined ? 25 : parseNonNegativeInteger(limitValue, 'limit')
+  const offset = offsetValue === undefined ? 0 : parseNonNegativeInteger(offsetValue, 'offset')
+  if (limit < 1 || limit > 100) {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', 'limit debe estar entre 1 y 100.')
+  }
+  return { limit, offset }
+}
+
+function parseNonNegativeInteger(value: unknown, field: string): number {
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', `${field} debe ser un entero no negativo.`)
+  }
+  const parsed = Number(value)
+  if (!Number.isSafeInteger(parsed)) {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', `${field} está fuera del rango permitido.`)
+  }
+  return parsed
+}
+
+function parseProspectDecision(idValue: unknown, value: unknown): ProspectDecisionInput {
+  const body = parseBody(value, ['decision', 'fundamento', 'nombre', 'apellido'])
+  const id = parseId(idValue)
+  const decision = parseDecision(body.decision)
+  const fundamento = parseString(body.fundamento, 'fundamento')
+  if (decision === 'aprobar') {
+    return {
+      id,
+      decision,
+      fundamento,
+      nombre: parseString(body.nombre, 'nombre'),
+      apellido: parseString(body.apellido, 'apellido'),
+    }
+  }
+  if (body.nombre !== undefined || body.apellido !== undefined) {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', 'No se envían nombre ni apellido al rechazar un prospecto.')
+  }
+  return {
+    id,
+    decision,
+    fundamento,
+  }
+}
+
+function parsePhoneChangeDecision(idValue: unknown, value: unknown): PhoneChangeDecisionInput {
+  const body = parseBody(value, ['decision', 'fundamento', 'telefonosADesvincular'])
+  const ids = body.telefonosADesvincular === undefined ? [] : body.telefonosADesvincular
+  if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'number')) {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', 'telefonosADesvincular debe ser una lista de identificadores.')
+  }
+  return {
+    id: parseId(idValue),
+    decision: parseDecision(body.decision),
+    fundamento: parseString(body.fundamento, 'fundamento'),
+    telefonosADesvincular: ids,
+  }
+}
+
+function parseBody(value: unknown, allowed: string[]): Record<string, unknown> {
+  if (!isRecord(value)) throw new RequestManagementError(400, 'VALIDATION_ERROR', 'El cuerpo debe ser un objeto JSON.')
+  if (Object.keys(value).some((key) => !allowed.includes(key))) {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', 'El cuerpo contiene campos no permitidos.')
+  }
+  return value
+}
+
+function parseId(value: unknown): number {
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', 'El identificador del trámite no es válido.')
+  }
+  const id = Number(value)
+  if (!Number.isSafeInteger(id) || id > 4_294_967_295) {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', 'El identificador del trámite está fuera del rango permitido.')
+  }
+  return id
+}
+
+function parseDecision(value: unknown): 'aprobar' | 'rechazar' {
+  if (value !== 'aprobar' && value !== 'rechazar') {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', 'La decisión debe ser aprobar o rechazar.')
+  }
+  return value
+}
+
+function parseString(value: unknown, field: string): string {
+  if (typeof value !== 'string') {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', `${field} debe ser texto.`)
+  }
+  return value
+}
+
+function handleRequestError(
+  error: unknown,
+  response: Response,
+  next: NextFunction,
+): void {
+  if (error instanceof RequestManagementError) {
+    response.status(error.statusCode).json({ error: { code: error.code, message: error.message } })
+    return
+  }
+  next(error)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

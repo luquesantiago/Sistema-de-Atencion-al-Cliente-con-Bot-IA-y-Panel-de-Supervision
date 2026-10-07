@@ -15,16 +15,3 @@ export function findDni(text: string): string | null {
 export function maskDni(text: string): string {
   return text.replace(dniPattern, '[DNI]')
 }
-
-export type YesNo = 'yes' | 'no'
-
-// Respuesta a «¿Es usted cliente nuevo?». Lo resuelve el código, sin el modelo: antes de
-// identificar al cliente no sale nada al proveedor. Lo que no es un sí se toma como un no.
-export function parseYesNo(text: string): YesNo {
-  const normalized = text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replace(/^[^\p{L}]+/u, '')
-  return /^(si|soy nuev[oa])(?![\p{L}])/u.test(normalized) ? 'yes' : 'no'
-}

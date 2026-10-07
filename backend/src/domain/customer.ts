@@ -29,7 +29,24 @@ export type Customer = {
   policies: CustomerPolicy[]
 }
 
+export type NewProspect = {
+  phone: string
+  name: string
+  dni: string
+}
+
+export type PhoneChangeRequest = {
+  phone: string
+  customerId: string
+}
+
 export interface CustomerRepository {
   findByDni(dni: string): Promise<Customer | null>
   findById(id: string): Promise<Customer | null>
+  hasLinkedPhone(phone: string): Promise<boolean>
+  hasOpenHandoff(phone: string): Promise<boolean>
+  recordMessageForOpenHandoff(phone: string, message: string): Promise<void>
+  recordIncomingPhone(phone: string): Promise<void>
+  createProspect(prospect: NewProspect): Promise<void>
+  createPhoneChangeRequest(request: PhoneChangeRequest): Promise<void>
 }

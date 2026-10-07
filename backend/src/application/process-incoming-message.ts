@@ -1,45 +1,72 @@
-import type { AiClient } from '../domain/ai-client.js'
+import type { AiClient, CustomerStatus } from '../domain/ai-client.js'
 import type { Customer, CustomerRepository } from '../domain/customer.js'
-import { findDni, maskDni, parseYesNo } from '../domain/dni.js'
+import { findDni, maskDni } from '../domain/dni.js'
 import { actionForIntent, type AnswerTemplate, type Intent } from '../domain/intent.js'
 import type { IncomingWhatsAppMessage } from '../domain/message.js'
 import { checkRewrite } from '../domain/rewrite-check.js'
 import {
   approvalNotice,
-  courtesyTemplate,
-  dniRetryRequest,
+  customerStatusQuestion,
+  customerStatusRetryQuestion,
+  existingCustomerDniRequest,
   expirationsTemplate,
   firstDniRequest,
   handoffMessage,
+  newCustomerDniRequest,
   newCustomerNameRequest,
-  newCustomerQuestion,
+  newCustomerPhotoRequest,
+  newCustomerPhotoRetryRequest,
+  phoneChangePendingMessage,
+  prospectHandoffMessage,
   repeatedDniRequest,
   statusesTemplate,
+  useNewPhoneRequest,
   welcomeMessage,
   type Clock,
 } from '../domain/templates.js'
 import type { WhatsAppClient } from '../domain/whatsapp-client.js'
 
-// Al 4.º DNI no reconocido se deriva (regla 2 de AGENTS.md, RF-ATE-03).
 const maxUnrecognizedDnis = 4
 
-// Estado de cada número, en memoria hasta que se reinicia el backend (provisional, sin base).
+type DniFlow = {
+  stage: 'awaiting_dni'
+  origin: 'known_phone' | 'existing_customer'
+  pendingQuestion: string | null
+  unrecognizedDnis: number
+}
+
+type CustomerStatusFlow = {
+  stage: 'awaiting_customer_status'
+  dniOrigin: DniFlow['origin']
+  pendingQuestion: string | null
+  unrecognizedDnis: number
+}
+
 type ConversationState =
-  | { stage: 'awaiting_dni'; pendingQuestion: string | null; unrecognizedDnis: number }
-  | { stage: 'awaiting_new_customer_answer'; pendingQuestion: string | null; unrecognizedDnis: number }
-  | { stage: 'awaiting_name' }
+  | CustomerStatusFlow
+  | DniFlow
+  | { stage: 'awaiting_new_customer_name' }
+  | { stage: 'awaiting_new_customer_dni'; name: string }
+  | { stage: 'awaiting_new_customer_photo'; name: string; dni: string }
   | { stage: 'identified'; customerId: string }
-  | { stage: 'silenced' }
+  | { stage: 'silenced'; persistent: boolean }
 
 export type ProcessResult =
+  | { status: 'CUSTOMER_STATUS_REQUESTED'; responseSent: true }
+  | { status: 'CUSTOMER_STATUS_REASKED'; responseSent: true }
   | { status: 'DNI_REQUESTED'; responseSent: true }
-  | { status: 'NEW_CUSTOMER_ASKED'; responseSent: true }
   | { status: 'NAME_REQUESTED'; responseSent: true }
+  | { status: 'NEW_CUSTOMER_DNI_REQUESTED'; responseSent: true }
+  | { status: 'PHOTO_REQUESTED'; responseSent: true }
+  | { status: 'PROSPECT_HANDED_OFF'; responseSent: true }
+  | { status: 'PHONE_CHANGE_PENDING'; responseSent: true }
+  | { status: 'NEW_PHONE_REQUESTED'; intent: Intent; responseSent: true }
   | { status: 'WELCOME_SENT'; responseSent: true }
   | { status: 'ANSWER_SENT'; intent: Intent; responseSent: true }
   | { status: 'APPROVAL_NOTICE_SENT'; intent: Intent; responseSent: true }
   | { status: 'HANDOFF_SENT'; reason: string; responseSent: true }
   | { status: 'IGNORED_NOT_INSURANCE'; responseSent: false }
+  | { status: 'IGNORED_MEDIA'; responseSent: false }
   | { status: 'SILENCED'; responseSent: false }
   | { status: 'DUPLICATE_IGNORED'; responseSent: false }
 
@@ -59,10 +86,9 @@ export class ProcessIncomingMessage {
       return { status: 'DUPLICATE_IGNORED', responseSent: false }
     }
     this.processedMessageIds.add(message.messageId)
-    // Si el proceso falla (en la práctica, el envío por WhatsApp), el canal vuelve a mandar
-    // el mensaje: se deshace lo que dejó en memoria para que el reintento arranque igual.
     const stateBefore = this.states.get(message.phone)
     try {
+      await this.customers.recordIncomingPhone(message.phone)
       return await this.process(message)
     } catch (error) {
       this.processedMessageIds.delete(message.messageId)
@@ -72,12 +98,36 @@ export class ProcessIncomingMessage {
     }
   }
 
-  private async process({ phone, text }: IncomingWhatsAppMessage): Promise<ProcessResult> {
+  private async process(message: IncomingWhatsAppMessage): Promise<ProcessResult> {
+    const { phone, text } = message
     const state = this.states.get(phone)
 
-    // Después de derivar o de mandar a aprobar, el asistente no responde más (RF-DER-03).
-    if (state?.stage === 'silenced') return { status: 'SILENCED', responseSent: false }
-    if (state?.stage === 'awaiting_name') return this.handoff(phone, 'cliente nuevo')
+    if (state?.stage === 'silenced') {
+      if (!state.persistent) return { status: 'SILENCED', responseSent: false }
+      if (await this.customers.hasOpenHandoff(phone)) {
+        await this.customers.recordMessageForOpenHandoff(phone, messageTextForCase(message))
+        return { status: 'SILENCED', responseSent: false }
+      }
+      this.states.delete(phone)
+      return this.process(message)
+    }
+    if (!state && await this.customers.hasOpenHandoff(phone)) {
+      await this.customers.recordMessageForOpenHandoff(phone, messageTextForCase(message))
+      this.states.set(phone, { stage: 'silenced', persistent: true })
+      return { status: 'SILENCED', responseSent: false }
+    }
+    if (message.media === 'image' && state?.stage !== 'awaiting_new_customer_photo') {
+      return { status: 'IGNORED_MEDIA', responseSent: false }
+    }
+    if (state?.stage === 'awaiting_customer_status') return this.classifyCustomerStatus(phone, state, text)
+    if (state?.stage === 'awaiting_new_customer_name') return this.collectNewCustomerName(phone, text)
+    if (state?.stage === 'awaiting_new_customer_dni') {
+      return this.collectNewCustomerDni(phone, state.name, text)
+    }
+    if (state?.stage === 'awaiting_new_customer_photo') {
+      return this.collectNewCustomerPhoto(phone, state.name, state.dni, message)
+    }
+    if (state?.stage === 'awaiting_dni') return this.identifyCustomer(phone, state, text)
 
     if (state?.stage === 'identified') {
       const customer = await this.customers.findById(state.customerId)
@@ -85,52 +135,144 @@ export class ProcessIncomingMessage {
       return this.answerQuery(phone, customer, text, false)
     }
 
-    const pendingQuestion = state?.pendingQuestion ?? null
-    const unrecognizedDnis = state?.unrecognizedDnis ?? 0
-
-    const dni = findDni(text)
-    if (dni) {
-      const customer = await this.customers.findByDni(dni)
-      if (customer) {
-        this.states.set(phone, { stage: 'identified', customerId: customer.id })
-        if (pendingQuestion) return this.answerQuery(phone, customer, pendingQuestion, true)
-        return this.sendWelcome(phone, customer)
+    if (await this.customers.hasLinkedPhone(phone)) {
+      const dniFlow: DniFlow = {
+        stage: 'awaiting_dni',
+        origin: 'known_phone',
+        pendingQuestion: containsQuestionOutsideDni(text) ? text : null,
+        unrecognizedDnis: 0,
       }
-      const attempts = unrecognizedDnis + 1
-      if (attempts >= maxUnrecognizedDnis) return this.handoff(phone, 'DNI no reconocido')
-      if (attempts === 1) {
-        this.states.set(phone, { stage: 'awaiting_new_customer_answer', pendingQuestion, unrecognizedDnis: attempts })
-        await this.whatsapp.sendText(phone, newCustomerQuestion)
-        return { status: 'NEW_CUSTOMER_ASKED', responseSent: true }
-      }
-      this.states.set(phone, { stage: 'awaiting_dni', pendingQuestion, unrecognizedDnis: attempts })
-      await this.whatsapp.sendText(phone, dniRetryRequest)
+      this.states.set(phone, dniFlow)
+      if (findDni(text)) return this.identifyCustomer(phone, dniFlow, text)
+      await this.whatsapp.sendText(phone, firstDniRequest)
       return { status: 'DNI_REQUESTED', responseSent: true }
     }
 
-    // La respuesta a «¿Es usted cliente nuevo?» la resuelve el código: antes de
-    // identificar al cliente no sale nada al proveedor de IA.
-    if (state?.stage === 'awaiting_new_customer_answer') {
-      if (parseYesNo(text) === 'yes') {
-        this.states.set(phone, { stage: 'awaiting_name' })
-        await this.whatsapp.sendText(phone, newCustomerNameRequest)
-        return { status: 'NAME_REQUESTED', responseSent: true }
-      }
-      this.states.set(phone, { stage: 'awaiting_dni', pendingQuestion, unrecognizedDnis })
-      await this.whatsapp.sendText(phone, dniRetryRequest)
-      return { status: 'DNI_REQUESTED', responseSent: true }
-    }
-
-    // Sin DNI: se pide, y se guarda el primer mensaje para responderlo después.
-    this.states.set(phone, { stage: 'awaiting_dni', pendingQuestion: pendingQuestion ?? text, unrecognizedDnis })
-    await this.whatsapp.sendText(phone, state ? repeatedDniRequest : firstDniRequest)
-    return { status: 'DNI_REQUESTED', responseSent: true }
+    this.states.set(phone, {
+      stage: 'awaiting_customer_status',
+      dniOrigin: 'existing_customer',
+      pendingQuestion: null,
+      unrecognizedDnis: 0,
+    })
+    await this.whatsapp.sendText(phone, customerStatusQuestion)
+    return { status: 'CUSTOMER_STATUS_REQUESTED', responseSent: true }
   }
 
-  // Atiende una consulta del cliente identificado. Si es la guardada antes del DNI y no es
-  // de seguros, en lugar de ignorarla se le pregunta en qué se lo puede ayudar.
-  private async answerQuery(phone: string, customer: Customer, text: string, welcomeIfIgnored: boolean): Promise<ProcessResult> {
-    // El DNI nunca sale al proveedor de IA, aunque el cliente lo haya escrito.
+  private async classifyCustomerStatus(
+    phone: string,
+    state: CustomerStatusFlow,
+    reply: string,
+  ): Promise<ProcessResult> {
+    let status: CustomerStatus
+    try {
+      status = await this.ai.classifyCustomerStatus(maskDni(reply))
+    } catch {
+      return this.handoff(phone, 'falla del proveedor al identificar el tipo de cliente')
+    }
+
+    switch (status) {
+      case 'NEW_CUSTOMER':
+        this.states.set(phone, { stage: 'awaiting_new_customer_name' })
+        await this.whatsapp.sendText(phone, newCustomerNameRequest)
+        return { status: 'NAME_REQUESTED', responseSent: true }
+      case 'EXISTING_CUSTOMER':
+        this.states.set(phone, {
+          stage: 'awaiting_dni',
+          origin: state.dniOrigin,
+          pendingQuestion: state.pendingQuestion,
+          unrecognizedDnis: state.unrecognizedDnis,
+        })
+        await this.whatsapp.sendText(phone, existingCustomerDniRequest)
+        return { status: 'DNI_REQUESTED', responseSent: true }
+      case 'UNRELATED':
+        await this.whatsapp.sendText(phone, customerStatusRetryQuestion)
+        return { status: 'CUSTOMER_STATUS_REASKED', responseSent: true }
+    }
+  }
+
+  private async collectNewCustomerName(phone: string, text: string): Promise<ProcessResult> {
+    const name = text.trim()
+    if (!name) {
+      await this.whatsapp.sendText(phone, newCustomerNameRequest)
+      return { status: 'NAME_REQUESTED', responseSent: true }
+    }
+    this.states.set(phone, { stage: 'awaiting_new_customer_dni', name })
+    await this.whatsapp.sendText(phone, newCustomerDniRequest)
+    return { status: 'NEW_CUSTOMER_DNI_REQUESTED', responseSent: true }
+  }
+
+  private async collectNewCustomerDni(phone: string, name: string, text: string): Promise<ProcessResult> {
+    const dni = findDni(text)
+    if (!dni) {
+      await this.whatsapp.sendText(phone, newCustomerDniRequest)
+      return { status: 'NEW_CUSTOMER_DNI_REQUESTED', responseSent: true }
+    }
+    const existingCustomer = await this.customers.findByDni(dni)
+    if (existingCustomer) {
+      await this.customers.createPhoneChangeRequest({ phone, customerId: existingCustomer.id })
+      this.states.set(phone, { stage: 'silenced', persistent: true })
+      await this.whatsapp.sendText(phone, phoneChangePendingMessage)
+      return { status: 'PHONE_CHANGE_PENDING', responseSent: true }
+    }
+    this.states.set(phone, { stage: 'awaiting_new_customer_photo', name, dni })
+    await this.whatsapp.sendText(phone, newCustomerPhotoRequest)
+    return { status: 'PHOTO_REQUESTED', responseSent: true }
+  }
+
+  private async collectNewCustomerPhoto(
+    phone: string,
+    name: string,
+    dni: string,
+    message: IncomingWhatsAppMessage,
+  ): Promise<ProcessResult> {
+    if (message.media !== 'image') {
+      await this.whatsapp.sendText(phone, newCustomerPhotoRetryRequest)
+      return { status: 'PHOTO_REQUESTED', responseSent: true }
+    }
+    await this.customers.createProspect({ phone, name, dni })
+    this.states.set(phone, { stage: 'silenced', persistent: true })
+    await this.whatsapp.sendText(phone, prospectHandoffMessage)
+    return { status: 'PROSPECT_HANDED_OFF', responseSent: true }
+  }
+
+  private async identifyCustomer(phone: string, state: DniFlow, text: string): Promise<ProcessResult> {
+    const dni = findDni(text)
+    if (!dni) {
+      await this.whatsapp.sendText(phone, repeatedDniRequest)
+      return { status: 'DNI_REQUESTED', responseSent: true }
+    }
+
+    const customer = await this.customers.findByDni(dni)
+    if (customer) {
+      if (state.origin === 'existing_customer') {
+        await this.customers.createPhoneChangeRequest({ phone, customerId: customer.id })
+        this.states.set(phone, { stage: 'silenced', persistent: true })
+        await this.whatsapp.sendText(phone, phoneChangePendingMessage)
+        return { status: 'PHONE_CHANGE_PENDING', responseSent: true }
+      }
+      this.states.set(phone, { stage: 'identified', customerId: customer.id })
+      if (state.pendingQuestion) return this.answerQuery(phone, customer, state.pendingQuestion, true)
+      return this.sendWelcome(phone, customer)
+    }
+
+    const attempts = state.unrecognizedDnis + 1
+    if (attempts >= maxUnrecognizedDnis) return this.handoff(phone, 'DNI no reconocido')
+    this.states.set(phone, {
+      stage: 'awaiting_customer_status',
+      dniOrigin: state.origin,
+      pendingQuestion: state.pendingQuestion,
+      unrecognizedDnis: attempts,
+    })
+    await this.whatsapp.sendText(phone, customerStatusQuestion)
+    return { status: 'CUSTOMER_STATUS_REQUESTED', responseSent: true }
+  }
+
+  private async answerQuery(
+    phone: string,
+    customer: Customer,
+    text: string,
+    welcomeIfIgnored: boolean,
+  ): Promise<ProcessResult> {
     const question = maskDni(text)
     let intent: Intent
     try {
@@ -147,7 +289,11 @@ export class ProcessIncomingMessage {
       case 'handoff':
         return this.handoff(phone, `intención: ${intent}`)
       case 'approval':
-        this.states.set(phone, { stage: 'silenced' })
+        if (intent === 'cambio de teléfono') {
+          await this.whatsapp.sendText(phone, useNewPhoneRequest)
+          return { status: 'NEW_PHONE_REQUESTED', intent, responseSent: true }
+        }
+        this.states.set(phone, { stage: 'silenced', persistent: false })
         await this.whatsapp.sendText(phone, approvalNotice)
         return { status: 'APPROVAL_NOTICE_SENT', intent, responseSent: true }
       case 'answer':
@@ -173,7 +319,6 @@ export class ProcessIncomingMessage {
     } catch {
       return this.handoff(phone, 'falla de la redacción')
     }
-    // La redacción no puede cambiar ni agregar datos (RF-ATE-02): si no pasa, se deriva.
     const check = checkRewrite(template, draft)
     if (!check.ok) return this.handoff(phone, `redacción rechazada: ${check.reason}`)
 
@@ -188,7 +333,7 @@ export class ProcessIncomingMessage {
       case 'statuses':
         return statusesTemplate(customer, this.clock())
       case 'courtesy':
-        return courtesyTemplate(customer)
+        return `Gracias por escribirnos, ${customer.firstName}. ¿En qué lo puedo ayudar?`
     }
   }
 
@@ -197,11 +342,19 @@ export class ProcessIncomingMessage {
     return { status: 'WELCOME_SENT', responseSent: true }
   }
 
-  // El número queda en silencio antes de enviar: si el envío falla, execute lo restaura.
   private async handoff(phone: string, reason: string): Promise<ProcessResult> {
-    this.states.set(phone, { stage: 'silenced' })
+    this.states.set(phone, { stage: 'silenced', persistent: false })
     await this.whatsapp.sendText(phone, handoffMessage)
     console.log(`[asistente] derivación: ${reason}`)
     return { status: 'HANDOFF_SENT', reason, responseSent: true }
   }
+}
+
+function messageTextForCase(message: IncomingWhatsAppMessage): string {
+  if (message.media === 'image') return 'El cliente envió una imagen por WhatsApp; el archivo no se almacena en el sistema.'
+  return message.text
+}
+
+function containsQuestionOutsideDni(text: string): boolean {
+  return maskDni(text).replace(/\[DNI\]/g, '').replace(/[^\p{L}]/gu, '').trim().length > 0
 }
