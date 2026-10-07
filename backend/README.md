@@ -69,3 +69,36 @@ Los errores de entrada responden `400`, un trámite inexistente `404` y una tran
 ```
 
 La identidad fija de prueba debe reemplazarse por autenticación y autorización del backend al integrar el login del panel.
+
+## Cartera de clientes
+
+Endpoints de solo lectura para la pantalla Base de Clientes del panel (RF-CAR-01, RF-CAR-02 y RF-CAR-03). La cartera se identifica por DNI; el teléfono no identifica y un número compartido puede devolver más de un cliente. No hay altas, bajas ni modificaciones por estos endpoints: la cartera se carga con la migración.
+
+### Listar clientes
+
+`GET /api/clientes?buscar=&limit=25&offset=0`
+
+Devuelve `{ items, total, limit, offset }`, ordenados por apellido (o razón social) ascendente. `buscar` es opcional y busca por tramo en nombre, apellido y razón social; sus dígitos se comparan sin puntos ni espacios contra DNI, CUIT y teléfono, así un DNI escrito `30.111.222` se encuentra igual que `30111222`. Cada elemento de `items` contiene:
+
+```json
+{
+  "id": "12",
+  "dni": "30111222",
+  "cuit": null,
+  "razonSocial": null,
+  "firstName": "Laura",
+  "lastName": "Gómez",
+  "phones": ["5491155551001"],
+  "policies": [
+    { "number": "POL-00123", "ramo": "auto", "status": "activa" }
+  ]
+}
+```
+
+Las empresas vienen con `cuit` y `razonSocial` y `dni` en `null`. `phones` y `policies` solo incluyen teléfonos y pólizas activos: cada póliza del listado trae tipo (`ramo`) y estado, que es lo que muestra la tabla del panel. Una búsqueda sin coincidencias devuelve `items: []` y `total: 0`, no un `404`.
+
+### Detalle de un cliente
+
+`GET /api/clientes/:id`
+
+Devuelve el mismo encabezado, con `phones` como lista de `{ id, number }` (el `id` es el que se usa para desvincular teléfonos en los trámites) y `policies` como ficha de cada póliza, ordenadas por vencimiento: `number`, `ramo` (el tipo, que el panel muestra como «Cobertura»), `status`, `startDate` (inicio de la vigencia, `null` en las fixtures de prueba), `expirationDate` y `insuredItem`. `insuredItem` es el bien asegurado (`description`, `plate`, `address`, `brand`, `model`, `year`) o `null` en los ramos que no aseguran un bien, como vida. Un identificador no numérico responde `400` y uno inexistente `404`, con el mismo formato de error de arriba.
