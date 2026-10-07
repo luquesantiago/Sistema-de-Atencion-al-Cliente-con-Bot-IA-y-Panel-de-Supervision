@@ -2,7 +2,7 @@ import { once } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AddressInfo } from 'node:net'
 import type { AiClient, CustomerStatus, RewriteInput } from '../domain/ai-client.js'
-import type { CustomerRepository } from '../domain/customer.js'
+import type { CustomerPolicy, CustomerRepository } from '../domain/customer.js'
 import type {
   PageRequest,
   PendingPhoneChange,
@@ -12,6 +12,7 @@ import type {
   RequestManagementRepository,
 } from '../domain/request-management.js'
 import type { WhatsAppClient } from '../domain/whatsapp-client.js'
+import { ManageCustomers } from '../application/manage-customers.js'
 import { ManageRequests } from '../application/manage-requests.js'
 import { ProcessIncomingMessage } from '../application/process-incoming-message.js'
 import { InMemoryConversationStore } from '../infrastructure/in-memory-conversation-store.js'
@@ -94,6 +95,7 @@ describe('endpoints de trámites', () => {
       assistant,
       { secret: 'test', findPhoneByLid: async () => null },
       new ManageRequests(repository, whatsapp),
+      new ManageCustomers(customers),
     )
     server = app.listen(0)
     await once(server, 'listening')
@@ -244,5 +246,195 @@ describe('endpoints de trámites', () => {
     await expect(retry.json()).resolves.toMatchObject({ notificationSent: true })
     expect(repository.recordedNotifications).toHaveLength(1)
     expect(repository.recordedNotifications[0]?.id).toBe(12)
+  })
+})
+
+describe('endpoints de clientes', () => {
+  let customers: InMemoryCustomerRepository
+  let server: ReturnType<ReturnType<typeof createApp>['listen']>
+  let baseUrl: string
+
+  const policy = (number: string, expirationDate: string): CustomerPolicy => ({
+    number,
+    ramo: 'auto',
+    status: 'activa',
+    expirationDate,
+  })
+
+  beforeEach(async () => {
+    customers = new InMemoryCustomerRepository([
+      {
+        id: 1,
+        dni: '30111222',
+        firstName: 'Laura',
+        lastName: 'Gómez',
+        policies: [policy('POL-00123', '2026-06-20')],
+      },
+      { id: 2, dni: '28111222', firstName: 'Ramiro', lastName: 'Pérez', policies: [] },
+      { id: 3, dni: '40111222', firstName: 'Sofía', lastName: 'Benítez', policies: [] },
+    ])
+    // Un mismo teléfono vinculado a dos clientes (RF-CAR-03).
+    customers.addPhoneLink(1, 17, '5491155551001')
+    customers.addPhoneLink(2, 17, '5491155551001')
+
+    const whatsapp = new FakeWhatsApp()
+    const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), new FakeAi(), whatsapp)
+    const app = createApp(
+      assistant,
+      { secret: 'test', findPhoneByLid: async () => null },
+      new ManageRequests(new FakeRequestRepository(), whatsapp),
+      new ManageCustomers(customers),
+    )
+    server = app.listen(0)
+    await once(server, 'listening')
+    const address = server.address() as AddressInfo
+    baseUrl = `http://127.0.0.1:${address.port}`
+  })
+
+  afterEach(async () => {
+    server.close()
+    await once(server, 'close')
+  })
+
+  it('lista los clientes por apellido con total y paginación', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes?limit=2&offset=0`)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      items: [
+        {
+          id: '3',
+          dni: '40111222',
+          cuit: null,
+          razonSocial: null,
+          firstName: 'Sofía',
+          lastName: 'Benítez',
+          phones: [],
+          policies: [],
+        },
+        {
+          id: '1',
+          dni: '30111222',
+          cuit: null,
+          razonSocial: null,
+          firstName: 'Laura',
+          lastName: 'Gómez',
+          phones: ['5491155551001'],
+          policies: [{ number: 'POL-00123', ramo: 'auto', status: 'activa' }],
+        },
+      ],
+      total: 3,
+      limit: 2,
+      offset: 0,
+    })
+  })
+
+  it('devuelve el resto de los clientes en la segunda página', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes?limit=2&offset=2`)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      total: 3,
+      items: [{ id: '2', lastName: 'Pérez' }],
+    })
+  })
+
+  it('rechaza paginación fuera de rango con un error consistente', async () => {
+    for (const query of ['limit=0', 'limit=1000', 'offset=-1']) {
+      const response = await fetch(`${baseUrl}/api/clientes?${query}`)
+      expect(response.status).toBe(400)
+      await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_ERROR' } })
+    }
+  })
+
+  it('busca por DNI ignorando puntos y espacios', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes?buscar=${encodeURIComponent('30.111')}`)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      total: 1,
+      items: [{ id: '1', dni: '30111222' }],
+    })
+  })
+
+  it('busca por nombre sin distinguir mayúsculas ni acentos', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes?buscar=gomez`)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      total: 1,
+      items: [{ id: '1', lastName: 'Gómez' }],
+    })
+  })
+
+  it('devuelve a todos los clientes que comparten un teléfono', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes?buscar=5491155551001`)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      total: 2,
+      items: [{ id: '1' }, { id: '2' }],
+    })
+  })
+
+  it('responde una lista vacía cuando nadie coincide con la búsqueda', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes?buscar=zzzz`)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ items: [], total: 0, limit: 25, offset: 0 })
+  })
+
+  it('rechaza una búsqueda demasiado larga', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes?buscar=${'x'.repeat(61)}`)
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_ERROR' } })
+  })
+
+  it('devuelve el detalle con teléfonos y pólizas', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/1`)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      id: '1',
+      dni: '30111222',
+      cuit: null,
+      razonSocial: null,
+      firstName: 'Laura',
+      lastName: 'Gómez',
+      phones: [{ id: 17, number: '5491155551001' }],
+      policies: [
+        {
+          number: 'POL-00123',
+          ramo: 'auto',
+          status: 'activa',
+          startDate: null,
+          expirationDate: '2026-06-20',
+          insuredItem: null,
+        },
+      ],
+    })
+  })
+
+  it('devuelve arreglos vacíos para un cliente sin pólizas ni teléfonos', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/3`)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ phones: [], policies: [] })
+  })
+
+  it('rechaza un identificador que no sea un número de cliente', async () => {
+    for (const id of ['abc', '0', '1.5']) {
+      const response = await fetch(`${baseUrl}/api/clientes/${id}`)
+      expect(response.status).toBe(400)
+      await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_ERROR' } })
+    }
+  })
+
+  it('responde 404 para un cliente que no existe', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/9999`)
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'NOT_FOUND' } })
   })
 })
