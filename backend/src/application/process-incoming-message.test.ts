@@ -1,15 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AiClient, RewriteInput } from '../domain/ai-client.js'
+import type { AiClient, CustomerStatus, RewriteInput } from '../domain/ai-client.js'
 import type { Customer } from '../domain/customer.js'
 import type { Intent } from '../domain/intent.js'
 import {
   approvalNotice,
-  dniRetryRequest,
+  customerStatusQuestion,
+  customerStatusRetryQuestion,
+  existingCustomerDniRequest,
   firstDniRequest,
   handoffMessage,
   newCustomerNameRequest,
-  newCustomerQuestion,
+  newCustomerPhotoRequest,
+  phoneChangePendingMessage,
+  prospectHandoffMessage,
   repeatedDniRequest,
+  useNewPhoneRequest,
 } from '../domain/templates.js'
 import type { WhatsAppClient } from '../domain/whatsapp-client.js'
 import { InMemoryCustomerRepository } from '../infrastructure/in-memory-customer-repository.js'
@@ -42,11 +47,20 @@ const otherPhone = '5490000000002'
 // Decisor falso: la intención sale de una tabla por texto; la redacción devuelve la
 // plantilla tal cual, salvo que la prueba la cambie. Registra todo lo que recibe.
 class FakeAi implements AiClient {
+  public customerStatusClassified: string[] = []
   public readonly classified: string[] = []
   public readonly rewritten: RewriteInput[] = []
+  public customerStatuses = new Map<string, CustomerStatus>()
+  public customerStatusError: Error | null = null
   public intents = new Map<string, Intent>()
   public classifyError: Error | null = null
   public rewriteResult: ((input: RewriteInput) => string) | Error = (input) => input.template
+
+  public async classifyCustomerStatus(reply: string): Promise<CustomerStatus> {
+    this.customerStatusClassified.push(reply)
+    if (this.customerStatusError) throw this.customerStatusError
+    return this.customerStatuses.get(reply) ?? 'UNRELATED'
+  }
 
   public async classifyIntent(text: string): Promise<Intent> {
     this.classified.push(text)
@@ -81,14 +95,20 @@ class FakeWhatsApp implements WhatsAppClient {
 let ai: FakeAi
 let whatsapp: FakeWhatsApp
 let assistant: ProcessIncomingMessage
+let customers: InMemoryCustomerRepository
 let counter = 0
 
-function newAssistant() {
-  return new ProcessIncomingMessage(new InMemoryCustomerRepository([ana, bruno, carla]), ai, whatsapp, () => now)
+function newAssistant(phoneLinked = true) {
+  customers = new InMemoryCustomerRepository([ana, bruno, carla])
+  if (phoneLinked) {
+    customers.linkPhone(phone)
+    customers.linkPhone(otherPhone)
+  }
+  return new ProcessIncomingMessage(customers, ai, whatsapp, () => now)
 }
 
-function send(text: string, from = phone, messageId = `msg-${++counter}`) {
-  return assistant.execute({ messageId, phone: from, text })
+function send(text: string, from = phone, messageId = `msg-${++counter}`, media?: 'image') {
+  return assistant.execute({ messageId, phone: from, text, media })
 }
 
 function lastText(to = phone) {
@@ -133,64 +153,117 @@ describe('DNI primero (RF-ATE-03)', () => {
     await send('¿vence el 15/11/2026?')
     await expect(send('¿me escuchan? 15/11/2026')).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
     expect(lastText()).toBe(repeatedDniRequest)
-    await send('30111222')
-    expect(lastText()).toBe(newCustomerQuestion)
   })
 })
 
 describe('DNI no reconocido (RF-ATE-03)', () => {
-  it('el primero pregunta si es cliente nuevo', async () => {
-    await expect(send('30111222')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_ASKED' })
-    expect(lastText()).toBe(newCustomerQuestion)
-  })
-
-  it.each(['no', '¿qué?'])('con «%s» vuelve a pedir el DNI', async (answer) => {
-    await send('30111222')
-    await expect(send(answer)).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
-    expect(lastText()).toBe(dniRetryRequest)
-  })
-
-  it('al 4.º DNI no reconocido deriva; un texto sin DNI no suma intento', async () => {
-    await send('30111222')
-    await send('no')
+  it('al cuarto DNI no reconocido deriva; un texto sin DNI no suma intento', async () => {
+    await send('Hola')
+    await expect(send('30111222')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REQUESTED' })
+    expect(lastText()).toBe(customerStatusQuestion)
+    await expect(send('perdón, ya lo busco')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REASKED' })
+    ai.customerStatuses.set('Sí, ya soy cliente', 'EXISTING_CUSTOMER')
+    await send('Sí, ya soy cliente')
     await send('30111223')
-    await send('perdón, ya lo busco')
-    expect(lastText()).toBe(repeatedDniRequest)
+    await send('Sí, ya soy cliente')
     await send('30111224')
-    expect(lastText()).toBe(dniRetryRequest)
+    await send('Sí, ya soy cliente')
     await expect(send('30111225')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'DNI no reconocido' })
     expect(lastText()).toBe(handoffMessage)
-    expect(ai.classified).toEqual([])
   })
 
-  it('un DNI como respuesta a «¿es cliente nuevo?» cuenta como intento', async () => {
-    await send('30111222')
-    await expect(send('30111223')).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
-    expect(lastText()).toBe(dniRetryRequest)
-    await send('30111224')
-    await expect(send('30111225')).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
-  })
-
-  it('conserva la consulta del primer mensaje después de un DNI no reconocido', async () => {
-    ai.intents.set('¿en qué estado está mi póliza?', 'estado de póliza')
+  it('si el DNI es correcto después de confirmar que ya es cliente, responde la consulta pendiente', async () => {
     await send('¿en qué estado está mi póliza?')
     await send('30111222')
-    await send('no')
-    expect(ai.classified).toEqual([])
+    ai.customerStatuses.set('Sí, ya soy cliente', 'EXISTING_CUSTOMER')
+    await send('Sí, ya soy cliente')
+    ai.intents.set('¿en qué estado está mi póliza?', 'estado de póliza')
     await expect(send('99000002')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'estado de póliza' })
-    expect(ai.classified).toEqual(['¿en qué estado está mi póliza?'])
     expect(lastText()).toContain('POL-90003 (moto): suspendida por mora.')
   })
+
 })
 
 describe('cliente nuevo', () => {
-  it('con «sí» pide el nombre y el mensaje siguiente deriva', async () => {
-    await send('30111222')
-    await expect(send('sí, soy nueva')).resolves.toMatchObject({ status: 'NAME_REQUESTED' })
+  it('interpreta la respuesta con IA, guarda los datos del prospecto y deriva al recibir la foto', async () => {
+    assistant = newAssistant(false)
+    ai.customerStatuses.set('Soy nuevo cliente', 'NEW_CUSTOMER')
+    await expect(send('hola')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REQUESTED' })
+    expect(lastText()).toBe(customerStatusQuestion)
+    await expect(send('Soy nuevo cliente')).resolves.toMatchObject({ status: 'NAME_REQUESTED' })
     expect(lastText()).toBe(newCustomerNameRequest)
-    await expect(send('Laura Inventada')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'cliente nuevo' })
+    await expect(send('Laura Inventada')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_DNI_REQUESTED' })
+    await expect(send('99.000.010')).resolves.toMatchObject({ status: 'PHOTO_REQUESTED' })
+    expect(lastText()).toBe(newCustomerPhotoRequest)
+    await expect(send('', phone, 'foto-dni', 'image')).resolves.toMatchObject({ status: 'PROSPECT_HANDED_OFF' })
+    expect(customers.prospects).toEqual([{ phone, name: 'Laura Inventada', dni: '99000010' }])
+    expect(lastText()).toBe(prospectHandoffMessage)
+    expect(ai.customerStatusClassified).toEqual(['Soy nuevo cliente'])
+    await expect(send('¿Me puede ayudar?')).resolves.toMatchObject({ status: 'SILENCED' })
+    expect(customers.handoffMessages).toEqual([{ phone, content: '¿Me puede ayudar?' }])
+    customers.closeHandoff(phone)
+    await expect(send('Buenas')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REQUESTED' })
+  })
+
+  it('vuelve a preguntar cuando la respuesta no indica si ya es cliente', async () => {
+    assistant = newAssistant(false)
+    await send('Buenas')
+    await expect(send('¿a qué hora atienden?')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REASKED' })
+    expect(lastText()).toBe(customerStatusRetryQuestion)
+  })
+
+  it('enmascara el DNI antes de enviar la respuesta a la IA', async () => {
+    assistant = newAssistant(false)
+    ai.customerStatuses.set('Sí, mi DNI es [DNI]', 'EXISTING_CUSTOMER')
+    await send('Hola')
+    await send('Sí, mi DNI es 30.111.222')
+    expect(ai.customerStatusClassified).toEqual(['Sí, mi DNI es [DNI]'])
+  })
+
+  it('deriva si falla el clasificador y no da por identificado al cliente', async () => {
+    assistant = newAssistant(false)
+    ai.customerStatusError = new Error('timeout')
+    await send('Hola')
+    await expect(send('Sí')).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
+    expect(customers.prospects).toEqual([])
     expect(lastText()).toBe(handoffMessage)
-    expect(ai.classified).toEqual([])
+  })
+
+  it('un cliente existente crea una solicitud pendiente sin vincular el teléfono automáticamente', async () => {
+    assistant = newAssistant(false)
+    ai.customerStatuses.set('Sí, ya soy cliente', 'EXISTING_CUSTOMER')
+    await send('Hola')
+    await send('Sí, ya soy cliente')
+    expect(lastText()).toBe(existingCustomerDniRequest)
+    await expect(send('30111222')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REQUESTED' })
+    await send('Sí, ya soy cliente')
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING' })
+    expect(customers.phoneChangeRequests).toEqual([{ phone, customerId: ana.id }])
+    expect(await customers.hasLinkedPhone(phone)).toBe(false)
+    expect(lastText()).toBe(phoneChangePendingMessage)
+    await expect(send('¿ya se actualizó?')).resolves.toMatchObject({ status: 'SILENCED' })
+  })
+
+  it('no persiste ni deriva un prospecto sin recibir la foto del DNI', async () => {
+    assistant = newAssistant(false)
+    ai.customerStatuses.set('Soy nuevo', 'NEW_CUSTOMER')
+    await send('Hola')
+    await send('Soy nuevo')
+    await send('Laura Inventada')
+    await send('99000099')
+    await expect(send('No tengo la foto ahora')).resolves.toMatchObject({ status: 'PHOTO_REQUESTED' })
+    expect(customers.prospects).toEqual([])
+  })
+
+  it('si el DNI declarado ya existe en la cartera, solicita la aprobación del teléfono y no duplica el prospecto', async () => {
+    assistant = newAssistant(false)
+    ai.customerStatuses.set('Soy nuevo', 'NEW_CUSTOMER')
+    await send('Hola')
+    await send('Soy nuevo')
+    await send('Laura Inventada')
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING' })
+    expect(customers.phoneChangeRequests).toEqual([{ phone, customerId: ana.id }])
+    expect(customers.prospects).toEqual([])
   })
 })
 
@@ -272,13 +345,19 @@ describe('mandar a aprobar (RF-APR-01)', () => {
   it.each<[string, Intent]>([
     ['quiero dar de baja la póliza', 'baja'],
     ['quiero agregar un conductor', 'modificación'],
-    ['cambié de número', 'cambio de teléfono'],
   ])('«%s» manda el aviso fijo, sin redactar', async (text, intent) => {
     await identify()
     ai.intents.set(text, intent)
     await expect(send(text)).resolves.toMatchObject({ status: 'APPROVAL_NOTICE_SENT', intent })
     expect(lastText()).toBe(approvalNotice)
     expect(ai.rewritten).toEqual([])
+  })
+
+  it('pide escribir desde el nuevo número para iniciar el trámite de cambio de teléfono', async () => {
+    await identify()
+    ai.intents.set('cambié de número', 'cambio de teléfono')
+    await expect(send('cambié de número')).resolves.toMatchObject({ status: 'NEW_PHONE_REQUESTED' })
+    expect(lastText()).toBe(useNewPhoneRequest)
   })
 })
 

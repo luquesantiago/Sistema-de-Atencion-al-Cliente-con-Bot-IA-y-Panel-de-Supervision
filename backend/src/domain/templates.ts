@@ -15,13 +15,33 @@ export const firstDniRequest =
 
 export const repeatedDniRequest = 'Para poder ayudarlo, necesito su número de DNI.'
 
-export const newCustomerQuestion =
-  'No encontramos ese DNI entre nuestros clientes. ¿Es usted cliente nuevo de Seguros Castaño?'
-
-export const dniRetryRequest = 'No encontramos ese DNI. ¿Podría revisarlo y escribirlo de nuevo?'
-
 export const newCustomerNameRequest =
-  'Gracias por elegirnos. Para que un miembro de nuestro equipo pueda contactarlo, ¿me indica su nombre y apellido?'
+  'Gracias por elegirnos. Para iniciar el alta, ¿me indica su nombre y apellido?'
+
+export const newCustomerDniRequest = 'Gracias. Ahora, ¿me indica su número de DNI?'
+
+export const newCustomerPhotoRequest =
+  'Por último, envíenos una foto clara de su DNI por este mismo chat. La imagen quedará disponible en WhatsApp para el equipo y no se guardará una copia en el sistema.'
+
+export const newCustomerPhotoRetryRequest = 'Para continuar con el alta, necesitamos una foto clara de su DNI enviada por este chat.'
+
+export const customerStatusQuestion =
+  'Para orientarlo mejor, ¿ya es cliente de Seguros Castaño o sería un cliente nuevo?'
+
+export const customerStatusRetryQuestion =
+  'Disculpe, no pude identificar si ya es cliente o si sería un cliente nuevo. ¿Podría confirmármelo?'
+
+export const existingCustomerDniRequest =
+  'Gracias. Para verificar sus datos, ¿me indica su DNI? El número desde el que nos escribe quedará sujeto a revisión para actualizar su teléfono de contacto.'
+
+export const prospectHandoffMessage =
+  'Gracias por compartir sus datos y la foto de su DNI. Un miembro autorizado del equipo revisará la solicitud y se comunicará con usted a la brevedad para completar el alta.'
+
+export const phoneChangePendingMessage =
+  'Verificamos sus datos. La actualización de este número quedó pendiente de aprobación por un miembro del equipo; le informaremos la decisión por este WhatsApp.'
+
+export const useNewPhoneRequest =
+  'Para solicitar un cambio de teléfono, escríbanos desde el nuevo número. Así podremos verificarlo antes de iniciar el trámite.'
 
 export type Clock = () => Date
 

@@ -1,9 +1,23 @@
 import { readFileSync } from 'node:fs'
-import { isPolicyStatus, isRamo, type Customer, type CustomerPolicy, type CustomerRepository } from '../domain/customer.js'
+import {
+  isPolicyStatus,
+  isRamo,
+  type Customer,
+  type CustomerPolicy,
+  type CustomerRepository,
+  type NewProspect,
+  type PhoneChangeRequest,
+} from '../domain/customer.js'
 
 // Adaptador provisional hasta que la cartera migrada esté en la base: los clientes salen
 // de backend/fixtures/clientes-ficticios.json, que son datos ficticios.
 export class InMemoryCustomerRepository implements CustomerRepository {
+  public readonly prospects: NewProspect[] = []
+  public readonly phoneChangeRequests: PhoneChangeRequest[] = []
+  public readonly handoffMessages: Array<{ phone: string; content: string }> = []
+  private readonly linkedPhones = new Set<string>()
+  private readonly handoffPhones = new Set<string>()
+
   public constructor(private readonly customers: Customer[]) {}
 
   public async findByDni(dni: string): Promise<Customer | null> {
@@ -12,6 +26,38 @@ export class InMemoryCustomerRepository implements CustomerRepository {
 
   public async findById(id: string): Promise<Customer | null> {
     return this.customers.find((customer) => customer.id === id) ?? null
+  }
+
+  public async hasLinkedPhone(phone: string): Promise<boolean> {
+    return this.linkedPhones.has(phone)
+  }
+
+  public async hasOpenHandoff(phone: string): Promise<boolean> {
+    return this.handoffPhones.has(phone)
+  }
+
+  public async recordMessageForOpenHandoff(phone: string, content: string): Promise<void> {
+    this.handoffMessages.push({ phone, content })
+  }
+
+  public async recordIncomingPhone(_phone: string): Promise<void> {}
+
+  public async createProspect(prospect: NewProspect): Promise<void> {
+    this.prospects.push(prospect)
+    this.handoffPhones.add(prospect.phone)
+  }
+
+  public async createPhoneChangeRequest(request: PhoneChangeRequest): Promise<void> {
+    this.phoneChangeRequests.push(request)
+    this.handoffPhones.add(request.phone)
+  }
+
+  public linkPhone(phone: string): void {
+    this.linkedPhones.add(phone)
+  }
+
+  public closeHandoff(phone: string): void {
+    this.handoffPhones.delete(phone)
   }
 }
 
