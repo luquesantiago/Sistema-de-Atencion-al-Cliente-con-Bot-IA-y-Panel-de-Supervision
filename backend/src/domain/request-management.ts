@@ -63,6 +63,7 @@ export interface RequestManagementRepository {
   decideProspect(input: ProspectDecisionInput): Promise<DecisionResult>
   decidePhoneChange(input: PhoneChangeDecisionInput): Promise<PhoneChangeDecisionResult>
   getPhoneChangeNotification(id: number): Promise<PhoneChangeNotification>
+  recordPhoneChangeNotification(id: number, text: string, sentAt: Date): Promise<void>
 }
 
 export class RequestManagementError extends Error {

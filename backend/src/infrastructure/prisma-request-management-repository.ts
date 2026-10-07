@@ -132,6 +132,7 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
               fecha_cierre: true,
               id_usuario_asignado: true,
               fecha_toma: true,
+              id_conversacion: true,
               conversacion: { select: { telefono: { select: { id_telefono: true } } } },
             },
           },
@@ -215,6 +216,7 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
         })
       }
       await closeCase(transaction, prospect.caso, operatorId, decidedAt)
+      await releaseSilence(transaction, prospect.caso.id_conversacion)
       return { id: prospect.id_prospecto, decision: input.decision, ...(customerId ? { clienteId: customerId } : {}) }
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   }
@@ -235,6 +237,7 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
               fecha_cierre: true,
               id_usuario_asignado: true,
               fecha_toma: true,
+              id_conversacion: true,
               conversacion: {
                 select: {
                   id_cliente: true,
@@ -322,12 +325,33 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
       }
 
       await closeCase(transaction, request.caso, operatorId, decidedAt)
+      await releaseSilence(transaction, request.caso.id_conversacion)
       return {
         id: request.id_solicitud,
         decision: input.decision,
         phone: requestedPhone,
       }
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  }
+
+  // El aviso de la decisión que salió por WhatsApp queda en el caso de la solicitud, como
+  // mensaje del asistente. No lleva respuesta: no contesta un mensaje del cliente.
+  public async recordPhoneChangeNotification(id: number, text: string, sentAt: Date): Promise<void> {
+    await this.prisma.$transaction(async (transaction) => {
+      const request = await transaction.solicitud_accion.findUnique({
+        where: { id_solicitud: id },
+        select: { id_caso: true },
+      })
+      if (!request) throw new RequestManagementError(404, 'NOT_FOUND', 'No se encontró la solicitud de cambio de teléfono.')
+      const origin = await transaction.origen_mensaje.findUnique({
+        where: { nombre: 'asistente' },
+        select: { id_origen_mensaje: true },
+      })
+      if (!origin) throw new Error('Falta el origen de mensaje asistente.')
+      await transaction.mensaje.create({
+        data: { id_caso: request.id_caso, id_origen_mensaje: origin.id_origen_mensaje, contenido: text, fecha_hora: sentAt },
+      })
+    })
   }
 
   public async getPhoneChangeNotification(id: number): Promise<PhoneChangeNotification> {
@@ -376,5 +400,19 @@ async function closeCase(
       fecha_toma: caseRecord.fecha_toma ?? closedAt,
       fecha_cierre: closedAt,
     },
+  })
+}
+
+// Contrato del cierre de casos (design.md, decisión 5): si la conversación sigue abierta y
+// ya no le queda un caso derivado sin cerrar, el asistente vuelve a atenderla.
+async function releaseSilence(transaction: Prisma.TransactionClient, conversationId: number): Promise<void> {
+  const openHandoff = await transaction.caso.findFirst({
+    where: { id_conversacion: conversationId, fecha_derivacion: { not: null }, fecha_cierre: null },
+    select: { id_caso: true },
+  })
+  if (openHandoff) return
+  await transaction.conversacion.updateMany({
+    where: { id_conversacion: conversationId, fecha_fin: null },
+    data: { asistente_suspendido: false },
   })
 }

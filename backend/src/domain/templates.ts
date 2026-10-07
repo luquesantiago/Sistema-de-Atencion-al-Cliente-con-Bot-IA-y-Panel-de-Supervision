@@ -35,7 +35,7 @@ export const existingCustomerDniRequest =
   'Gracias. Para verificar sus datos, ¿me indica su DNI? El número desde el que nos escribe quedará sujeto a revisión para actualizar su teléfono de contacto.'
 
 export const prospectHandoffMessage =
-  'Gracias por compartir sus datos y la foto de su DNI. Un miembro autorizado del equipo revisará la solicitud y se comunicará con usted a la brevedad para completar el alta.'
+  'Gracias por compartir sus datos y la foto de su DNI. Un miembro autorizado del equipo revisará la solicitud y se comunicará con usted para completar el alta.'
 
 export const phoneChangePendingMessage =
   'Verificamos sus datos. La actualización de este número quedó pendiente de aprobación por un miembro del equipo; le informaremos la decisión por este WhatsApp.'

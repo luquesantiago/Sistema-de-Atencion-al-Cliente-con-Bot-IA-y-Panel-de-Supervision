@@ -2,7 +2,7 @@
   "aviso": "Datos ficticios para probar el asistente. No son clientes reales.",
   "clientes": [
     {
-      "id": "ficticio-1",
+      "id": 90001,
       "dni": "99000001",
       "firstName": "Ana",
       "lastName": "Ficticia",
@@ -12,7 +12,7 @@
       ]
     },
     {
-      "id": "ficticio-2",
+      "id": 90002,
       "dni": "99000002",
       "firstName": "Bruno",
       "lastName": "Ficticio",
@@ -21,7 +21,7 @@
       ]
     },
     {
-      "id": "ficticio-3",
+      "id": 90003,
       "dni": "99000003",
       "firstName": "Carla",
       "lastName": "Ficticia",
