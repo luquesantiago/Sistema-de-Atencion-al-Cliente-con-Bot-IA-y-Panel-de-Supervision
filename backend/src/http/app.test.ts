@@ -14,6 +14,7 @@ import type {
 import type { WhatsAppClient } from '../domain/whatsapp-client.js'
 import { ManageRequests } from '../application/manage-requests.js'
 import { ProcessIncomingMessage } from '../application/process-incoming-message.js'
+import { InMemoryConversationStore } from '../infrastructure/in-memory-conversation-store.js'
 import { InMemoryCustomerRepository } from '../infrastructure/in-memory-customer-repository.js'
 import { createApp } from './app.js'
 
@@ -70,6 +71,12 @@ class FakeRequestRepository implements RequestManagementRepository {
   public async getPhoneChangeNotification(id: number) {
     return { id, decision: 'aprobar' as const, phone: '5491100000000' }
   }
+
+  public readonly recordedNotifications: Array<{ id: number; text: string }> = []
+
+  public async recordPhoneChangeNotification(id: number, text: string, _sentAt: Date): Promise<void> {
+    this.recordedNotifications.push({ id, text })
+  }
 }
 
 describe('endpoints de trámites', () => {
@@ -82,7 +89,7 @@ describe('endpoints de trámites', () => {
     repository = new FakeRequestRepository()
     whatsapp = new FakeWhatsApp()
     const customers: CustomerRepository = new InMemoryCustomerRepository([])
-    const assistant = new ProcessIncomingMessage(customers, new FakeAi(), whatsapp)
+    const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), new FakeAi(), whatsapp)
     const app = createApp(
       assistant,
       { secret: 'test', findPhoneByLid: async () => null },
@@ -210,5 +217,32 @@ describe('endpoints de trámites', () => {
       decision: 'aprobar',
       notificationSent: true,
     })
+  })
+
+  it('guarda el aviso de la decisión una vez cuando sale por WhatsApp', async () => {
+    const response = await fetch(`${baseUrl}/api/tramites/cambios-telefono/12/decision`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'rechazar', fundamento: 'No se pudo verificar', telefonosADesvincular: [] }),
+    })
+    await expect(response.json()).resolves.toMatchObject({ notificationSent: true })
+    expect(repository.recordedNotifications).toEqual([{ id: 12, text: whatsapp.sent[0]?.text }])
+  })
+
+  it('con el envío fallido no guarda el aviso, y el reintento por /notificacion lo guarda', async () => {
+    whatsapp.fail = true
+    const response = await fetch(`${baseUrl}/api/tramites/cambios-telefono/12/decision`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'aprobar', fundamento: 'Identidad verificada', telefonosADesvincular: [] }),
+    })
+    await expect(response.json()).resolves.toMatchObject({ notificationSent: false })
+    expect(repository.recordedNotifications).toEqual([])
+
+    whatsapp.fail = false
+    const retry = await fetch(`${baseUrl}/api/tramites/cambios-telefono/12/notificacion`, { method: 'POST' })
+    await expect(retry.json()).resolves.toMatchObject({ notificationSent: true })
+    expect(repository.recordedNotifications).toHaveLength(1)
+    expect(repository.recordedNotifications[0]?.id).toBe(12)
   })
 })

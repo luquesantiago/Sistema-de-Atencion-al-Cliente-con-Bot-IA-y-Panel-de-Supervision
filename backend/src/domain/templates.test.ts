@@ -6,7 +6,7 @@ import { approvalNotice, argentinaToday, expirationsTemplate, handoffMessage, st
 const lateNight = new Date('2026-10-05T02:30:00Z')
 
 const customer: Customer = {
-  id: 'ficticio-prueba',
+  id: 90099,
   dni: '99000099',
   firstName: 'Ana',
   lastName: 'Prueba',

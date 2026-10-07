@@ -34,8 +34,8 @@ No implementar emisión ni cotización de pólizas, integración con compañías
 
 ### Reglas de negocio no negociables
 
-1. Identificar clientes por DNI. El teléfono no identifica: una persona puede tener varios teléfonos y un teléfono puede pertenecer a varias personas. El sistema sí comprueba si el número de WhatsApp está vinculado para elegir el inicio del flujo. También hay clientes empresa (CUIT + razón social); si el asistente les pide CUIT todavía no está definido.
-2. Si el teléfono está vinculado, pedir el DNI al iniciar cada conversación. Si no está vinculado, preguntar si ya es cliente o si es nuevo; la IA interpreta la respuesta como cliente nuevo, cliente existente o ajena/ambigua. Ante una respuesta ajena o ambigua, volver a preguntar. Si es existente, pedir el DNI y, si no se reconoce, volver a pedirlo hasta 3 veces más (4 pedidos en total); si sigue sin reconocerse, derivar.
+1. Identificar clientes por DNI. Una persona puede tener varios teléfonos y un teléfono puede pertenecer a varias personas. La única excepción es un número de WhatsApp vinculado a un solo cliente activo: identifica a ese cliente sin pedir el DNI (regla 2). Un número compartido no identifica a nadie. El sistema comprueba si el número está vinculado para elegir el inicio del flujo. También hay clientes empresa (CUIT + razón social); si el asistente les pide CUIT todavía no está definido.
+2. Si el teléfono está vinculado a un solo cliente activo, la conversación queda identificada con ese cliente y no se pide el DNI. Si está vinculado a más de un cliente, pedir el DNI al iniciar cada conversación. Si no está vinculado, preguntar si ya es cliente o si es nuevo; la IA interpreta la respuesta como cliente nuevo, cliente existente o ajena/ambigua. Ante una respuesta ajena o ambigua, volver a preguntar. Si es existente, pedir el DNI. Si un DNI no se reconoce, con el teléfono vinculado o no, volver a preguntar si ya es cliente o si es nuevo y, si confirma que ya es cliente, pedirle el DNI de nuevo. Al cuarto DNI no reconocido (3 reintentos), derivar. Si quien escribe desde un número vinculado da el DNI de un cliente que no está vinculado a ese número, o si en una conversación ya identificada da un DNI distinto del del cliente identificado, derivar.
 3. Si es cliente nuevo, pedir nombre y apellido, DNI y una foto del DNI. Guardar nombre, DNI y número de WhatsApp en un prospecto pendiente; no guardar una copia de la foto en el sistema. Derivar para que un miembro autorizado del equipo confirme el alta.
 4. Responder solo con información de la cartera y solo sobre el cliente identificado: nunca mostrar datos de otro cliente, aunque comparta el teléfono. Ante duda, dato ausente o consulta de accidentes, siniestros o cotizaciones, derivar.
 5. Cuando una consulta se deriva, el cliente recibe el mensaje de derivación y el asistente deja de responder en esa conversación hasta que se cierre el caso (RF-DER-03). Lo que el cliente siga escribiendo queda en el mismo caso para el operador, y la inactividad no cierra una conversación que tenga un caso derivado abierto.
@@ -43,7 +43,7 @@ No implementar emisión ni cotización de pólizas, integración con compañías
 7. Verificar cada respuesta antes de enviarla. Retener la respuesta si contiene datos falsos, no verificables, datos personales expuestos, manipulación del asistente o compromiso de una acción no autorizada. Una respuesta retenida no se envía y la consulta se deriva a un operador.
 8. Las bajas, modificaciones de contrato y altas de conductor quedan pendientes de aprobación. Solo pueden aprobar Roberto (rol Administrador), Graciela o Diego (rol Operador); Graciela puede aprobar casos que ella misma atendió. La aprobación registra quién, cuándo y por qué.
 9. El cambio de teléfono (RF-CAR-05) también queda pendiente de aprobación, pero es un dato de cartera y no una acción crítica: no genera la alerta «Pedido de acción crítica».
-   - Si una persona indica que ya es cliente desde un número no vinculado, el asistente pide el DNI. Si coincide, registra una solicitud pendiente de cambio de teléfono; no vincula el número hasta que un operador la apruebe. Informa al cliente que la decisión queda pendiente y le comunica el resultado por ese WhatsApp.
+   - Si una persona indica que ya es cliente desde un número no vinculado, el asistente pide el DNI. Si coincide, registra una solicitud pendiente de cambio de teléfono; no vincula el número hasta que un operador la apruebe. Informa al cliente que la decisión queda pendiente, sigue atendiendo sus consultas en esa conversación como cliente identificado y le comunica el resultado por ese WhatsApp.
    - El número nuevo es el de la conversación. Si alguien pide el cambio escribiendo desde un número que ya tiene vinculado, el asistente le pide que escriba desde el nuevo.
    - Al aprobar, el operador elige qué números anteriores del cliente se desvinculan (puede no elegir ninguno). Solo cambia el vínculo de ese cliente, no el de otros que compartan el número.
    - Al aplicar el cambio, el sistema anota en el `detalle` de la solicitud qué número vinculó y cuáles desvinculó, y le avisa la decisión al cliente en ese número.
@@ -52,7 +52,7 @@ No implementar emisión ni cotización de pólizas, integración con compañías
 ### Casos y cierre
 
 - Un caso por consulta: un mensaje abre un caso nuevo cuando cambia la intención que detecta el LLM; mientras sea la misma, sigue en el mismo caso. La respuesta del asistente va al caso de la consulta que responde.
-- El ofrecimiento del cambio de teléfono y la respuesta del cliente forman su propio caso, aunque el cliente diga que no.
+- La solicitud de cambio de teléfono forma su propio caso.
 - Solo cierra el responsable del caso; si lo quiere cerrar otro, primero lo toma. Cuando una conversación termina por inactividad, se cierran sus casos no derivados que no tengan nada pendiente (ni una alerta sin atender ni una solicitud sin decidir); esos casos quedan sin responsable.
 - El caso de un cambio de teléfono lo cierra quien aprueba o rechaza el pedido, en el mismo paso, y queda como responsable.
 
@@ -60,13 +60,13 @@ No implementar emisión ni cotización de pólizas, integración con compañías
 
 Se muestra una conversación por WhatsApp de punta a punta, con los datos históricos migrados. Mientras la cátedra no diga otra cosa, el Parcial 1 no incluye ABM.
 
-1. Si el número de WhatsApp está vinculado, el asistente pide el DNI antes de responder cualquier cosa. Si no está vinculado, pregunta si ya es cliente o si es nuevo; la IA interpreta la respuesta y, si es un cliente existente, se pide y valida el DNI.
+1. Si el número de WhatsApp está vinculado a un solo cliente activo, el asistente lo atiende como ese cliente sin pedir el DNI. Si está vinculado a varios, pide el DNI antes de responder cualquier cosa. Si no está vinculado, pregunta si ya es cliente o si es nuevo; la IA interpreta la respuesta y, si es un cliente existente, se pide y valida el DNI.
 2. Para un cliente nuevo, el asistente solicita nombre y apellido, DNI y foto del DNI; guarda nombre, DNI y teléfono como prospecto pendiente, no conserva una copia de la foto y deriva el caso.
-3. Para un número no vinculado, el LLM primero clasifica la respuesta a «¿ya es cliente o es nuevo?» como cliente nuevo, cliente existente o ajena/ambigua. Para los números vinculados, y para quienes confirman que ya son clientes, el DNI sigue siendo obligatorio. Una vez identificado, el LLM elige la intención de una lista cerrada: el catálogo `tipo_consulta` (que incluye «cambio de teléfono»), más «no es de seguros» y «no sé».
+3. Para un número no vinculado, el LLM primero clasifica la respuesta a «¿ya es cliente o es nuevo?» como cliente nuevo, cliente existente o ajena/ambigua. Para los números vinculados a varios clientes, y para quienes confirman que ya son clientes, el DNI sigue siendo obligatorio. Una vez identificado, el LLM elige la intención de una lista cerrada: el catálogo `tipo_consulta` (que incluye «cambio de teléfono»), más «no es de seguros» y «no sé».
 4. Según la intención:
    - Vencimiento o estado de la póliza: responde el asistente. Si el cliente tiene varias pólizas, responde todas juntas, una línea por póliza con el número, el ramo y el dato pedido.
    - Saludo o agradecimiento: responde con una plantilla de cortesía, sin derivar.
-   - Cambio de teléfono pedido desde un número ya vinculado: le pide que escriba desde el número nuevo. Mientras los clientes salgan de los fixtures, que no tienen teléfonos, se manda a aprobar como una baja.
+   - Cambio de teléfono pedido desde un número ya vinculado: le pide que escriba desde el número nuevo.
    - Baja o modificación (incluida el alta de conductor): le avisa que un miembro del equipo va a revisar el pedido, sin darlo por hecho, y deja de responder en esa conversación.
    - Lo que no es de seguros: no contesta ni deriva.
    - Cualquier otra cosa (incluidos siniestro, cotización, saldo, cobertura, reclamo y lo que no se pueda clasificar): deriva a la bandeja de un operador.
@@ -75,6 +75,9 @@ Reglas del Parcial 1:
 
 - El LLM elige la intención de una lista cerrada (salida estructurada estricta) y vuelve a redactar la plantilla completada con los datos, sin cambiarlos; el código controla que los datos no cambien y, si cambian, deriva. El motor de verificación (RF-VER-02) todavía no está.
 - El asistente consulta y guarda los datos operativos en MySQL. `backend/fixtures/clientes-ficticios.json` se reserva para pruebas automatizadas; los datos históricos se cargan siguiendo `docs/migracion.md`.
+- El asistente guarda cada conversación en la base (`conversacion`, `caso`, `mensaje` y `respuesta`). El silencio después de derivar, de mandar a aprobar o de registrar un prospecto dura hasta que se cierre el caso derivado (`asistente_suspendido`).
+- Si se reinicia el backend, la conversación que no está en silencio termina cuando el número vuelve a escribir, y ese mensaje empieza una conversación nueva. El silencio después de derivar o de mandar a aprobar sí se conserva (regla 5).
+- Desvíos provisionales: la baja y la modificación (incluida el alta de conductor) se derivan sin registrar la solicitud pendiente (regla 8), y los mensajes repetidos se descartan en memoria, porque la base no guarda el id del mensaje de WhatsApp: después de un reinicio, un reintento de WAHA puede duplicar un mensaje.
 - Los textos de las plantillas los propone la IA que programa, en el PR, con el tono de «Contexto funcional». El equipo los revisa ahí.
 - Login en Frontend: la interfaz incluye la pantalla de inicio de sesión con los usuarios de prueba (`admin` y `operador` / clave `1234`) para simular el acceso según el rol. El backend atribuye todo lo que se hace desde el panel al usuario de prueba `operador` y la autenticación real de servidor se integrará en el Parcial 2.
 - El operador le contesta al cliente desde el panel: el mensaje sale por WhatsApp desde el número del asistente y queda guardado con origen «operador».
@@ -159,6 +162,7 @@ No cerrar por código sin confirmación del cliente. Si una tarea depende de alg
 - Forma final de presentación del asistente (mientras tanto rige lo de "Contexto funcional").
 - Si después de derivar el asistente deja de responder del todo en esa conversación o sigue con otras consultas simples. Mientras tanto rige RF-DER-03.
 - Fuera de horario (RF-DER-04) y el cambio de teléfono por WhatsApp (RF-CAR-05) son propuestas del equipo que la agencia todavía no validó. Mientras tanto rigen como están escritas.
+- No pedir el DNI cuando el número está vinculado a un solo cliente activo (reglas 1 y 2) es una propuesta del equipo (07/10/2026) que la agencia todavía no validó: en la entrevista del 16/09/2026 pidió identificar por DNI en todos los casos (RF-ATE-03). Mientras tanto rige como está escrita.
 - Si el Parcial 1 tiene que incluir ABM. Mientras tanto, no.
 - Requisitos y documentación de cada acción crítica, y si un alta de conductor aprobada la aplica el sistema o la carga el operador.
 - Qué ficha vale en los clientes duplicados y quién es el titular del VW Gol. Mientras tanto, la migración sigue `docs/migracion.md`: el duplicado exacto quedó en una sola fila y las pólizas POL-00126 y POL-00131 se omiten.
@@ -168,7 +172,7 @@ No cerrar por código sin confirmación del cliente. Si una tarea depende de alg
 - Cuotas de las pólizas.
 - Si el asistente pide CUIT a los clientes empresa.
 - Tratamiento de datos sensibles.
-- Qué hace el asistente con los audios, las fotos y los archivos sin texto. Mientras tanto, el canal los ignora sin responder y deja una línea en el log del backend; si la foto trae epígrafe, procesa el texto.
+- Qué hace el asistente con los audios, las fotos y los archivos sin texto. Mientras tanto, el canal los ignora sin responder y deja una línea en el log del backend; si la foto trae epígrafe, procesa el texto. Las excepciones son la foto del DNI del cliente nuevo y la imagen que llega a una conversación en silencio: se procesan sin guardar la imagen, y queda un mensaje con un texto que dice que el cliente la mandó.
 - Minutos para alertar una derivación sin tomar (60, provisorio) y minutos de inactividad que cierran una sesión (30, provisorio).
 - Cómo se cuenta «lo resolvió el asistente» en las métricas (RF-SUP-05). Definirlo antes de programarlas.
 

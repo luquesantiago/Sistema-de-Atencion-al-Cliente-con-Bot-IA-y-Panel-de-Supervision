@@ -552,8 +552,9 @@ async function load(
         id_cliente: policy?.holderId ?? null,
         fecha_inicio: caseRow.openedAt,
         fecha_fin: caseRow.closedAt,
-        // Decisión del equipo (06/10/2026): FALSE también en las conversaciones abiertas.
-        asistente_suspendido: false,
+        // Una conversación abierta tiene su caso derivado sin cerrar: el asistente no la
+        // atiende hasta que un operador lo cierre (RF-DER-03, change asistente-con-base).
+        asistente_suspendido: caseRow.closedAt === null,
       },
     })
     counts.conversacion++

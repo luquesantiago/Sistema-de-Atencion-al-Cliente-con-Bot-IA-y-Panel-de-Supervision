@@ -59,4 +59,4 @@ Mantener alertas diferenciables para datos falsos o no verificables, exposición
 - Solicitud de baja o modificación: queda pendiente y no altera la cartera.
 - Aprobación autorizada y rechazo: ambos dejan trazabilidad completa.
 - Mensaje posterior a una derivación: no se genera respuesta automática.
-- Mensaje de WhatsApp repetido: no duplica mensajes ni efectos.
+- Mensaje de WhatsApp repetido: no duplica mensajes ni efectos. Desvío provisional del Parcial 1: los repetidos se descartan en memoria; después de un reinicio, un reintento de WAHA puede duplicar un mensaje.

@@ -15,7 +15,7 @@ Reglas para importar a la base los datos históricos de la agencia (Parcial 1). 
 
   Para leer otro archivo: `npm run migrar-planilla -- <ruta dentro de backend/>`. Valida toda la planilla antes de escribir y carga todo en una transacción: si algo falla, la base queda como estaba. Si la base ya tiene clientes o los usuarios `roberto` o `graciela`, no escribe nada. Al terminar informa cuántos registros cargó por tabla y qué filas salteó.
 - Los datos quedan en el volumen de Docker de la base: `docker compose stop`, `restart` y `down` (sin `-v`) no los borran. `docker compose down -v` sí: después hay que volver a correr el script.
-- Quien no tenga el Excel no tiene los datos migrados. La demo corre en una máquina que lo tenga.
+- Quien no tenga el Excel no tiene los datos migrados y el asistente no reconoce ningún DNI. La demo corre en una máquina que lo tenga.
 
 ## Qué lee el script
 
@@ -41,7 +41,7 @@ Reglas para importar a la base los datos históricos de la agencia (Parcial 1). 
 - **Tipo de consulta:** «siniestro_urgente» se carga como siniestro. PROMPT_INJECTION no es un tipo de consulta: el caso queda sin tipo y con la alerta «Intento de manipulación del asistente».
 - **Alertas** (CASO-003, 005, 006, 010 y 012): se cargan atendidas por el responsable del caso, a la hora de la toma. ALERTA_ACCION pasa a «Pedido de acción crítica», salvo CASO-006, que pasa a «Pedido de reembolso (aviso al equipo)».
 - **Póliza del caso** (`caso.id_poliza`, opcional): CASO-001, 011 y 012 → POL-00123; CASO-006 → POL-00124. Quedan vacíos hasta que responda la agencia CASO-002 (además, POL-00128 no se migra), CASO-004 y CASO-008, porque el log los vincula a pólizas que no coinciden con la consulta.
-- **Conversaciones:** una por caso. Empieza a la hora de apertura; si el caso está cerrado, termina a la hora de cierre, y si sigue abierto, queda abierta. Si el caso tiene póliza, la conversación queda a nombre del titular de esa póliza y su número se vincula a ese cliente: CASO-001, 011 y 012 → Juan García (5491155551001 y 5491155551009); CASO-006 → María del Carmen López (5491155551005). Si no tiene póliza, la conversación queda sin cliente y el número sin vincular, como una conversación en la que nadie dio el DNI. CASO-003 usa el mismo número que CASO-001 y 011 pero no tiene póliza: su conversación queda sin cliente, aunque el número quede vinculado a García. Riesgo aceptado: en CASO-012 no escribió el titular (el log dice «Consultó al titular»).
+- **Conversaciones:** una por caso. Empieza a la hora de apertura; si el caso está cerrado, termina a la hora de cierre, y si sigue abierto, queda abierta y con el asistente suspendido (`asistente_suspendido`), porque tiene un caso derivado sin cerrar: el asistente no le contesta a ese número hasta que un operador cierre el caso. Si el caso tiene póliza, la conversación queda a nombre del titular de esa póliza y su número se vincula a ese cliente: CASO-001, 011 y 012 → Juan García (5491155551001 y 5491155551009); CASO-006 → María del Carmen López (5491155551005). Si no tiene póliza, la conversación queda sin cliente y el número sin vincular, como una conversación en la que nadie dio el DNI. CASO-003 usa el mismo número que CASO-001 y 011 pero no tiene póliza: su conversación queda sin cliente, aunque el número quede vinculado a García. Riesgo aceptado: en CASO-012 no escribió el titular (el log dice «Consultó al titular»).
 
 ## Usuarios
 

@@ -5,59 +5,43 @@ import {
   type Customer,
   type CustomerPolicy,
   type CustomerRepository,
-  type NewProspect,
-  type PhoneChangeRequest,
 } from '../domain/customer.js'
 
-// Adaptador provisional hasta que la cartera migrada esté en la base: los clientes salen
-// de backend/fixtures/clientes-ficticios.json, que son datos ficticios.
+// Doble de prueba de la cartera: el asistente usa PrismaCustomerRepository. El cargador de
+// backend/fixtures/clientes-ficticios.json (datos ficticios) queda para las pruebas.
 export class InMemoryCustomerRepository implements CustomerRepository {
-  public readonly prospects: NewProspect[] = []
-  public readonly phoneChangeRequests: PhoneChangeRequest[] = []
-  public readonly handoffMessages: Array<{ phone: string; content: string }> = []
-  private readonly linkedPhones = new Set<string>()
-  private readonly handoffPhones = new Set<string>()
+  private readonly links: Array<{ phone: string; customerId: number }> = []
+  private readonly inactiveIds = new Set<number>()
 
   public constructor(private readonly customers: Customer[]) {}
 
   public async findByDni(dni: string): Promise<Customer | null> {
-    return this.customers.find((customer) => customer.dni === dni) ?? null
+    return this.activeCustomers().find((customer) => customer.dni === dni) ?? null
   }
 
-  public async findById(id: string): Promise<Customer | null> {
-    return this.customers.find((customer) => customer.id === id) ?? null
+  public async findById(id: number): Promise<Customer | null> {
+    return this.activeCustomers().find((customer) => customer.id === id) ?? null
   }
 
-  public async hasLinkedPhone(phone: string): Promise<boolean> {
-    return this.linkedPhones.has(phone)
+  public async linkedCustomerIds(phone: string): Promise<number[]> {
+    const active = new Set(this.activeCustomers().map((customer) => customer.id))
+    return this.links
+      .filter((link) => link.phone === phone && active.has(link.customerId))
+      .map((link) => link.customerId)
+      .sort((a, b) => a - b)
   }
 
-  public async hasOpenHandoff(phone: string): Promise<boolean> {
-    return this.handoffPhones.has(phone)
+  public linkPhone(phone: string, customerId: number): void {
+    this.links.push({ phone, customerId })
   }
 
-  public async recordMessageForOpenHandoff(phone: string, content: string): Promise<void> {
-    this.handoffMessages.push({ phone, content })
+  // Marca al cliente como cargado por error (activo = FALSE en la base).
+  public deactivate(customerId: number): void {
+    this.inactiveIds.add(customerId)
   }
 
-  public async recordIncomingPhone(_phone: string): Promise<void> {}
-
-  public async createProspect(prospect: NewProspect): Promise<void> {
-    this.prospects.push(prospect)
-    this.handoffPhones.add(prospect.phone)
-  }
-
-  public async createPhoneChangeRequest(request: PhoneChangeRequest): Promise<void> {
-    this.phoneChangeRequests.push(request)
-    this.handoffPhones.add(request.phone)
-  }
-
-  public linkPhone(phone: string): void {
-    this.linkedPhones.add(phone)
-  }
-
-  public closeHandoff(phone: string): void {
-    this.handoffPhones.delete(phone)
+  private activeCustomers(): Customer[] {
+    return this.customers.filter((customer) => !this.inactiveIds.has(customer.id))
   }
 }
 
@@ -82,7 +66,7 @@ function parseCustomer(value: unknown, path: string): Customer {
   const dni = requiredString(value, 'dni', path)
   if (!/^\d{7,8}$/.test(dni)) throw new Error(`${path}.dni tiene que tener 7 u 8 dígitos`)
   return {
-    id: requiredString(value, 'id', path),
+    id: requiredPositiveInteger(value, 'id', path),
     dni,
     firstName: requiredString(value, 'firstName', path),
     lastName: requiredString(value, 'lastName', path),
@@ -109,6 +93,14 @@ function parsePolicy(value: unknown, path: string): CustomerPolicy {
 function requiredString(record: Record<string, unknown>, key: string, path: string): string {
   const value = record[key]
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${path}.${key} falta o no es texto`)
+  return value
+}
+
+function requiredPositiveInteger(record: Record<string, unknown>, key: string, path: string): number {
+  const value = record[key]
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`${path}.${key} tiene que ser un entero positivo`)
+  }
   return value
 }
 

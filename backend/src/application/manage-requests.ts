@@ -16,6 +16,7 @@ export class ManageRequests {
   public constructor(
     private readonly repository: RequestManagementRepository,
     private readonly whatsapp: WhatsAppClient,
+    private readonly clock: () => Date = () => new Date(),
   ) {}
 
   public listPendingProspects(page: PageRequest): Promise<PendingProspect[]> {
@@ -67,17 +68,22 @@ export class ManageRequests {
   }
 
   private async sendPhoneChangeNotification(id: number, phone: string, decision: 'aprobar' | 'rechazar') {
-    let notificationSent = true
+    const text = decision === 'aprobar'
+      ? 'Su solicitud de actualización de teléfono fue aprobada. El número solicitado ya quedó registrado.'
+      : 'Su solicitud de actualización de teléfono fue rechazada. Si necesita más información, comuníquese con nuestro equipo.'
     try {
-      const text = decision === 'aprobar'
-        ? 'Su solicitud de actualización de teléfono fue aprobada. El número solicitado ya quedó registrado.'
-        : 'Su solicitud de actualización de teléfono fue rechazada. Si necesita más información, comuníquese con nuestro equipo.'
       await this.whatsapp.sendText(phone, text)
     } catch {
-      notificationSent = false
       console.error(`[tramites] No se pudo notificar la decisión ${id} al cliente.`)
+      return false
     }
-    return notificationSent
+    // El aviso ya salió: si no se puede guardar, queda la línea en el log y no se reenvía.
+    try {
+      await this.repository.recordPhoneChangeNotification(id, text, this.clock())
+    } catch {
+      console.error(`[tramites] No se pudo guardar el aviso de la decisión ${id}.`)
+    }
+    return true
   }
 }
 
