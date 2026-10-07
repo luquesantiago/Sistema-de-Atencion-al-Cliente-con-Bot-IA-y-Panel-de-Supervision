@@ -38,9 +38,9 @@ export function parseWahaWebhook(body: unknown): WahaWebhookContent {
   if (content !== undefined && content !== null && typeof content !== 'string') {
     return ignored(messageId, 'formato inesperado')
   }
-  // Audios, fotos y archivos sin epígrafe llegan sin body: no hay nada que procesar.
   const text = typeof content === 'string' ? content : ''
-  if (!text.trim()) return ignored(messageId, 'sin texto')
+  const media = isImageMessage(payload) ? 'image' : undefined
+  if (!text.trim() && !media) return ignored(messageId, 'sin texto')
 
   const receivedAt = typeof payload.timestamp === 'number' && Number.isFinite(payload.timestamp)
     ? new Date(payload.timestamp * 1000).toISOString()
@@ -49,13 +49,13 @@ export function parseWahaWebhook(body: unknown): WahaWebhookContent {
   if (from.endsWith('@lid')) {
     // GOWS deja el número del remitente en _data.Info.SenderAlt; si no viene, se le pregunta a WAHA.
     const phone = senderAltPhone(payload._data)
-    if (phone) return { kind: 'message', from, message: { messageId, phone, text, receivedAt } }
-    return { kind: 'lid', from, message: { messageId, text, receivedAt } }
+    if (phone) return { kind: 'message', from, message: { messageId, phone, text, media, receivedAt } }
+    return { kind: 'lid', from, message: { messageId, text, media, receivedAt } }
   }
   if (!from.endsWith('@c.us') && !from.endsWith('@s.whatsapp.net')) return ignored(messageId, 'no es un chat individual')
   const phone = phoneFromChatId(from)
   if (!phone) return ignored(messageId, 'sin número válido')
-  return { kind: 'message', from, message: { messageId, phone, text, receivedAt } }
+  return { kind: 'message', from, message: { messageId, phone, text, media, receivedAt } }
 }
 
 // Para los logs: el id de WAHA incluye el chat (y con él el número), así que se muestra solo el id propio de WhatsApp.
@@ -71,6 +71,16 @@ function senderAltPhone(data: unknown): string | null {
   if (!isRecord(data) || !isRecord(data.Info)) return null
   const senderAlt = data.Info.SenderAlt
   return typeof senderAlt === 'string' ? phoneFromChatId(senderAlt) : null
+}
+
+function isImageMessage(payload: Record<string, unknown>): boolean {
+  if (payload.hasMedia !== true) return false
+  const media = payload.media
+  if (isRecord(media) && typeof media.mimetype === 'string' && media.mimetype.startsWith('image/')) return true
+  if (typeof payload.mimetype === 'string' && payload.mimetype.startsWith('image/')) return true
+  const data = payload._data
+  if (!isRecord(data) || !isRecord(data.message)) return false
+  return isRecord(data.message.imageMessage)
 }
 
 function ignored(messageId: string | null, reason: IgnoredReason): WahaWebhookContent {
