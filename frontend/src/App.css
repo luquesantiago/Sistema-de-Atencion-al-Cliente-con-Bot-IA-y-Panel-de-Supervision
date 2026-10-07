@@ -871,9 +871,32 @@
   font-size: 0.82rem;
 }
 
-.tabla__numero {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+/* Una línea por póliza en la lista: número, tipo y estado */
+
+.tabla__polizas {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tabla__poliza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.tabla__poliza-tipo {
+  color: var(--texto);
+  font-size: 0.85rem;
+}
+
+.tabla__sin-datos {
+  color: var(--texto-tenue);
+  font-size: 0.85rem;
 }
 
 .tabla__accion {
@@ -987,11 +1010,13 @@
 }
 
 .detalle-panel__polizas {
-  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .detalle-panel__subtitulo {
-  margin-bottom: 8px;
+  margin-bottom: -4px;
   color: var(--texto-suave);
   font-size: 0.75rem;
   font-weight: 650;
@@ -999,15 +1024,47 @@
   text-transform: uppercase;
 }
 
-.tabla--compacta {
-  border: 0;
-  box-shadow: none;
+/* Una tarjeta por póliza: número y estado arriba, cobertura y bien debajo */
+
+.detalle-panel__poliza {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--superficie-alterna);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
 }
 
-.tabla--compacta th,
-.tabla--compacta td {
-  padding: 7px 8px;
-  font-size: 0.8rem;
+.detalle-panel__poliza-encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detalle-panel__poliza-numero {
+  font-size: 0.88rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--texto);
+}
+
+.detalle-panel__bien {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--borde);
+}
+
+.detalle-panel__bien-titulo {
+  color: var(--texto-suave);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /* Responsive: la navegación se reordena arriba, sin ocultar módulos */

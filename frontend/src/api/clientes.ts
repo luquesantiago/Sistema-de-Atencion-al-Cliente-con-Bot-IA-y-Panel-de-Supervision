@@ -8,12 +8,33 @@
  * campos ausentes llegan como `null` y no se inventan valores en su lugar.
  */
 
-export type DatoPoliza = {
+export type DatoPolizaResumen = {
   number: string
   ramo: string
   status: string
+}
+
+// El bien que asegura la póliza: patente para autos y motos, dirección para
+// inmuebles y comercios. Los ramos que no aseguran un bien (vida) traen null.
+export type DatoBienAsegurado = {
+  description: string
+  plate: string | null
+  address: string | null
+  brand: string | null
+  model: string | null
+  year: number | null
+}
+
+export type DatoPoliza = {
+  number: string
+  /** El tipo de póliza: el panel lo muestra como «Cobertura». */
+  ramo: string
+  status: string
+  /** Inicio de la vigencia, aaaa-mm-dd. Puede ser null. */
+  startDate: string | null
   /** Fecha sin hora, aaaa-mm-dd. */
   expirationDate: string
+  insuredItem: DatoBienAsegurado | null
 }
 
 export type ClienteLista = {
@@ -24,7 +45,7 @@ export type ClienteLista = {
   firstName: string | null
   lastName: string | null
   phones: string[]
-  policyCount: number
+  policies: DatoPolizaResumen[]
 }
 
 export type ClienteDetalle = {

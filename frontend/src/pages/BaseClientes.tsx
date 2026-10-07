@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Modulo } from '../navigation'
 import PageHeader from '../components/PageHeader'
 import EstadoPanel from '../components/EstadoPanel'
-import { listarClientes, obtenerCliente, type ClienteDetalle, type ClienteLista } from '../api/clientes'
+import {
+  listarClientes,
+  obtenerCliente,
+  type ClienteDetalle,
+  type ClienteLista,
+  type DatoPolizaResumen,
+} from '../api/clientes'
 
 const LIMITE_PAGINA = 25
 const RETRASO_BUSQUEDA_MS = 300
@@ -32,6 +38,33 @@ function tonoDeEstado(status: string): string {
 
 function mensajeDeError(error: unknown, textoPorDefecto: string): string {
   return error instanceof Error ? error.message : textoPorDefecto
+}
+
+// Una línea por póliza en la lista: número, tipo y estado. Nunca un conteo
+// suelto: el operador tiene que ver de qué se trata cada póliza.
+function resumenDePolizas(polizas: DatoPolizaResumen[]): ReactNode {
+  if (polizas.length === 0) {
+    return <span className="tabla__sin-datos">Sin pólizas</span>
+  }
+  return (
+    <ul className="tabla__polizas">
+      {polizas.map((poliza) => (
+        <li key={poliza.number} className="tabla__poliza">
+          <span className="tabla__poliza-tipo">
+            {poliza.number} · {poliza.ramo}
+          </span>
+          <span className={tonoDeEstado(poliza.status)}>{poliza.status}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+// «Vigencia» de la ficha: con inicio y fin, o solo el vencimiento si la
+// fecha de inicio no está cargada.
+function vigenciaDe(startDate: string | null, expirationDate: string): string {
+  const hasta = fechaLegible(expirationDate)
+  return startDate === null ? `Vence ${hasta}` : `${fechaLegible(startDate)} a ${hasta}`
 }
 
 /**
@@ -167,9 +200,7 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
               <th scope="col">Identificación</th>
               <th scope="col">Cliente</th>
               <th scope="col">Teléfonos</th>
-              <th scope="col" className="tabla__numero">
-                Pólizas
-              </th>
+              <th scope="col">Pólizas</th>
               <th scope="col">
                 <span className="visually-hidden">Acciones</span>
               </th>
@@ -189,7 +220,7 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
                   <td className="tabla__telefonos">
                     {cliente.phones.length > 0 ? cliente.phones.join(' · ') : 'Sin teléfono vinculado'}
                   </td>
-                  <td className="tabla__numero">{cliente.policyCount}</td>
+                  <td>{resumenDePolizas(cliente.policies)}</td>
                   <td className="tabla__accion">
                     <button
                       type="button"
@@ -293,28 +324,67 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
                   {detalle.policies.length === 0 ? (
                     <p className="detalle-panel__aviso">Este cliente no tiene pólizas cargadas.</p>
                   ) : (
-                    <table className="tabla tabla--compacta">
-                      <thead>
-                        <tr>
-                          <th scope="col">Número</th>
-                          <th scope="col">Ramo</th>
-                          <th scope="col">Estado</th>
-                          <th scope="col">Vencimiento</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detalle.policies.map((poliza) => (
-                          <tr key={poliza.number}>
-                            <td>{poliza.number}</td>
-                            <td>{poliza.ramo}</td>
-                            <td>
-                              <span className={tonoDeEstado(poliza.status)}>{poliza.status}</span>
-                            </td>
-                            <td>{fechaLegible(poliza.expirationDate)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    detalle.policies.map((poliza) => (
+                      <article key={poliza.number} className="detalle-panel__poliza">
+                        <header className="detalle-panel__poliza-encabezado">
+                          <h4 className="detalle-panel__poliza-numero">{poliza.number}</h4>
+                          <span className={tonoDeEstado(poliza.status)}>{poliza.status}</span>
+                        </header>
+
+                        <dl className="detalle-panel__datos">
+                          <dt>Cobertura</dt>
+                          <dd>{poliza.ramo}</dd>
+
+                          <dt>Vigencia</dt>
+                          <dd>{vigenciaDe(poliza.startDate, poliza.expirationDate)}</dd>
+                        </dl>
+
+                        {poliza.insuredItem ? (
+                          <div className="detalle-panel__bien">
+                            <h5 className="detalle-panel__bien-titulo">Bien asegurado</h5>
+                            <dl className="detalle-panel__datos">
+                              <dt>Descripción</dt>
+                              <dd>{poliza.insuredItem.description}</dd>
+
+                              {poliza.insuredItem.plate !== null ? (
+                                <>
+                                  <dt>Patente</dt>
+                                  <dd>{poliza.insuredItem.plate}</dd>
+                                </>
+                              ) : null}
+
+                              {poliza.insuredItem.brand !== null ? (
+                                <>
+                                  <dt>Marca</dt>
+                                  <dd>{poliza.insuredItem.brand}</dd>
+                                </>
+                              ) : null}
+
+                              {poliza.insuredItem.model !== null ? (
+                                <>
+                                  <dt>Modelo</dt>
+                                  <dd>{poliza.insuredItem.model}</dd>
+                                </>
+                              ) : null}
+
+                              {poliza.insuredItem.year !== null ? (
+                                <>
+                                  <dt>Año</dt>
+                                  <dd>{poliza.insuredItem.year}</dd>
+                                </>
+                              ) : null}
+
+                              {poliza.insuredItem.address !== null ? (
+                                <>
+                                  <dt>Dirección</dt>
+                                  <dd>{poliza.insuredItem.address}</dd>
+                                </>
+                              ) : null}
+                            </dl>
+                          </div>
+                        ) : null}
+                      </article>
+                    ))
                   )}
                 </section>
               </>
