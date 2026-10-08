@@ -240,7 +240,7 @@ Con `docker compose --profile whatsapp up -d`, la sesión de WAHA en `WORKING` y
   - tres mensajes seguidos que no se entienden («eso», «lo otro», «aquello») → dos repreguntas y la derivación con el motivo «no se entendió la consulta».
 
   Verificar los motivos con SELECT. La falla de Groq se cubre con las pruebas de Vitest de la tarea 2.3; en la demo no se simula.
-- [ ] 5.4 **Lo migrado no cambió.** Repetir el SELECT de la tarea 1.1. Si para probar se cerraron a mano los casos derivados para levantar el silencio (también los de la planilla), el hash de `caso` cambia por eso: se toma una huella nueva justo después de cerrarlos y se compara contra esa. Verificar:
+- [x] 5.4 **Lo migrado no cambió.** Repetir el SELECT de la tarea 1.1. Si para probar se cerraron a mano los casos derivados para levantar el silencio (también los de la planilla), el hash de `caso` cambia por eso: se toma una huella nueva justo después de cerrarlos y se compara contra esa. Verificar:
   - los hashes son iguales;
   - los conteos son los de la tarea 1.2 (12, 5, 6, 4 y 5).
 
