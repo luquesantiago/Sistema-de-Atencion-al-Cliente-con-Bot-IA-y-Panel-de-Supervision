@@ -151,7 +151,7 @@ Son funciones puras, sin base ni Groq. Todavía no se usan en el flujo.
   - `conversacion`, sin la columna `asistente_suspendido`.
 
   Se toman las filas con id menor o igual al conteo de la migración (10 conversaciones y casos, 20 mensajes, 10 respuestas, 8 teléfonos, 3 vínculos, 5 alertas). Se anota el resultado, que no muestra datos. Verificar: el SELECT corre y devuelve un hash por tabla.
-- [ ] 5.2 **Vincular el celular de la demo**, después de la tarea 4.1, con `docker compose --profile whatsapp up -d` y la sesión de WAHA en `WORKING`. Desde un celular no vinculado:
+- [x] 5.2 **Vincular el celular de la demo**, después de la tarea 4.1, con `docker compose --profile whatsapp up -d` y la sesión de WAHA en `WORKING`. Desde un celular no vinculado:
   1. «hola, ¿cuándo vence mi seguro?» → «¿ya es cliente o es nuevo?»;
   2. «ya soy cliente» → pedido de DNI;
   3. el DNI de un cliente migrado con pólizas → aviso de pendiente y una línea por póliza, cada una diciendo que venció;
@@ -159,7 +159,7 @@ Son funciones puras, sin base ni Groq. Todavía no se usan en el flujo.
   5. aprobar la solicitud con `GET /api/tramites/cambios-telefono` y `POST /api/tramites/cambios-telefono/:id/decision`, sin desvincular números → llega el aviso de aprobación.
 
   Con SELECT, sin textos ni números completos, verificar: la solicitud aprobada con su `detalle`; el caso de la solicitud cerrado con responsable; el vínculo nuevo en `cliente_telefono`; el aviso guardado como mensaje del asistente en ese caso; una sola conversación abierta para el número.
-- [ ] 5.3 **Conversación desde el número vinculado:**
+- [x] 5.3 **Conversación desde el número vinculado:**
   1. `docker compose restart backend` y «¿y el estado de mis pólizas?» → el estado, sin pedir el DNI ni preguntar si ya es cliente;
   2. «tuve un choque» → mensaje de derivación;
   3. «¿hola?» → nada;
@@ -170,17 +170,17 @@ Son funciones puras, sin base ni Groq. Todavía no se usan en el flujo.
   - hay 2 casos: estado de póliza y siniestro, este último derivado con el motivo `intención: siniestro`;
   - los «¿hola?» están en el caso derivado y no tienen respuesta;
   - todas las respuestas del asistente tienen `id_mensaje_enviado`.
-- [ ] 5.4 **Cliente nuevo**, desde otro número de prueba: «hola» → «soy nuevo» → nombre → un DNI que no está en la base → foto → aviso de revisión. Verificar con SELECT que hay un prospecto «pendiente» con `dni_declarado` y `nombre_declarado` no nulos (sin mostrarlos), en la conversación abierta del número, con el motivo `cliente nuevo` y `asistente_suspendido = TRUE`, y que la cantidad de filas de `cliente` no cambió. Después, rechazar el prospecto con `POST /api/tramites/prospectos/:id/decision` y verificar que la conversación quedó con `asistente_suspendido = FALSE` y que «hola» vuelve a recibir respuesta.
+- [x] 5.4 **Cliente nuevo**, desde otro número de prueba: «hola» → «soy nuevo» → nombre → un DNI que no está en la base → foto → aviso de revisión. Verificar con SELECT que hay un prospecto «pendiente» con `dni_declarado` y `nombre_declarado` no nulos (sin mostrarlos), en la conversación abierta del número, con el motivo `cliente nuevo` y `asistente_suspendido = TRUE`, y que la cantidad de filas de `cliente` no cambió. Después, rechazar el prospecto con `POST /api/tramites/prospectos/:id/decision` y verificar que la conversación quedó con `asistente_suspendido = FALSE` y que «hola» vuelve a recibir respuesta.
 - [x] 5.5 **Falla del envío contra la base real.** Con `docker compose stop waha`, guardar los conteos de `conversacion`, `caso`, `mensaje`, `respuesta` y `telefono`. Mandar al webhook un aviso con el formato de WAHA, un número ficticio (`5490000000099`) y el texto «hola», desde el contenedor del backend con `node -e` y `fetch`, usando `process.env.WHATSAPP_WEBHOOK_SECRET` (no se lee el `.env`). Verificar:
   - el webhook responde 500 y el log dice que WAHA lo reintenta;
   - los conteos son los mismos;
   - después, `docker compose --profile whatsapp up -d` para levantar WAHA de nuevo.
-- [ ] 5.6 **Inactividad contra la base real (opcional, si hay tiempo).** Con el número de la tarea 5.4: escribir, esperar 31 minutos y volver a escribir. Verificar:
+- [x] 5.6 **Inactividad contra la base real (opcional, si hay tiempo).** Con el número de la tarea 5.4: escribir, esperar 31 minutos y volver a escribir. Verificar:
   - la identificación empieza de nuevo;
   - con SELECT, la conversación anterior tiene `fecha_fin` igual al último mensaje más 30 minutos;
   - sus casos no derivados quedaron cerrados y sin responsable;
   - hay una conversación nueva abierta para ese número.
-- [ ] 5.7 **Lo migrado no cambió.** Repetir el SELECT de la tarea 5.1. Verificar:
+- [x] 5.7 **Lo migrado no cambió.** Repetir el SELECT de la tarea 5.1. Verificar:
   - los hashes son iguales;
   - `SELECT COUNT(*) FROM conversacion WHERE asistente_suspendido = TRUE AND id_conversacion <= 10` da 7.
 
