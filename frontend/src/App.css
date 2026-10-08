@@ -889,9 +889,10 @@
   gap: 6px;
 }
 
-.tabla__poliza-tipo {
+.tabla__poliza-numero {
   color: var(--texto);
   font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .tabla__sin-datos {

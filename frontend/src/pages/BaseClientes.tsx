@@ -40,7 +40,7 @@ function mensajeDeError(error: unknown, textoPorDefecto: string): string {
   return error instanceof Error ? error.message : textoPorDefecto
 }
 
-// Una línea por póliza en la lista: número, tipo y estado. Nunca un conteo
+// Una línea por póliza en la lista: número y estado. Nunca un conteo
 // suelto: el operador tiene que ver de qué se trata cada póliza.
 function resumenDePolizas(polizas: DatoPolizaResumen[]): ReactNode {
   if (polizas.length === 0) {
@@ -50,9 +50,7 @@ function resumenDePolizas(polizas: DatoPolizaResumen[]): ReactNode {
     <ul className="tabla__polizas">
       {polizas.map((poliza) => (
         <li key={poliza.number} className="tabla__poliza">
-          <span className="tabla__poliza-tipo">
-            {poliza.number} · {poliza.ramo}
-          </span>
+          <span className="tabla__poliza-numero">{poliza.number}</span>
           <span className={tonoDeEstado(poliza.status)}>{poliza.status}</span>
         </li>
       ))}
@@ -228,6 +226,12 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
                       aria-expanded={activo}
                       onClick={(evento) => {
                         evento.stopPropagation()
+                        // «Viendo» alterna: tocarlo cierra la ficha, igual que el
+                        // botón Cerrar del panel, y vuelve la lista completa.
+                        if (activo) {
+                          cerrarDetalle()
+                          return
+                        }
                         void abrirDetalle(cliente)
                       }}
                     >

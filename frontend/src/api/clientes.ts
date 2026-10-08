@@ -8,6 +8,8 @@
  * campos ausentes llegan como `null` y no se inventan valores en su lugar.
  */
 
+// La lista muestra número y estado; la API también trae `ramo` (el tipo de
+// póliza), que la ficha presenta como «Cobertura».
 export type DatoPolizaResumen = {
   number: string
   ramo: string
