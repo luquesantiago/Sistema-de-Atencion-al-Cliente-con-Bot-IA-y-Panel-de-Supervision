@@ -15,6 +15,7 @@ import type { WhatsAppClient } from '../domain/whatsapp-client.js'
 import { ManageCustomers } from '../application/manage-customers.js'
 import { ManageRequests } from '../application/manage-requests.js'
 import { ProcessIncomingMessage } from '../application/process-incoming-message.js'
+import { InMemoryAgencyInfoSource } from '../infrastructure/in-memory-agency-info.js'
 import { InMemoryConversationStore } from '../infrastructure/in-memory-conversation-store.js'
 import { InMemoryCustomerRepository } from '../infrastructure/in-memory-customer-repository.js'
 import { createApp } from './app.js'
@@ -24,7 +25,7 @@ class FakeAi implements AiClient {
     return 'UNRELATED'
   }
   public async classifyIntent(_text: string) {
-    return 'no sé' as const
+    return 'otra consulta' as const
   }
   public async rewrite(_input: RewriteInput): Promise<string> {
     return ''
@@ -90,7 +91,8 @@ describe('endpoints de trámites', () => {
     repository = new FakeRequestRepository()
     whatsapp = new FakeWhatsApp()
     const customers: CustomerRepository = new InMemoryCustomerRepository([])
-    const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), new FakeAi(), whatsapp)
+    const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, hours: [] })
+    const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), agency, new FakeAi(), whatsapp)
     const app = createApp(
       assistant,
       { secret: 'test', findPhoneByLid: async () => null },

@@ -35,7 +35,10 @@ const linkPattern = /https?:\/\/|www\.|@|\b[a-z0-9-]+\.(com|ar|net|org|gob|gov|i
 const policyPattern = /\bpol-\d+\b/g
 const datePattern = /\b\d{2}\/\d{2}\/\d{4}\b/g
 const digitsPattern = /\d+/g
-const wordPatterns = [...policyStatuses, 'vencida', ...ramos, 'vence', 'vencio'].map(
+// Los días de la semana, sin tildes y en singular o en plural: una redacción que agrega
+// un día al horario cambia los datos.
+const weekdays = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabados?', 'domingos?']
+const wordPatterns = [...policyStatuses, 'vencida', ...ramos, 'vence', 'vencio', ...weekdays].map(
   (word) => [word, new RegExp(`\\b${word}\\b`, 'g')] as const,
 )
 
@@ -47,8 +50,13 @@ function countMatches(text: string, pattern: RegExp): number {
   return text.match(pattern)?.length ?? 0
 }
 
-// Multiconjunto de los datos de un texto: pólizas, fechas, otros números, estados,
-// ramos y «vence»/«venció». Las pólizas y las fechas se sacan antes de contar los números.
+function literalPattern(literal: string): RegExp {
+  return new RegExp(`\\b${normalize(literal).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g')
+}
+
+// Multiconjunto de los datos de un texto: pólizas, fechas, otros números, estados, ramos,
+// días de la semana y «vence»/«venció». Las pólizas y las fechas se sacan antes de contar
+// los números.
 function dataOf(text: string): string[] {
   const data: string[] = []
   let rest = text
@@ -63,12 +71,22 @@ function dataOf(text: string): string[] {
   return data.sort()
 }
 
-// Controla la redacción del modelo contra la plantilla que la originó (RF-ATE-02).
-export function checkRewrite(template: string, draft: string): RewriteCheck {
+// Controla la redacción del modelo contra la plantilla que la originó (RF-ATE-02). literals
+// son los datos de la información de la agencia (ramos, planes, dirección, teléfono y
+// horario): cada uno tiene que aparecer tal cual, las mismas veces que en la plantilla. Se
+// controlan antes que los demás datos, para que el motivo diga qué dato cambió.
+export function checkRewrite(template: string, draft: string, literals: readonly string[] = []): RewriteCheck {
   const normalizedDraft = normalize(draft)
   const normalizedTemplate = normalize(template)
   if (!normalizedDraft.trim()) return { ok: false, reason: 'redacción vacía' }
   if (linkPattern.test(normalizedDraft)) return { ok: false, reason: 'link o dirección' }
+
+  for (const literal of literals) {
+    const pattern = literalPattern(literal)
+    if (countMatches(normalizedDraft, pattern) !== countMatches(normalizedTemplate, pattern)) {
+      return { ok: false, reason: 'dato de la agencia distinto' }
+    }
+  }
 
   const expected = dataOf(normalizedTemplate)
   const actual = dataOf(normalizedDraft)

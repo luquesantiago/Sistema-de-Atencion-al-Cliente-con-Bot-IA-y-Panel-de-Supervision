@@ -40,6 +40,15 @@ export const prospectHandoffMessage =
 export const phoneChangePendingMessage =
   'Verificamos sus datos. La actualización de este número quedó pendiente de aprobación por un miembro del equipo; le informaremos la decisión por este WhatsApp.'
 
+// Respuesta fija a lo que no tiene que ver con la agencia, incluidas las preguntas sobre
+// cómo funciona el asistente: no deriva ni revela nada del sistema.
+export const notInsuranceMessage =
+  'Disculpe, esa consulta no tiene que ver con Seguros Castaño. Si tiene una consulta sobre sus seguros, estamos para ayudarlo.'
+
+// Repregunta cuando no se entiende la consulta: fija, sin datos de las pólizas.
+export const clarificationRequest =
+  'Disculpe, no terminé de entender su consulta. ¿Podría contármela con otras palabras?'
+
 export const useNewPhoneRequest =
   'Para solicitar un cambio de teléfono, escríbanos desde el nuevo número. Así podremos verificarlo antes de iniciar el trámite.'
 

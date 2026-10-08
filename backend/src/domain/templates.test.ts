@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { Customer } from './customer.js'
-import { approvalNotice, argentinaToday, expirationsTemplate, handoffMessage, statusesTemplate } from './templates.js'
+import {
+  approvalNotice,
+  argentinaToday,
+  clarificationRequest,
+  expirationsTemplate,
+  handoffMessage,
+  notInsuranceMessage,
+  statusesTemplate,
+} from './templates.js'
 
 // 04/10/2026 a las 23:30 en Argentina: en UTC ya es el 05/10.
 const lateNight = new Date('2026-10-05T02:30:00Z')
@@ -64,5 +72,15 @@ describe('textos fijos', () => {
 
   it('avisa que el pedido queda en revisión, sin darlo por hecho', () => {
     expect(approvalNotice).toBe('Recibimos su pedido. Un miembro de nuestro equipo lo va a revisar y se va a comunicar con usted.')
+  })
+
+  it('lo que no es de seguros recibe un texto que no menciona bots, la IA ni el sistema', () => {
+    expect(notInsuranceMessage).toContain('no tiene que ver con Seguros Castaño')
+    expect(notInsuranceMessage).not.toMatch(/\bbots?\b|inteligencia artificial|modelo|instrucciones|\bsoy\b|\d/i)
+  })
+
+  it('la repregunta no lista datos de las pólizas', () => {
+    expect(clarificationRequest).not.toMatch(/\d|POL-/)
+    expect(clarificationRequest).not.toMatch(/\b(auto|moto|vida|hogar|embarcaciones|comercio)\b/)
   })
 })
