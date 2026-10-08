@@ -5,6 +5,7 @@ import { ManageRequests } from './application/manage-requests.js'
 import { createApp } from './http/app.js'
 import { config } from './infrastructure/config.js'
 import { OpenAiCompatibleClient } from './infrastructure/openai-compatible-client.js'
+import { PrismaAgencyInfoSource } from './infrastructure/prisma-agency-info.js'
 import { PrismaConversationStore } from './infrastructure/prisma-conversation-store.js'
 import { PrismaCustomerRepository } from './infrastructure/prisma-customer-repository.js'
 import { PrismaRequestManagementRepository } from './infrastructure/prisma-request-management-repository.js'
@@ -23,6 +24,7 @@ const whatsapp = new WahaWhatsAppClient(config.whatsappApiUrl, config.whatsappAp
 const processIncomingMessage = new ProcessIncomingMessage(
   new PrismaCustomerRepository(prisma),
   new PrismaConversationStore(prisma),
+  new PrismaAgencyInfoSource(prisma),
   new OpenAiCompatibleClient(config.aiApiUrl, config.aiApiKey, config.aiModel),
   whatsapp,
   () => new Date(),

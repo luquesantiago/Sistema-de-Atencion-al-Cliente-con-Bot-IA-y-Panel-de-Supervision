@@ -4,7 +4,7 @@ Trabajo integrador de Prácticas Pre Profesionales 1 (UNLa, 2026): Caso 8, Grupo
 
 El sistema tiene tres partes conectadas:
 
-- **Atención automática por WhatsApp** para las consultas de rutina (saldo, vencimiento, estado de póliza), respondidas solo con datos de la cartera.
+- **Atención automática por WhatsApp** para las consultas de rutina (saldo, vencimiento, estado de póliza), respondidas con datos de la cartera, y para las preguntas generales sobre la agencia (seguros, planes, dirección, teléfono y horario).
 - **Derivación y seguimiento** por operadores cuando la consulta no se puede responder sola: siniestros, cotizaciones, reclamos o dudas.
 - **Panel de supervisión**: verifica cada respuesta antes de enviarla, alerta riesgos y exige aprobación humana para bajas, modificaciones y altas de conductor.
 
@@ -122,7 +122,7 @@ El esquema de MySQL se maneja con migraciones SQL escritas a mano (SQL-first), e
 
 En [`docs/`](docs/):
 
-- [`requisitos.md`](docs/requisitos.md): los 28 requisitos funcionales (RF-CAR, RF-ATE, RF-DER, RF-VER, RF-SUP, RF-APR) con su origen en el material del cliente.
+- [`requisitos.md`](docs/requisitos.md): los 29 requisitos funcionales (RF-CAR, RF-ATE, RF-DER, RF-VER, RF-SUP, RF-APR) con su origen en el material del cliente.
 - [`caso8_der.md`](docs/caso8_der.md): DER, convenciones de la base y decisiones de modelado. Diagrama en [`caso8_der.svg`](docs/caso8_der.svg).
 - [`01_esquema.sql`](docs/01_esquema.sql) y [`02_catalogos.sql`](docs/02_catalogos.sql): esquema en MySQL como quedó en el Hito 0. El vigente está en `backend/prisma/migrations`.
 - [`caso8_tabla_de_eventos.md`](docs/caso8_tabla_de_eventos.md) y [`caso8_diagrama_contexto.puml`](docs/caso8_diagrama_contexto.puml): eventos de negocio y diagrama de contexto.

@@ -4,10 +4,14 @@ import {
   casesClosedWithConversation,
   endByInactivity,
   endByRestart,
+  intentContext,
+  isQueryType,
   parseSettings,
   type ConversationCase,
+  type ConversationMessage,
   type OpenConversation,
 } from './conversation.js'
+import type { Intent } from './intent.js'
 
 const now = new Date('2026-10-07T15:00:00Z')
 const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000)
@@ -66,13 +70,31 @@ describe('el caso de cada mensaje', () => {
     expect(caseForMessage(afterRequest, { kind: 'intent', intent: 'saludo' })).toEqual({ kind: 'new', type: 'saludo' })
   })
 
-  it('«no sé» y otro DNI van a un caso sin tipo', () => {
+  it.each<Intent>(['otra consulta', 'no se entiende'])('«%s» va al caso actual si no tiene tipo', (intent) => {
+    const untyped = conversation({ cases: [aCase(10)] })
+    expect(caseForMessage(untyped, { kind: 'intent', intent })).toEqual({ kind: 'existing', caseId: 10, setType: null })
+  })
+
+  it.each<Intent>(['otra consulta', 'no se entiende'])('«%s» con un caso actual con tipo, o sin caso abierto, va a uno nuevo sin tipo', (intent) => {
+    const expiration = conversation({ cases: [aCase(10, { type: 'vencimiento' })] })
+    const phoneChange = conversation({ cases: [aCase(10, { type: 'vencimiento' }), aCase(11, { type: 'cambio de teléfono', hasPending: true })] })
+    expect(caseForMessage(expiration, { kind: 'intent', intent })).toEqual({ kind: 'new', type: null })
+    expect(caseForMessage(phoneChange, { kind: 'intent', intent })).toEqual({ kind: 'new', type: null })
+    expect(caseForMessage(null, { kind: 'intent', intent })).toEqual({ kind: 'new', type: null })
+  })
+
+  it('otro DNI va a un caso sin tipo', () => {
     const untyped = conversation({ cases: [aCase(10)] })
     const typed = conversation({ cases: [aCase(10, { type: 'vencimiento' })] })
-    expect(caseForMessage(untyped, { kind: 'intent', intent: 'no sé' })).toEqual({ kind: 'existing', caseId: 10, setType: null })
-    expect(caseForMessage(typed, { kind: 'intent', intent: 'no sé' })).toEqual({ kind: 'new', type: null })
     expect(caseForMessage(untyped, { kind: 'untyped-handoff' })).toEqual({ kind: 'existing', caseId: 10, setType: null })
     expect(caseForMessage(typed, { kind: 'untyped-handoff' })).toEqual({ kind: 'new', type: null })
+  })
+
+  it('«no es de seguros», «otra consulta» y «no se entiende» no son tipos de consulta', () => {
+    expect(isQueryType('vencimiento')).toBe(true)
+    expect(isQueryType('no es de seguros')).toBe(false)
+    expect(isQueryType('otra consulta')).toBe(false)
+    expect(isQueryType('no se entiende')).toBe(false)
   })
 
   it('«no es de seguros» va al caso actual sin cambiarlo', () => {
@@ -181,5 +203,43 @@ describe('parseSettings', () => {
   it.each(['0', '-1', 'abc', '', '2.5'])('el valor «%s» lanza', (valor) => {
     const invalid = rows.map((row) => (row.clave === 'minutos_inactividad_sesion' ? { ...row, valor } : row))
     expect(() => parseSettings(invalid)).toThrow('minutos_inactividad_sesion')
+  })
+})
+
+describe('el contexto para elegir la intención', () => {
+  const message = (id: number, origin: ConversationMessage['origin'], text: string): ConversationMessage =>
+    ({ id, caseId: 10, origin, text, sentAt: minutesAgo(20 - id) })
+
+  it('con 6 mensajes da los 4 últimos, en orden', () => {
+    const open = conversation({
+      messages: [1, 2, 3, 4, 5, 6].map((id) => message(id, id % 2 === 1 ? 'cliente' : 'asistente', `m${id}`)),
+    })
+    expect(intentContext(open)).toEqual([
+      { from: 'cliente', text: 'm3' },
+      { from: 'asistente', text: 'm4' },
+      { from: 'cliente', text: 'm5' },
+      { from: 'asistente', text: 'm6' },
+    ])
+  })
+
+  it('no entran los mensajes del operador y el DNI sale tapado', () => {
+    const open = conversation({
+      messages: [message(1, 'cliente', 'mi DNI es 30.111.222'), message(2, 'operador', 'Hola, soy del equipo'), message(3, 'asistente', 'Gracias.')],
+    })
+    expect(intentContext(open)).toEqual([
+      { from: 'cliente', text: 'mi DNI es [DNI]' },
+      { from: 'asistente', text: 'Gracias.' },
+    ])
+  })
+
+  it('para la consulta guardada, solo entran los mensajes anteriores a ella', () => {
+    const open = conversation({ messages: [message(1, 'cliente', 'a'), message(2, 'cliente', '¿cuándo vence?'), message(3, 'asistente', 'b')] })
+    expect(intentContext(open, 2)).toEqual([{ from: 'cliente', text: 'a' }])
+    expect(intentContext(open, 1)).toEqual([])
+  })
+
+  it('sin conversación o sin mensajes, el contexto queda vacío', () => {
+    expect(intentContext(null)).toEqual([])
+    expect(intentContext(conversation())).toEqual([])
   })
 })

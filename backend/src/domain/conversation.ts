@@ -1,13 +1,15 @@
+import type { ContextMessage } from './ai-client.js'
+import { maskDni } from './dni.js'
 import type { Intent } from './intent.js'
 
 // Conversación por WhatsApp guardada en la base (design.md, decisiones 3, 6 y 7). Son
 // tipos y funciones puras: la base y el envío quedan en el ConversationStore.
 
-// Intenciones que son un valor del catálogo tipo_consulta: todas menos dos.
-export type QueryType = Exclude<Intent, 'no es de seguros' | 'no sé'>
+// Intenciones que son un valor del catálogo tipo_consulta: todas menos tres.
+export type QueryType = Exclude<Intent, 'no es de seguros' | 'otra consulta' | 'no se entiende'>
 
 export function isQueryType(intent: Intent): intent is QueryType {
-  return intent !== 'no es de seguros' && intent !== 'no sé'
+  return intent !== 'no es de seguros' && intent !== 'otra consulta' && intent !== 'no se entiende'
 }
 
 export type MessageOrigin = 'cliente' | 'asistente' | 'operador'
@@ -148,6 +150,8 @@ export function caseForMessage(conversation: OpenConversation | null, situation:
         : conversation?.cases.find((item) => item.id === situation.caseId) ?? null
       const { intent } = situation
       if (intent === 'no es de seguros') return target ? keep(target) : newUntyped
+      // «otra consulta» y «no se entiende» van al caso actual solo si no tiene tipo: así una
+      // derivación nunca cae en un caso con tipo, como el del cambio de teléfono.
       if (!isQueryType(intent)) return target && target.type === null ? keep(target) : newUntyped
       if (!target || target.handedOff) return { kind: 'new', type: intent }
       if (target.type === null) return { kind: 'existing', caseId: target.id, setType: intent }
@@ -155,6 +159,22 @@ export function caseForMessage(conversation: OpenConversation | null, situation:
       return { kind: 'new', type: intent }
     }
   }
+}
+
+// Mensajes anteriores que van como contexto para elegir la intención.
+export const contextSize = 4
+
+// El contexto para elegir la intención: los últimos mensajes del cliente y del asistente
+// de la conversación abierta, en orden y con el DNI tapado. Los del operador no van.
+// Con beforeId (la consulta guardada que se responde al identificarse), solo los
+// anteriores a ese mensaje.
+export function intentContext(conversation: OpenConversation | null, beforeId?: number): ContextMessage[] {
+  const messages = conversation?.messages ?? []
+  const end = beforeId === undefined ? messages.length : messages.findIndex((message) => message.id === beforeId)
+  return messages
+    .slice(0, Math.max(end, 0))
+    .flatMap((message) => (message.origin === 'operador' ? [] : [{ from: message.origin, text: maskDni(message.text) }]))
+    .slice(-contextSize)
 }
 
 export type ConversationEnd = {
