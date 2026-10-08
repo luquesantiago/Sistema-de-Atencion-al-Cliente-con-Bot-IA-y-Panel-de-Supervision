@@ -1,4 +1,5 @@
 import express, { type ErrorRequestHandler, type NextFunction, type RequestHandler, type Response } from 'express'
+import { ManageCustomers } from '../application/manage-customers.js'
 import { ManageRequests } from '../application/manage-requests.js'
 import type { ProcessIncomingMessage } from '../application/process-incoming-message.js'
 import {
@@ -18,6 +19,7 @@ export function createApp(
   processIncomingMessage: ProcessIncomingMessage,
   whatsapp: WhatsAppWebhookOptions,
   manageRequests: ManageRequests,
+  manageCustomers: ManageCustomers,
 ) {
   const app = express()
   const senders = new KeyedQueue()
@@ -130,6 +132,25 @@ export function createApp(
       handleRequestError(error, response, next)
     }
   })
+  // Cartera de clientes para el panel (RF-CAR-01, RF-CAR-02, RF-CAR-03).
+  app.get('/api/clientes', async (request, response, next) => {
+    try {
+      const page = parsePage(request.query.limit, request.query.offset)
+      const search = parseSearch(request.query.buscar)
+      const result = await manageCustomers.listCustomers({ ...page, ...(search === undefined ? {} : { search }) })
+      response.status(200).json({ items: result.items, total: result.total, ...page })
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.get('/api/clientes/:id', async (request, response, next) => {
+    try {
+      const detail = await manageCustomers.findCustomerDetail(request.params.id)
+      response.status(200).json(detail)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
   const errorHandler: ErrorRequestHandler = (error, _request, response, _next) => {
     if (isRecord(error) && error.type === 'entity.parse.failed') {
       response.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'El cuerpo no contiene JSON válido.' } })
@@ -153,6 +174,14 @@ function parsePage(limitValue: unknown, offsetValue: unknown): { limit: number; 
     throw new RequestManagementError(400, 'VALIDATION_ERROR', 'limit debe estar entre 1 y 100.')
   }
   return { limit, offset }
+}
+
+function parseSearch(value: unknown): string | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'string') {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', 'buscar debe ser texto.')
+  }
+  return value
 }
 
 function parseNonNegativeInteger(value: unknown, field: string): number {

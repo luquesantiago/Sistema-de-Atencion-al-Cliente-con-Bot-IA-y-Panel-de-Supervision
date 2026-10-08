@@ -1,6 +1,7 @@
 import { PrismaMariaDb } from '@prisma/adapter-mariadb'
 import { PrismaClient } from './generated/prisma/client.js'
 import { ProcessIncomingMessage } from './application/process-incoming-message.js'
+import { ManageCustomers } from './application/manage-customers.js'
 import { ManageRequests } from './application/manage-requests.js'
 import { createApp } from './http/app.js'
 import { config } from './infrastructure/config.js'
@@ -21,8 +22,9 @@ const adapter = new PrismaMariaDb({
 })
 const prisma = new PrismaClient({ adapter })
 const whatsapp = new WahaWhatsAppClient(config.whatsappApiUrl, config.whatsappApiKey)
+const customerRepository = new PrismaCustomerRepository(prisma)
 const processIncomingMessage = new ProcessIncomingMessage(
-  new PrismaCustomerRepository(prisma),
+ customerRepository,
   new PrismaConversationStore(prisma),
   new PrismaAgencyInfoSource(prisma),
   new OpenAiCompatibleClient(config.aiApiUrl, config.aiApiKey, config.aiModel),
@@ -30,10 +32,11 @@ const processIncomingMessage = new ProcessIncomingMessage(
   () => new Date(),
 )
 const manageRequests = new ManageRequests(new PrismaRequestManagementRepository(prisma), whatsapp)
+const manageCustomers = new ManageCustomers(customerRepository)
 
 createApp(processIncomingMessage, {
   secret: config.whatsappWebhookSecret,
   findPhoneByLid: (lid) => whatsapp.findPhoneByLid(lid),
-}, manageRequests).listen(config.port, () => {
+}, manageRequests, manageCustomers).listen(config.port, () => {
   console.log(`Backend listening on port ${config.port}`)
 })
