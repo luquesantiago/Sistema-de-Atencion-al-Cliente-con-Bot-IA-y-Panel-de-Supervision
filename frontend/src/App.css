@@ -720,6 +720,353 @@
   font-size: 0.9rem;
 }
 
+/* Utilidad para textos visibles solo para lectores de pantalla */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Cartera de clientes: búsqueda, listado y ficha lateral */
+
+.busqueda {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-tarjeta);
+}
+
+.busqueda__etiqueta {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--texto);
+}
+
+.busqueda__campo {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio-chico);
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.busqueda__campo:focus-visible {
+  border-color: var(--primario);
+  outline: 2px solid var(--primario);
+  outline-offset: 1px;
+}
+
+.busqueda__pista {
+  color: var(--texto-tenue);
+  font-size: 0.78rem;
+}
+
+.cartera {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.cartera--con-detalle {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+}
+
+.cartera__lista {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cartera__pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.cartera__conteo {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Listado */
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-tarjeta);
+  font-size: 0.88rem;
+}
+
+.tabla th,
+.tabla td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--borde);
+  text-align: left;
+  vertical-align: top;
+}
+
+.tabla thead th {
+  background: var(--superficie-alterna);
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tabla tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tabla__fila {
+  cursor: pointer;
+}
+
+.tabla__fila:hover {
+  background: var(--superficie-alterna);
+}
+
+.tabla__fila--activa {
+  background: var(--primario-suave);
+  box-shadow: inset 3px 0 0 var(--primario);
+}
+
+.tabla__identificacion {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--texto-suave);
+}
+
+.tabla__nombre {
+  font-weight: 600;
+  color: var(--texto);
+}
+
+.tabla__telefonos {
+  color: var(--texto-suave);
+  font-size: 0.82rem;
+}
+
+/* Una línea por póliza en la lista: número, tipo y estado */
+
+.tabla__polizas {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tabla__poliza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.tabla__poliza-tipo {
+  color: var(--texto);
+  font-size: 0.85rem;
+}
+
+.tabla__sin-datos {
+  color: var(--texto-tenue);
+  font-size: 0.85rem;
+}
+
+.tabla__accion {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tabla__ver {
+  padding: 4px 9px;
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio-chico);
+  background: var(--superficie);
+  color: var(--primario);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabla__ver:hover {
+  background: var(--primario-suave);
+  border-color: var(--primario);
+}
+
+.tabla__ver:focus-visible {
+  outline: 2px solid var(--primario);
+  outline-offset: 1px;
+}
+
+/* Ficha del cliente, al costado del listado */
+
+.detalle-panel {
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-left: 3px solid var(--primario);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra-tarjeta);
+}
+
+.detalle-panel__encabezado {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.detalle-panel__titulo {
+  font-size: 1rem;
+  font-weight: 650;
+  color: var(--texto);
+}
+
+.detalle-panel__cerrar {
+  flex: none;
+  padding: 3px 9px;
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio-chico);
+  background: var(--superficie);
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.detalle-panel__cerrar:hover {
+  background: var(--superficie-alterna);
+  border-color: var(--texto-tenue);
+  color: var(--texto);
+}
+
+.detalle-panel__aviso {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+}
+
+.detalle-panel__aviso--riesgo {
+  color: var(--riesgo);
+  font-weight: 600;
+}
+
+.detalle-panel__datos {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.detalle-panel__datos dt {
+  color: var(--texto-suave);
+  font-weight: 600;
+}
+
+.detalle-panel__datos dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.detalle-panel__telefonos {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.detalle-panel__polizas {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detalle-panel__subtitulo {
+  margin-bottom: -4px;
+  color: var(--texto-suave);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Una tarjeta por póliza: número y estado arriba, cobertura y bien debajo */
+
+.detalle-panel__poliza {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: var(--superficie-alterna);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+}
+
+.detalle-panel__poliza-encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detalle-panel__poliza-numero {
+  font-size: 0.88rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--texto);
+}
+
+.detalle-panel__bien {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--borde);
+}
+
+.detalle-panel__bien-titulo {
+  color: var(--texto-suave);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 /* Responsive: la navegación se reordena arriba, sin ocultar módulos */
 
 @media (max-width: 900px) {
@@ -781,6 +1128,23 @@
     flex-direction: column;
     align-items: stretch;
     padding: 18px;
+  }
+
+  /* La ficha pasa debajo del listado y el listado se desliza solo */
+  .cartera--con-detalle {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detalle-panel {
+    position: static;
+  }
+
+  .cartera__lista {
+    overflow-x: auto;
+  }
+
+  .tabla {
+    min-width: 640px;
   }
 }
 
