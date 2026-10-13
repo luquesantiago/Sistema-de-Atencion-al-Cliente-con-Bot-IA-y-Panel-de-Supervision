@@ -32,13 +32,26 @@ export const forbiddenTerms: ReadonlyArray<{ term: string; pattern: RegExp }> = 
 
 const linkPattern = /https?:\/\/|www\.|@|\b[a-z0-9-]+\.(com|ar|net|org|gob|gov|io|info)\b/
 
+// Un importe con su moneda, sobre el texto normalizado: «$ 45.000,00» o «us$ 45,00». Se
+// compara entero, así cambiar el formato, la moneda o el número no coincide.
+const amountPattern = /(?:us\$|\$) ?\d{1,3}(?:\.\d{3})*,\d{2}\b/g
 const policyPattern = /\bpol-\d+\b/g
 const datePattern = /\b\d{2}\/\d{2}\/\d{4}\b/g
 const digitsPattern = /\d+/g
 // Los días de la semana, sin tildes y en singular o en plural: una redacción que agrega
-// un día al horario cambia los datos.
+// un día al horario cambia los datos. «Vencida(s)», «por vencer» y «ningún/ninguna» dan el
+// sentido de los importes del saldo: si cambian, cambia lo que se informa.
 const weekdays = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabados?', 'domingos?']
-const wordPatterns = [...policyStatuses, 'vencida', ...ramos, 'vence', 'vencio', ...weekdays].map(
+const wordPatterns = [
+  ...policyStatuses,
+  'vencidas?',
+  ...ramos,
+  'vence',
+  'vencio',
+  'por vencer',
+  'ningun[ao]?',
+  ...weekdays,
+].map(
   (word) => [word, new RegExp(`\\b${word}\\b`, 'g')] as const,
 )
 
@@ -54,28 +67,43 @@ function literalPattern(literal: string): RegExp {
   return new RegExp(`\\b${normalize(literal).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g')
 }
 
-// Multiconjunto de los datos de un texto: pólizas, fechas, otros números, estados, ramos,
-// días de la semana y «vence»/«venció». Las pólizas y las fechas se sacan antes de contar
-// los números.
-function dataOf(text: string): string[] {
-  const data: string[] = []
+// Datos de un texto con su posición: importes, pólizas, fechas, otros números, estados,
+// ramos, días de la semana y las palabras de los vencimientos. Los importes, las pólizas y
+// las fechas se tapan con espacios antes de buscar lo demás, para no contar sus dígitos
+// como números sueltos sin correr las posiciones.
+function dataOf(text: string): Array<{ position: number; item: string }> {
+  const data: Array<{ position: number; item: string }> = []
   let rest = text
-  for (const [kind, pattern] of [['póliza', policyPattern], ['fecha', datePattern]] as const) {
-    for (const match of rest.match(pattern) ?? []) data.push(`${kind}:${match}`)
-    rest = rest.replace(pattern, ' ')
+  for (const [kind, pattern] of [['importe', amountPattern], ['póliza', policyPattern], ['fecha', datePattern]] as const) {
+    for (const match of rest.matchAll(pattern)) data.push({ position: match.index, item: `${kind}:${match[0].replace(' ', '')}` })
+    rest = rest.replace(pattern, (match) => ' '.repeat(match.length))
   }
-  for (const match of rest.match(digitsPattern) ?? []) data.push(`número:${match}`)
+  for (const match of rest.matchAll(digitsPattern)) data.push({ position: match.index, item: `número:${match[0]}` })
   for (const [word, pattern] of wordPatterns) {
-    for (let i = 0; i < countMatches(rest, pattern); i++) data.push(`palabra:${word}`)
+    for (const match of rest.matchAll(pattern)) data.push({ position: match.index, item: `palabra:${word}` })
   }
-  return data.sort()
+  return data
+}
+
+// Sin orden, los datos se comparan como multiconjunto. En orden (el saldo), como secuencia:
+// así no se pueden intercambiar las cuotas vencidas con las por vencer.
+function dataSequence(text: string, ordered: boolean): string[] {
+  const data = dataOf(text)
+  if (ordered) return data.sort((a, b) => a.position - b.position).map(({ item }) => item)
+  return data.map(({ item }) => item).sort()
 }
 
 // Controla la redacción del modelo contra la plantilla que la originó (RF-ATE-02). literals
 // son los datos de la información de la agencia (ramos, planes, dirección, teléfono y
 // horario): cada uno tiene que aparecer tal cual, las mismas veces que en la plantilla. Se
-// controlan antes que los demás datos, para que el motivo diga qué dato cambió.
-export function checkRewrite(template: string, draft: string, literals: readonly string[] = []): RewriteCheck {
+// controlan antes que los demás datos, para que el motivo diga qué dato cambió. ordered
+// exige además que los datos aparezcan en el mismo orden que en la plantilla.
+export function checkRewrite(
+  template: string,
+  draft: string,
+  literals: readonly string[] = [],
+  ordered = false,
+): RewriteCheck {
   const normalizedDraft = normalize(draft)
   const normalizedTemplate = normalize(template)
   if (!normalizedDraft.trim()) return { ok: false, reason: 'redacción vacía' }
@@ -88,8 +116,8 @@ export function checkRewrite(template: string, draft: string, literals: readonly
     }
   }
 
-  const expected = dataOf(normalizedTemplate)
-  const actual = dataOf(normalizedDraft)
+  const expected = dataSequence(normalizedTemplate, ordered)
+  const actual = dataSequence(normalizedDraft, ordered)
   if (expected.length !== actual.length || expected.some((item, index) => item !== actual[index])) {
     return { ok: false, reason: 'datos distintos de la plantilla' }
   }

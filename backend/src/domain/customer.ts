@@ -1,9 +1,12 @@
 // Valores de los catálogos estado_poliza y ramo (migración 20260928140100).
 export const policyStatuses = ['activa', 'suspendida por mora', 'dada de baja'] as const
 export const ramos = ['auto', 'moto', 'vida', 'hogar', 'embarcaciones', 'comercio'] as const
+// Códigos del catálogo moneda (migración 20260928140100).
+export const currencies = ['ARS', 'USD'] as const
 
 export type PolicyStatus = (typeof policyStatuses)[number]
 export type Ramo = (typeof ramos)[number]
+export type Currency = (typeof currencies)[number]
 
 export function isPolicyStatus(value: unknown): value is PolicyStatus {
   return policyStatuses.some((status) => status === value)
@@ -13,12 +16,28 @@ export function isRamo(value: unknown): value is Ramo {
   return ramos.some((ramo) => ramo === value)
 }
 
+export function isCurrency(value: unknown): value is Currency {
+  return currencies.some((currency) => currency === value)
+}
+
+// Una fila de cuota. El importe va en centavos enteros, para sumar sin error de redondeo.
+export type Installment = {
+  number: number
+  // Fecha sin hora, aaaa-mm-dd.
+  dueDate: string
+  amountCents: number
+  paid: boolean
+}
+
 export type CustomerPolicy = {
   number: string
   ramo: Ramo
   status: PolicyStatus
   // Fecha sin hora, aaaa-mm-dd. «Vencida» no es un estado: se calcula con esta fecha.
   expirationDate: string
+  currency: Currency
+  // Ordenadas por número de cuota. Vacía si la póliza no tiene cuotas registradas.
+  installments: Installment[]
 }
 
 // Resumen que lleva el listado del panel: una línea por póliza con su tipo

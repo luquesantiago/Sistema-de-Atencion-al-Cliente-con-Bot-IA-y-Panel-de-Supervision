@@ -158,7 +158,8 @@ describe('rewrite', () => {
 
     const body = requests[0]?.body as { messages: Array<{ role: string; content: string }> }
     expect(body.messages[0]?.content).toContain('no digas que sos una persona')
-    expect(body.messages[0]?.content).toContain('ramos, planes, direcciones, teléfonos, horarios ni números')
+    expect(body.messages[0]?.content).toContain('ramos, planes, direcciones, teléfonos, horarios, importes ni números')
+    expect(body.messages[0]?.content).toContain('Mantené los datos en el mismo orden')
     expect(body).toMatchObject({ response_format: { json_schema: { strict: true } } })
   })
 

@@ -1,5 +1,6 @@
 import { agencyInfoAnswer, type AgencyInfoAnswer, type AgencyInfoSource } from '../domain/agency-info.js'
 import type { AiClient, CustomerStatus } from '../domain/ai-client.js'
+import { balanceTemplate } from '../domain/balance.js'
 import {
   caseForMessage,
   endByInactivity,
@@ -522,9 +523,16 @@ export class ProcessIncomingMessage {
     templateKind: AnswerTemplate,
   ): Promise<ProcessResult> {
     if (templateKind === 'agency') return this.sendAgencyInfo(turn, ref, question, answers, intent)
-    // Sin pólizas no hay dato para vencimientos ni estados (RF-ATE-02).
+    // Sin pólizas no hay dato para vencimientos, estados ni saldo (RF-ATE-02).
     if (templateKind !== 'courtesy' && customer.policies.length === 0) {
       return this.handoffIn(turn, ref, 'cliente sin pólizas', answers)
+    }
+    if (templateKind === 'balance') {
+      // Sin cuotas registradas no hay saldo: se deriva sin pedir la redacción (RF-ATE-02). La
+      // redacción se controla en orden, para que no cambie cuotas vencidas por por vencer.
+      const template = balanceTemplate(customer, this.clock())
+      if (!template) return this.handoffIn(turn, ref, 'póliza sin cuotas registradas', answers)
+      return this.sendRewritten(turn, ref, { template, literals: [] }, question, answers, intent, true)
     }
     const template = this.fillTemplate(customer, templateKind)
     return this.sendRewritten(turn, ref, { template, literals: [] }, question, answers, intent)
@@ -545,6 +553,7 @@ export class ProcessIncomingMessage {
     question: string,
     answers: QueryRef,
     intent: Intent,
+    ordered = false,
   ): Promise<ProcessResult> {
     let draft: string
     try {
@@ -552,7 +561,7 @@ export class ProcessIncomingMessage {
     } catch {
       return this.handoffIn(turn, ref, 'falla de la redacción', answers)
     }
-    const check = checkRewrite(filled.template, draft, filled.literals)
+    const check = checkRewrite(filled.template, draft, filled.literals, ordered)
     if (!check.ok) {
       turn.changes.rejectedDraft = { text: draft, answers }
       return this.handoffIn(turn, ref, `redacción rechazada: ${check.reason}`, answers)
@@ -562,7 +571,7 @@ export class ProcessIncomingMessage {
     return { status: 'ANSWER_SENT', intent, responseSent: true }
   }
 
-  private fillTemplate(customer: Customer, templateKind: Exclude<AnswerTemplate, 'agency'>): string {
+  private fillTemplate(customer: Customer, templateKind: Exclude<AnswerTemplate, 'agency' | 'balance'>): string {
     switch (templateKind) {
       case 'expirations':
         return expirationsTemplate(customer, this.clock())

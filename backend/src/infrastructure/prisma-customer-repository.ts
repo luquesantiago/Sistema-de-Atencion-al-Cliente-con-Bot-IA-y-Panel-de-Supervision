@@ -1,6 +1,7 @@
 import type { Prisma } from '../generated/prisma/client.js'
 import type { PrismaClient } from '../generated/prisma/client.js'
 import {
+  isCurrency,
   isPolicyStatus,
   isRamo,
   type Customer,
@@ -11,6 +12,7 @@ import {
   type CustomerPolicy,
   type CustomerPolicySummary,
   type CustomerRepository,
+  type Installment,
   type PolicyDetail,
 } from '../domain/customer.js'
 
@@ -104,7 +106,10 @@ export class PrismaCustomerRepository implements CustomerRepository {
 }
 
 const customerInclude = {
-  poliza: { where: { activo: true }, include: { ramo: true, estado_poliza: true } },
+  poliza: {
+    where: { activo: true },
+    include: { ramo: true, estado_poliza: true, moneda: true, cuota: { orderBy: { numero_cuota: 'asc' } } },
+  },
 } as const
 
 export type CustomerRecord = {
@@ -119,6 +124,14 @@ export type CustomerRecord = {
     activo: boolean
     ramo: { nombre: string }
     estado_poliza: { nombre: string }
+    moneda: { codigo: string }
+    cuota: Array<{
+      numero_cuota: number
+      fecha_vencimiento: Date
+      // DECIMAL(12,2): Prisma lo entrega como Decimal.
+      importe: { toFixed(decimals: number): string }
+      fecha_pago: Date | null
+    }>
   }>
 }
 
@@ -132,7 +145,7 @@ export function customerFromRecord(record: CustomerRecord): Customer | null {
   }
   const policies: CustomerPolicy[] = record.poliza
     .filter((policy) => policy.activo)
-    .map((policy) => toPolicy(policy))
+    .map(toCustomerPolicy)
     .sort((a, b) => a.number.localeCompare(b.number, 'es', { numeric: true }))
   return {
     id: record.id_cliente,
@@ -192,7 +205,8 @@ export type CustomerDetailRecord = {
   poliza: PolicyDetailRecord[]
 }
 
-function toPolicy(policy: PolicyRecord): CustomerPolicy {
+// Lo común de la póliza, para el asistente y para la ficha del panel.
+function toPolicy(policy: PolicyRecord): Omit<CustomerPolicy, 'currency' | 'installments'> {
   if (!isRamo(policy.ramo.nombre) || !isPolicyStatus(policy.estado_poliza.nombre)) {
     throw new Error(`La póliza ${policy.numero_poliza} contiene valores fuera de catálogo`)
   }
@@ -200,8 +214,26 @@ function toPolicy(policy: PolicyRecord): CustomerPolicy {
     number: policy.numero_poliza,
     ramo: policy.ramo.nombre,
     status: policy.estado_poliza.nombre,
-    // Columna DATE: la fecha llega a medianoche UTC y se toma tal cual, sin zona horaria.
-    expirationDate: policy.fecha_vencimiento.toISOString().slice(0, 10),
+    expirationDate: dateOnly(policy.fecha_vencimiento),
+  }
+}
+
+// El asistente suma la moneda y las cuotas, para responder el saldo.
+function toCustomerPolicy(policy: CustomerRecord['poliza'][number]): CustomerPolicy {
+  if (!isCurrency(policy.moneda.codigo)) {
+    throw new Error(`La póliza ${policy.numero_poliza} contiene valores fuera de catálogo`)
+  }
+  return {
+    ...toPolicy(policy),
+    currency: policy.moneda.codigo,
+    installments: policy.cuota
+      .map((installment): Installment => ({
+        number: installment.numero_cuota,
+        dueDate: dateOnly(installment.fecha_vencimiento),
+        amountCents: centsOf(installment.importe),
+        paid: installment.fecha_pago !== null,
+      }))
+      .sort((a, b) => a.number - b.number),
   }
 }
 
@@ -281,4 +313,16 @@ function customerSearchWhere(query: CustomerListQuery): Prisma.clienteWhereInput
     )
   }
   return { activo: true, ...(clauses.length > 0 ? { OR: clauses } : {}) }
+}
+
+// Columna DATE: la fecha llega a medianoche UTC y se toma tal cual, sin zona horaria.
+function dateOnly(date: Date): string {
+  return date.toISOString().slice(0, 10)
+}
+
+// DECIMAL(12,2) a centavos enteros, por texto, sin pasar por un número con decimales.
+function centsOf(amount: { toFixed(decimals: number): string }): number {
+  const text = amount.toFixed(2)
+  if (!/^\d+\.\d{2}$/.test(text)) throw new Error(`Importe de cuota inválido: ${text}`)
+  return Number(text.replace('.', ''))
 }

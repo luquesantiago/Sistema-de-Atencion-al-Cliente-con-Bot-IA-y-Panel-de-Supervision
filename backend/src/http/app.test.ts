@@ -261,6 +261,8 @@ describe('endpoints de clientes', () => {
     ramo: 'auto',
     status: 'activa',
     expirationDate,
+    currency: 'ARS',
+    installments: [],
   })
 
   beforeEach(async () => {
@@ -280,7 +282,8 @@ describe('endpoints de clientes', () => {
     customers.addPhoneLink(2, 17, '5491155551001')
 
     const whatsapp = new FakeWhatsApp()
-    const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), new FakeAi(), whatsapp)
+    const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, hours: [] })
+    const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), agency, new FakeAi(), whatsapp)
     const app = createApp(
       assistant,
       { secret: 'test', findPhoneByLid: async () => null },

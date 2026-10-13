@@ -1,5 +1,5 @@
 {
-  "aviso": "Datos ficticios para probar el asistente. No son clientes reales.",
+  "aviso": "Datos ficticios para probar el asistente. No son clientes reales. Las cuotas también son ficticias.",
   "clientes": [
     {
       "id": 90001,
@@ -7,8 +7,30 @@
       "firstName": "Ana",
       "lastName": "Ficticia",
       "policies": [
-        { "number": "POL-90001", "ramo": "auto", "status": "activa", "expirationDate": "2027-03-15" },
-        { "number": "POL-90002", "ramo": "hogar", "status": "activa", "expirationDate": "2026-09-01" }
+        {
+          "number": "POL-90001",
+          "ramo": "auto",
+          "status": "activa",
+          "expirationDate": "2027-03-15",
+          "currency": "ARS",
+          "installments": [
+            { "number": 1, "dueDate": "2026-08-15", "amountCents": 4500000, "paid": true },
+            { "number": 2, "dueDate": "2026-09-15", "amountCents": 4500000, "paid": false },
+            { "number": 3, "dueDate": "2026-10-15", "amountCents": 4500000, "paid": false },
+            { "number": 4, "dueDate": "2026-11-15", "amountCents": 4500000, "paid": false }
+          ]
+        },
+        {
+          "number": "POL-90002",
+          "ramo": "hogar",
+          "status": "activa",
+          "expirationDate": "2026-09-01",
+          "currency": "USD",
+          "installments": [
+            { "number": 1, "dueDate": "2026-07-01", "amountCents": 2000, "paid": true },
+            { "number": 2, "dueDate": "2026-08-01", "amountCents": 2000, "paid": true }
+          ]
+        }
       ]
     },
     {
@@ -17,7 +39,7 @@
       "firstName": "Bruno",
       "lastName": "Ficticio",
       "policies": [
-        { "number": "POL-90003", "ramo": "moto", "status": "suspendida por mora", "expirationDate": "2026-12-10" }
+        { "number": "POL-90003", "ramo": "moto", "status": "suspendida por mora", "expirationDate": "2026-12-10", "currency": "ARS", "installments": [] }
       ]
     },
     {
