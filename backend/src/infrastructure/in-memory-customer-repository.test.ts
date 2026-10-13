@@ -15,7 +15,15 @@ describe('clientes de prueba', () => {
     expect(await repository.findByDni('30111222')).toBeNull()
   })
 
-  const validPolicy = { number: 'POL-90001', ramo: 'auto', status: 'activa', expirationDate: '2027-03-15' }
+  const validInstallment = { number: 1, dueDate: '2026-10-15', amountCents: 4500000, paid: false }
+  const validPolicy = {
+    number: 'POL-90001',
+    ramo: 'auto',
+    status: 'activa',
+    expirationDate: '2027-03-15',
+    currency: 'ARS',
+    installments: [validInstallment],
+  }
   const fixtureWith = (policy: Record<string, unknown>) => ({
     clientes: [{ id: 9, dni: '99000009', firstName: 'X', lastName: 'Y', policies: [policy] }],
   })
@@ -31,6 +39,25 @@ describe('clientes de prueba', () => {
 
   it('rechaza un estado fuera del catálogo', () => {
     expect(() => parseCustomerFixtures(fixtureWith({ ...validPolicy, status: 'ACTIVE' }))).toThrow('status')
+  })
+
+  it('carga las cuotas de la póliza', () => {
+    const [customer] = parseCustomerFixtures(fixtureWith(validPolicy))
+    expect(customer?.policies[0]?.installments).toEqual([validInstallment])
+  })
+
+  it('rechaza una moneda fuera del catálogo', () => {
+    expect(() => parseCustomerFixtures(fixtureWith({ ...validPolicy, currency: 'EUR' }))).toThrow('currency')
+  })
+
+  it('rechaza una cuota sin fecha de vencimiento válida', () => {
+    const installments = [{ ...validInstallment, dueDate: '15/10/2026' }]
+    expect(() => parseCustomerFixtures(fixtureWith({ ...validPolicy, installments }))).toThrow('dueDate')
+  })
+
+  it('rechaza una cuota con importe negativo', () => {
+    const installments = [{ ...validInstallment, amountCents: -1 }]
+    expect(() => parseCustomerFixtures(fixtureWith({ ...validPolicy, installments }))).toThrow('amountCents')
   })
 
   it('rechaza un archivo sin "clientes"', () => {

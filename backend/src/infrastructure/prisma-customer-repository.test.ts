@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { Prisma } from '../generated/prisma/client.js'
 import {
   customerFromRecord,
   toDetail,
@@ -16,6 +17,8 @@ function policy(numero: string, overrides: Partial<CustomerRecord['poliza'][numb
     activo: true,
     ramo: { nombre: 'auto' },
     estado_poliza: { nombre: 'activa' },
+    moneda: { codigo: 'ARS' },
+    cuota: [],
     ...overrides,
   }
 }
@@ -46,8 +49,8 @@ describe('customerFromRecord', () => {
       firstName: 'Ana',
       lastName: 'Ficticia',
       policies: [
-        { number: 'POL-00126', ramo: 'auto', status: 'suspendida por mora', expirationDate: '2027-03-15' },
-        { number: 'POL-00131', ramo: 'hogar', status: 'activa', expirationDate: '2026-09-01' },
+        { number: 'POL-00126', ramo: 'auto', status: 'suspendida por mora', expirationDate: '2027-03-15', currency: 'ARS', installments: [] },
+        { number: 'POL-00131', ramo: 'hogar', status: 'activa', expirationDate: '2026-09-01', currency: 'ARS', installments: [] },
       ],
     })
   })
@@ -67,6 +70,35 @@ describe('customerFromRecord', () => {
 
   it('un ramo fuera del catálogo lanza', () => {
     expect(() => customerFromRecord(record({ poliza: [policy('POL-00126', { ramo: { nombre: 'aviones' } })] })))
+      .toThrow('fuera de catálogo')
+  })
+
+  it('da la moneda y las cuotas, con el importe en centavos exactos y si están pagas', () => {
+    const customer = customerFromRecord(record({
+      poliza: [policy('POL-00126', {
+        moneda: { codigo: 'USD' },
+        cuota: [
+          { numero_cuota: 2, fecha_vencimiento: new Date('2026-11-15T00:00:00.000Z'), importe: new Prisma.Decimal('12345.67'), fecha_pago: null },
+          {
+            numero_cuota: 1,
+            fecha_vencimiento: new Date('2026-10-15T00:00:00.000Z'),
+            importe: new Prisma.Decimal('0.1'),
+            fecha_pago: new Date('2026-10-14T00:00:00.000Z'),
+          },
+        ],
+      })],
+    }))
+    expect(customer?.policies[0]).toMatchObject({
+      currency: 'USD',
+      installments: [
+        { number: 1, dueDate: '2026-10-15', amountCents: 10, paid: true },
+        { number: 2, dueDate: '2026-11-15', amountCents: 1234567, paid: false },
+      ],
+    })
+  })
+
+  it('una moneda fuera del catálogo lanza', () => {
+    expect(() => customerFromRecord(record({ poliza: [policy('POL-00126', { moneda: { codigo: 'EUR' } })] })))
       .toThrow('fuera de catálogo')
   })
 

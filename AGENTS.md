@@ -65,13 +65,14 @@ Se muestra una conversación por WhatsApp de punta a punta, con los datos histó
 3. Para un número no vinculado, el LLM primero clasifica la respuesta a «¿ya es cliente o es nuevo?» como cliente nuevo, cliente existente o ajena/ambigua. Para los números vinculados a varios clientes, y para quienes confirman que ya son clientes, el DNI sigue siendo obligatorio. Una vez identificado, el LLM elige la intención de una lista cerrada: el catálogo `tipo_consulta` (que incluye «cambio de teléfono» e «información de la agencia»), más «no es de seguros», «otra consulta» y «no se entiende». Antes de identificarse, en los mensajes sin DNI, la elige solo para saber si piden la información de la agencia.
 4. Según la intención:
    - Vencimiento o estado de la póliza: responde el asistente. Si el cliente tiene varias pólizas, responde todas juntas, una línea por póliza con el número, el ramo y el dato pedido.
+   - Saldo: responde el asistente con las cuotas sin pagar de cada póliza, una línea por póliza con las vencidas y las por vencer y sus importes; si una póliza no tiene cuotas registradas, deriva.
    - Saludo o agradecimiento: responde con una plantilla de cortesía, sin derivar.
    - Información de la agencia (ramos y planes activos, dirección, teléfono y horario de atención): responde el asistente, también antes de identificarse, y después repite la pregunta pendiente (si ya es cliente o el DNI). No la responde mientras toma los datos de un cliente nuevo ni en silencio.
    - Cambio de teléfono pedido desde un número ya vinculado: le pide que escriba desde el número nuevo.
    - Baja o modificación (incluida el alta de conductor): le avisa que un miembro del equipo va a revisar el pedido, sin darlo por hecho, y deja de responder en esa conversación.
    - Lo que no es de seguros, incluidas las preguntas sobre cómo funciona el asistente: contesta con un texto fijo que no tiene que ver con Seguros Castaño, sin redacción de la IA y sin derivar.
    - Lo que no se entiende, ni con los mensajes anteriores: repregunta con un texto fijo, hasta 2 veces seguidas; si el tercer mensaje seguido tampoco se entiende, deriva.
-   - Cualquier otra cosa (incluidos siniestro, cotización, saldo, cobertura, reclamo, medios de pago y pedidos de grúa o asistencia): deriva a la bandeja de un operador.
+   - Cualquier otra cosa (incluidos siniestro, cotización, cobertura, reclamo, medios de pago y pedidos de grúa o asistencia): deriva a la bandeja de un operador.
 
 Reglas del Parcial 1:
 
@@ -173,7 +174,7 @@ No cerrar por código sin confirmación del cliente. Si una tarea depende de alg
 - Inconsistencias entre las hojas de la planilla (casos vinculados a una póliza de otro ramo, un vencimiento que no coincide y primas sin símbolo de moneda). Mientras tanto, esos casos quedan sin póliza y las primas sin símbolo se toman como pesos.
 - Valores del catálogo de planes (el nombre "riesgos incompletos" está a verificar) y coberturas de vida, hogar y embarcaciones, que no se relevaron. La estructura sí está decidida: los planes son iguales para cualquier bien y se cargan con ABM.
 - Compañía aseguradora: que Seguros Castaño figure como la aseguradora es un supuesto del equipo.
-- Cuotas de las pólizas.
+- Cuotas de las pólizas. Mientras tanto, las cuotas de la base son de ejemplo (`docs/migracion.md`).
 - Si el asistente pide CUIT a los clientes empresa.
 - Tratamiento de datos sensibles.
 - Qué hace el asistente con los audios, las fotos y los archivos sin texto. Mientras tanto, el canal los ignora sin responder y deja una línea en el log del backend; si la foto trae epígrafe, procesa el texto. Las excepciones son la foto del DNI del cliente nuevo y la imagen que llega a una conversación en silencio: se procesan sin guardar la imagen, y queda un mensaje con un texto que dice que el cliente la mandó.

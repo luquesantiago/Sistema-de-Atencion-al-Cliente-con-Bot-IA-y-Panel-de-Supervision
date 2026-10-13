@@ -43,6 +43,21 @@ Reglas para importar a la base los datos históricos de la agencia (Parcial 1). 
 - **Póliza del caso** (`caso.id_poliza`, opcional): CASO-001, 011 y 012 → POL-00123; CASO-006 → POL-00124. Quedan vacíos hasta que responda la agencia CASO-002 (además, POL-00128 no se migra), CASO-004 y CASO-008, porque el log los vincula a pólizas que no coinciden con la consulta.
 - **Conversaciones:** una por caso. Empieza a la hora de apertura; si el caso está cerrado, termina a la hora de cierre, y si sigue abierto, queda abierta y con el asistente suspendido (`asistente_suspendido`), porque tiene un caso derivado sin cerrar: el asistente no le contesta a ese número hasta que un operador cierre el caso. Si el caso tiene póliza, la conversación queda a nombre del titular de esa póliza y su número se vincula a ese cliente: CASO-001, 011 y 012 → Juan García (5491155551001 y 5491155551009); CASO-006 → María del Carmen López (5491155551005). Si no tiene póliza, la conversación queda sin cliente y el número sin vincular, como una conversación en la que nadie dio el DNI. CASO-003 usa el mismo número que CASO-001 y 011 pero no tiene póliza: su conversación queda sin cliente, aunque el número quede vinculado a García. Riesgo aceptado: en CASO-012 no escribió el titular (el log dice «Consultó al titular»).
 
+## Cuotas de ejemplo
+
+La planilla no registra cuotas ni pagos (RF-CAR-02): la migración no escribe en `cuota`. Para que el asistente pueda mostrar el saldo, hay una carga aparte y opcional de **cuotas de ejemplo, que son datos ficticios** (decisión de Santiago del 13/10/2026). Mientras la agencia no informe las cuotas reales, todo lo que hay en `cuota` es de ejemplo.
+
+- **Qué carga:** a todas las pólizas activas del titular de POL-00123 (Juan García) y de la titular de POL-00124 (María del Carmen López), los dos con número vinculado, una cuota por mes desde el inicio de la vigencia hasta su vencimiento, con la prima mensual como importe. A García le quedan sin pagar las dos últimas cuotas de cada póliza; a López, ninguna. Las cuotas pagas tienen como fecha de pago su vencimiento. Los demás clientes quedan sin cuotas: el asistente deriva su consulta de saldo.
+- **Cómo se carga**, después de `migrar-planilla`:
+
+  ```bash
+  docker compose exec backend npm run cargar-cuotas-ejemplo
+  ```
+
+  No escribe nada si la tabla `cuota` ya tiene filas, si falta POL-00123 o POL-00124, o si una de las pólizas elegidas no tiene prima. Si no, carga todo en una transacción e informa cuántas cuotas cargó por póliza y cuántas quedaron sin pagar.
+- **Cómo se quitan:** mientras sean las únicas cuotas, vaciando la tabla (`DELETE FROM cuota`). Antes de cargar cuotas reales hay que vaciarla: la base no distingue unas de otras.
+- **A tener en cuenta:** como la cartera migrada está vencida por fecha, todas las cuotas de ejemplo quedan vencidas y la demo no muestra cuotas por vencer. El cliente recibe estos importes como reales, igual que la dirección y el teléfono de ejemplo. La prima de POL-00124 no tenía símbolo y se tomó como pesos.
+
 ## Usuarios
 
 - **De prueba:** `admin` (rol administrador, «Admin Prueba») y `operador` (rol operador, «Operador Prueba»), con contraseña 1234. Van en una migración SQL, así existen en todas las bases aunque no se haya corrido la migración de la planilla: el panel del Parcial 1 atribuye todo a `operador`. El repo es público: antes de producción se borran o se les cambia la contraseña.

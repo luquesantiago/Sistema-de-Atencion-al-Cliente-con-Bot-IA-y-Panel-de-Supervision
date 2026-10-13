@@ -19,8 +19,8 @@ const customer: Customer = {
   firstName: 'Ana',
   lastName: 'Prueba',
   policies: [
-    { number: 'POL-90001', ramo: 'auto', status: 'activa', expirationDate: '2026-10-04' },
-    { number: 'POL-90002', ramo: 'hogar', status: 'activa', expirationDate: '2026-10-03' },
+    { number: 'POL-90001', ramo: 'auto', status: 'activa', expirationDate: '2026-10-04', currency: 'ARS', installments: [] },
+    { number: 'POL-90002', ramo: 'hogar', status: 'activa', expirationDate: '2026-10-03', currency: 'ARS', installments: [] },
   ],
 }
 
@@ -53,8 +53,8 @@ describe('statusesTemplate', () => {
     const other: Customer = {
       ...customer,
       policies: [
-        { number: 'POL-90003', ramo: 'moto', status: 'dada de baja', expirationDate: '2026-01-01' },
-        { number: 'POL-90004', ramo: 'vida', status: 'suspendida por mora', expirationDate: '2026-01-01' },
+        { number: 'POL-90003', ramo: 'moto', status: 'dada de baja', expirationDate: '2026-01-01', currency: 'ARS', installments: [] },
+        { number: 'POL-90004', ramo: 'vida', status: 'suspendida por mora', expirationDate: '2026-01-01', currency: 'ARS', installments: [] },
       ],
     }
     expect(statusesTemplate(other, lateNight)).toBe(

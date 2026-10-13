@@ -2,14 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { actionForIntent, clarificationStep, intents, isIntent, type Intent } from './intent.js'
 
 describe('actionForIntent', () => {
-  it('responde vencimiento, estado de póliza, saludo e información de la agencia', () => {
+  it('responde vencimiento, estado de póliza, saldo, saludo e información de la agencia', () => {
     expect(actionForIntent('vencimiento')).toEqual({ kind: 'answer', template: 'expirations' })
     expect(actionForIntent('estado de póliza')).toEqual({ kind: 'answer', template: 'statuses' })
+    expect(actionForIntent('saldo')).toEqual({ kind: 'answer', template: 'balance' })
     expect(actionForIntent('saludo')).toEqual({ kind: 'answer', template: 'courtesy' })
     expect(actionForIntent('información de la agencia')).toEqual({ kind: 'answer', template: 'agency' })
   })
 
-  it.each<Intent>(['siniestro', 'cotización', 'saldo', 'cobertura', 'reclamo', 'otra consulta'])('deriva %s', (intent) => {
+  it.each<Intent>(['siniestro', 'cotización', 'cobertura', 'reclamo', 'otra consulta'])('deriva %s', (intent) => {
     expect(actionForIntent(intent)).toEqual({ kind: 'handoff' })
   })
 
