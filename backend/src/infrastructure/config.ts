@@ -8,6 +8,11 @@ function requiredEnvironment(name: string): string {
 
 export const config = {
   port: Number(process.env.PORT ?? 3000),
+  databaseHost: requiredEnvironment('DATABASE_HOST'),
+  databasePort: Number(requiredEnvironment('DATABASE_PORT')),
+  databaseUser: requiredEnvironment('DATABASE_USER'),
+  databasePassword: requiredEnvironment('DATABASE_PASSWORD'),
+  databaseName: requiredEnvironment('DATABASE_NAME'),
   aiApiUrl: requiredEnvironment('AI_API_URL'),
   aiApiKey: requiredEnvironment('AI_API_KEY'),
   aiModel: requiredEnvironment('AI_MODEL'),

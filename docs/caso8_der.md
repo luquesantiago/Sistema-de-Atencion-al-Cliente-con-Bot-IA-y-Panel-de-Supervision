@@ -45,7 +45,7 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 29/09/2026 (suma `caso
 |---|---|
 | `rol` | Administrador y operador. |
 | `usuario` | Usuarios de la agencia, con rol y contraseña hasheada. Reemplaza el texto libre («Graciela», «ROBERTO»). |
-| `parametro_configuracion` | Clave–valor para los parámetros configurables: tope de reintentos de DNI, minutos de un caso derivado sin tomar y minutos de inactividad que cierran una conversación sin caso derivado abierto. |
+| `parametro_configuracion` | Clave–valor para los parámetros configurables: tope de reintentos de DNI, minutos de un caso derivado sin tomar y minutos de inactividad que cierran una conversación sin caso derivado abierto. También guarda los datos de contacto de la agencia que informa el asistente (dirección y teléfono, de ejemplo hasta que la agencia informe los reales). |
 | `horario_atencion` | Horario de atención humana: una fila por día con atención (1 = lunes … 7 = domingo), con hora de apertura y de cierre, en hora argentina. |
 
 ### Atención
@@ -106,7 +106,7 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 29/09/2026 (suma `caso
 - **estado_siniestro**: registrado, en gestión, cerrado.
 - **rol**: administrador, operador.
 - **origen_mensaje**: cliente, asistente, operador.
-- **tipo_consulta**: saldo, vencimiento, estado de póliza, cobertura, siniestro, cotización, baja, modificación, reclamo, saludo y cambio de teléfono (28/09/2026). En la migración, «siniestro_urgente» se carga como siniestro; PROMPT_INJECTION no es un tipo de consulta (lo cubre la alerta «Intento de manipulación del asistente»). «Estado de póliza» sale de RF-ATE-01.
+- **tipo_consulta**: saldo, vencimiento, estado de póliza, cobertura, siniestro, cotización, baja, modificación, reclamo, saludo, cambio de teléfono (28/09/2026) e información de la agencia (07/10/2026). En la migración, «siniestro_urgente» se carga como siniestro; PROMPT_INJECTION no es un tipo de consulta (lo cubre la alerta «Intento de manipulación del asistente»). «Estado de póliza» sale de RF-ATE-01.
 - **estado_prospecto**: pendiente, confirmado, descartado.
 - **resultado_verificacion**: aprobada, retenida.
 - **nivel_riesgo** (orden 1 = más grave): 1 crítico, 2 alto, 3 medio, 4 bajo.
@@ -122,7 +122,7 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 29/09/2026 (suma `caso
 - **tipo_accion**: baja de póliza, modificación de póliza, alta de conductor y cambio de teléfono (28/09/2026).
 - **estado_solicitud**: pendiente, aprobada, rechazada, aplicada.
 - **horario_atencion**: lunes a viernes de 9 a 18, según informó la agencia.
-- **parametro_configuracion**: `max_intentos_dni` = 3; `minutos_max_caso_sin_tomar` = 60 y `minutos_inactividad_sesion` = 30 (provisorios).
+- **parametro_configuracion**: `max_intentos_dni` = 3; `minutos_max_caso_sin_tomar` = 60 y `minutos_inactividad_sesion` = 30 (provisorios). `direccion_agencia` = Ficticia 123 y `telefono_agencia` = 11 7816-8015 (07/10/2026): datos de ejemplo, porque la agencia no los informó.
 
 ## Decisiones tomadas el 21/09/2026
 

@@ -1,3 +1,5 @@
 .env
 node_modules/
 dist/
+# Excel limpio de la planilla histórica: tiene datos reales, no se sube (docs/migracion.md)
+backend/planilla/

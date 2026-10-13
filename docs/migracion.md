@@ -5,8 +5,17 @@ Reglas para importar a la base los datos históricos de la agencia (Parcial 1). 
 ## Dónde está el Excel
 
 - No se sube al repo. Está en la carpeta del proyecto en Drive.
-- El script de migración lo lee desde una carpeta dentro de `backend/` que Git ignora. Tiene que estar ahí porque el contenedor del backend solo ve `./backend`: un archivo en otra carpeta (por ejemplo, el Escritorio de Windows) no lo encuentra.
-- Quien no tenga el Excel no tiene los datos migrados. La demo corre en una máquina que lo tenga.
+- Para cargarlo, se copia a `backend/planilla/`, una carpeta que Git ignora. Tiene que estar ahí porque el contenedor del backend solo ve `./backend`: un archivo en otra carpeta (por ejemplo, el Escritorio de Windows) no lo encuentra. Después de cargar se puede borrar de ahí: los datos quedan en la base.
+- El script está en `backend/scripts/migrar-planilla.ts` y se corre sobre una base vacía, recién migrada:
+
+  ```bash
+  cp <carpeta de Drive>/Caso8_seguros_bot_datos_limpios.xlsx backend/planilla/
+  docker compose exec backend npm run migrar-planilla
+  ```
+
+  Para leer otro archivo: `npm run migrar-planilla -- <ruta dentro de backend/>`. Valida toda la planilla antes de escribir y carga todo en una transacción: si algo falla, la base queda como estaba. Si la base ya tiene clientes o los usuarios `roberto` o `graciela`, no escribe nada. Al terminar informa cuántos registros cargó por tabla y qué filas salteó.
+- Los datos quedan en el volumen de Docker de la base: `docker compose stop`, `restart` y `down` (sin `-v`) no los borran. `docker compose down -v` sí: después hay que volver a correr el script.
+- Quien no tenga el Excel no tiene los datos migrados y el asistente no reconoce ningún DNI. La demo corre en una máquina que lo tenga.
 
 ## Qué lee el script
 
@@ -32,14 +41,14 @@ Reglas para importar a la base los datos históricos de la agencia (Parcial 1). 
 - **Tipo de consulta:** «siniestro_urgente» se carga como siniestro. PROMPT_INJECTION no es un tipo de consulta: el caso queda sin tipo y con la alerta «Intento de manipulación del asistente».
 - **Alertas** (CASO-003, 005, 006, 010 y 012): se cargan atendidas por el responsable del caso, a la hora de la toma. ALERTA_ACCION pasa a «Pedido de acción crítica», salvo CASO-006, que pasa a «Pedido de reembolso (aviso al equipo)».
 - **Póliza del caso** (`caso.id_poliza`, opcional): CASO-001, 011 y 012 → POL-00123; CASO-006 → POL-00124. Quedan vacíos hasta que responda la agencia CASO-002 (además, POL-00128 no se migra), CASO-004 y CASO-008, porque el log los vincula a pólizas que no coinciden con la consulta.
-- **Conversaciones:** una por caso. Empieza a la hora de apertura; si el caso está cerrado, termina a la hora de cierre, y si sigue abierto, queda abierta. Si el caso tiene póliza, la conversación queda a nombre del titular de esa póliza y su número se vincula a ese cliente: CASO-001, 011 y 012 → Juan García (5491155551001 y 5491155551009); CASO-006 → María del Carmen López (5491155551005). Si no tiene póliza, la conversación queda sin cliente y el número sin vincular, como una conversación en la que nadie dio el DNI. CASO-003 usa el mismo número que CASO-001 y 011 pero no tiene póliza: su conversación queda sin cliente, aunque el número quede vinculado a García. Riesgo aceptado: en CASO-012 no escribió el titular (el log dice «Consultó al titular»).
+- **Conversaciones:** una por caso. Empieza a la hora de apertura; si el caso está cerrado, termina a la hora de cierre, y si sigue abierto, queda abierta y con el asistente suspendido (`asistente_suspendido`), porque tiene un caso derivado sin cerrar: el asistente no le contesta a ese número hasta que un operador cierre el caso. Si el caso tiene póliza, la conversación queda a nombre del titular de esa póliza y su número se vincula a ese cliente: CASO-001, 011 y 012 → Juan García (5491155551001 y 5491155551009); CASO-006 → María del Carmen López (5491155551005). Si no tiene póliza, la conversación queda sin cliente y el número sin vincular, como una conversación en la que nadie dio el DNI. CASO-003 usa el mismo número que CASO-001 y 011 pero no tiene póliza: su conversación queda sin cliente, aunque el número quede vinculado a García. Riesgo aceptado: en CASO-012 no escribió el titular (el log dice «Consultó al titular»).
 
 ## Usuarios
 
 - **De prueba:** `admin` (rol administrador, «Admin Prueba») y `operador` (rol operador, «Operador Prueba»), con contraseña 1234. Van en una migración SQL, así existen en todas las bases aunque no se haya corrido la migración de la planilla: el panel del Parcial 1 atribuye todo a `operador`. El repo es público: antes de producción se borran o se les cambia la contraseña.
-- **Históricos:** el script de la planilla crea a Roberto Castaño (administrador, usuario `roberto`) y a Graciela Castaño (operador, usuario `graciela`) desactivados, con una contraseña al azar que nadie conoce. No pueden entrar al sistema: solo figuran como responsables de sus casos y como quienes atendieron sus alertas. Cuando se creen los usuarios permanentes, se activan esos mismos registros. El apellido de Graciela es un supuesto (en la carta es hija de Roberto).
+- **Históricos:** el script de la planilla crea a Roberto Castaño (administrador, usuario `roberto`) y a Graciela Castaño (operador, usuario `graciela`) activos, con contraseña `seguros1234` (decisión del equipo, 06/10/2026). Son los responsables de los casos migrados y quienes atendieron sus alertas. El repo es público: antes de producción se les cambia la contraseña. El apellido de Graciela es un supuesto (en la carta es hija de Roberto).
 - Diego no se carga ahora porque no figura en la planilla.
-- El algoritmo de hash es bcrypt, con prefijo `$2b$` y coste 10, fijado como literal en la migración `20260929204929_caso_poliza_cambio_telefono_usuarios_prueba`. El login del Parcial 2 usa el mismo.
+- El algoritmo de hash es bcrypt, con prefijo `$2b$` y coste 10: literal en la migración `20260929204929_caso_poliza_cambio_telefono_usuarios_prueba` para los usuarios de prueba, y generado con `bcryptjs` por el script de la planilla para los históricos. El login del Parcial 2 usa el mismo.
 
 ## A tener en cuenta
 

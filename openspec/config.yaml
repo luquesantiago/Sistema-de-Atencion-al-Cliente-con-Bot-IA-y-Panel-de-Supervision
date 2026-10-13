@@ -8,7 +8,7 @@ context: |
   Proyecto: sistema de atención al cliente por WhatsApp con asistente de IA y panel de supervisión para Seguros Castaño.
   Fuentes del proyecto:
   - AGENTS.md: reglas de negocio, convenciones, comandos de verificación y decisiones abiertas.
-  - docs/requisitos.md: los 28 requisitos funcionales, con IDs por módulo (RF-CAR, RF-ATE, RF-DER, RF-VER, RF-SUP, RF-APR).
+  - docs/requisitos.md: los 29 requisitos funcionales, con IDs por módulo (RF-CAR, RF-ATE, RF-DER, RF-VER, RF-SUP, RF-APR).
   - docs/caso8_der.md: modelo de datos acordado. El esquema vigente está en backend/prisma/migrations; docs/01_esquema.sql y docs/02_catalogos.sql son la foto del Hito 0.
   - docs/caso8_tabla_de_eventos.md: eventos de negocio.
   - docs/migracion.md: reglas de la migración de la planilla histórica y de los usuarios.
