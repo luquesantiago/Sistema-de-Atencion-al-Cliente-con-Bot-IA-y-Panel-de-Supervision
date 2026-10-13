@@ -1,4 +1,21 @@
-export default function BandejaAtencion() {
+import ChatHeader from '../components/ChatHeader'
+import { IconoConversacion } from '../components/iconos'
+import type { Modulo } from '../navigation'
+
+export interface ConversacionSeleccionada {
+  nombre: string
+  vehiculo: string
+  patente: string
+}
+
+interface BandejaAtencionProps {
+  modulo: Modulo
+  conversacionSeleccionada?: ConversacionSeleccionada | null
+}
+
+export default function BandejaAtencion({
+  conversacionSeleccionada = null,
+}: BandejaAtencionProps) {
   return (
     <div className="pagina pagina--bandeja">
       <div className="bandeja-layout">
@@ -32,9 +49,26 @@ export default function BandejaAtencion() {
         </aside>
 
         <section className="bandeja__chat" aria-label="Panel de conversación">
-          <p className="bandeja__chat-vacio">
-            Seleccioná un contacto de la lista para comenzar la atención
-          </p>
+          {conversacionSeleccionada === null ? (
+            <div className="bandeja__empty-state" role="status">
+              <span className="bandeja__empty-state-icono" aria-hidden="true">
+                <IconoConversacion />
+              </span>
+              <p className="bandeja__chat-vacio">
+                Seleccioná un contacto de la lista para comenzar la atención
+              </p>
+            </div>
+          ) : (
+            <>
+              <ChatHeader
+                nombre={conversacionSeleccionada.nombre}
+                vehiculo={conversacionSeleccionada.vehiculo}
+                patente={conversacionSeleccionada.patente}
+                previsualizacion={false}
+              />
+              <div className="bandeja__chat-cuerpo" aria-label="Mensajes de la conversación" />
+            </>
+          )}
         </section>
       </div>
     </div>
