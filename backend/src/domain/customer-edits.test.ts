@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   assertPolicyWindow,
   parseCreateCustomer,
+  parseCreatePolicy,
   parseLinkPhone,
   parseReplaceCoverages,
   parseUpdateCustomer,
@@ -239,5 +240,120 @@ describe('parseReplaceCoverages', () => {
 
   it('rechaza una cobertura sin planId', () => {
     expectValidationError(() => parseReplaceCoverages(4, { coverages: [{ description: null, insuredSumCents: null }] }))
+  })
+})
+
+describe('parseCreatePolicy', () => {
+  // Cuerpo completo de un alta: obligatorios + opcionales.
+  const altaCompleta = () => ({
+    number: 'POL-00999',
+    companyId: 1,
+    ramo: 'auto',
+    status: 'activa',
+    currency: 'ARS',
+    startDate: '2026-10-01',
+    expirationDate: '2027-10-01',
+    premiumCents: 12_500_00,
+    observations: 'Póliza cargada desde el panel',
+    insuredItem: { description: 'VW Gol', plate: 'ABC123', brand: 'Volkswagen', model: 'Gol', year: 2019 },
+    coverages: [{ planId: 2, description: 'Responsabilidad civil', insuredSumCents: 100_000_00 }],
+  })
+
+  it('arma el alta completa con las coberturas y el bien', () => {
+    const input = parseCreatePolicy(7, altaCompleta())
+    expect(input).toEqual({
+      customerId: 7,
+      number: 'POL-00999',
+      companyId: 1,
+      ramo: 'auto',
+      status: 'activa',
+      currency: 'ARS',
+      startDate: '2026-10-01',
+      expirationDate: '2027-10-01',
+      premiumCents: 12_500_00,
+      observations: 'Póliza cargada desde el panel',
+      insuredItem: {
+        description: 'VW Gol',
+        plate: 'ABC123',
+        address: null,
+        brand: 'Volkswagen',
+        model: 'Gol',
+        year: 2019,
+      },
+      coverages: [{ planId: 2, description: 'Responsabilidad civil', insuredSumCents: 100_000_00 }],
+    })
+  })
+
+  it('acepta el mínimo: sin coberturas, sin bien y sin prima', () => {
+    const input = parseCreatePolicy(3, {
+      number: 'POL-01000',
+      companyId: 1,
+      ramo: 'vida',
+      status: 'activa',
+      currency: 'ARS',
+      startDate: '2026-10-01',
+      expirationDate: '2027-10-01',
+    })
+    expect(input).toEqual({
+      customerId: 3,
+      number: 'POL-01000',
+      companyId: 1,
+      ramo: 'vida',
+      status: 'activa',
+      currency: 'ARS',
+      startDate: '2026-10-01',
+      expirationDate: '2027-10-01',
+      coverages: [],
+    })
+  })
+
+  it('normaliza el número con espacios de sobra', () => {
+    const input = parseCreatePolicy(1, { ...altaCompleta(), number: '  POL-00999  ' })
+    expect(input.number).toBe('POL-00999')
+  })
+
+  it('rechaza un alta sin número', () => {
+    const { number: _number, ...sinNumero } = altaCompleta()
+    expectValidationError(() => parseCreatePolicy(1, sinNumero))
+  })
+
+  it('rechaza un alta sin vigencia', () => {
+    const { startDate: _startDate, ...sinInicio } = altaCompleta()
+    expectValidationError(() => parseCreatePolicy(1, sinInicio))
+  })
+
+  it('rechaza una compañía que no sea un identificador', () => {
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), companyId: 'todos' }))
+  })
+
+  it('rechaza un ramo fuera de catálogo', () => {
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), ramo: 'viajes' }))
+  })
+
+  it('rechaza un estado fuera de catálogo', () => {
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), status: 'pagada' }))
+  })
+
+  it('rechaza una moneda fuera de catálogo', () => {
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), currency: 'EUR' }))
+  })
+
+  it('rechaza una vigencia que no cierra', () => {
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), expirationDate: '2026-05-01' }))
+  })
+
+  it('rechaza una prima negativa', () => {
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), premiumCents: -100 }))
+  })
+
+  it('rechaza campos de más, entre ellos el del actor', () => {
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), actor: 'operador' }))
+  })
+
+  it('rechaza coberturas con id: en un alta no existen todavía', () => {
+    expectValidationError(() => parseCreatePolicy(1, {
+      ...altaCompleta(),
+      coverages: [{ id: 12, planId: 2, description: null, insuredSumCents: null }],
+    }))
   })
 })

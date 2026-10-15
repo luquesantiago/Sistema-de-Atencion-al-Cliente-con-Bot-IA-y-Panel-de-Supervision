@@ -1,16 +1,33 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Catalogos } from '../api/catalogos'
-import type { DatoPoliza, EntradaCobertura, EntradaEdicionPoliza } from '../api/clientes'
+import type {
+  DatoPoliza,
+  EntradaAltaPoliza,
+  EntradaCobertura,
+  EntradaEdicionPoliza,
+} from '../api/clientes'
 
-interface FormularioPolizaProps {
-  poliza: DatoPoliza
-  catalogos: Catalogos
-  ocupado: boolean
-  error: string | null
-  /** Guarda los datos de la póliza y el set completo de coberturas. */
-  onGuardar: (entrada: EntradaEdicionPoliza, coberturas: EntradaCobertura[]) => void
-  onCancelar: () => void
-}
+// El modo define qué entrada entrega el formulario: en alta el contrato
+// completo con sus coberturas; en edición, los campos cambiados y el set de
+// coberturas aparte (se mandan por otro endpoint).
+type FormularioPolizaProps =
+  | {
+      modo: 'alta'
+      catalogos: Catalogos
+      ocupado: boolean
+      error: string | null
+      onGuardar: (entrada: EntradaAltaPoliza) => void
+      onCancelar: () => void
+    }
+  | {
+      modo: 'edicion'
+      poliza: DatoPoliza
+      catalogos: Catalogos
+      ocupado: boolean
+      error: string | null
+      onGuardar: (entrada: EntradaEdicionPoliza, coberturas: EntradaCobertura[]) => void
+      onCancelar: () => void
+    }
 
 type FilaCobertura = {
   clave: number
@@ -35,40 +52,37 @@ function centosAPesos(centavos: number | null): string {
 }
 
 /**
- * Formulario de edición de una póliza: datos generales, bien asegurado y
- * coberturas. Las coberturas se mandan completas: las que se quitan quedan
- * dadas de baja en el sistema.
+ * Formulario de alta y de edición de una póliza: datos generales, bien
+ * asegurado y coberturas. Las coberturas se mandan completas: las que se
+ * quitan quedan dadas de baja en el sistema. El DNI del dueño no se toca:
+ * la póliza se da de alta sobre el cliente que ya está en la ficha.
  */
-export default function FormularioPoliza({
-  poliza,
-  catalogos,
-  ocupado,
-  error,
-  onGuardar,
-  onCancelar,
-}: FormularioPolizaProps) {
-  const [numero, setNumero] = useState(poliza.number)
-  const [companiaId, setCompaniaId] = useState<string>(poliza.company?.id ?? '')
-  const [ramo, setRamo] = useState(poliza.ramo)
-  const [estado, setEstado] = useState(poliza.status)
-  const [moneda, setMoneda] = useState(poliza.currency)
-  const [fechaInicio, setFechaInicio] = useState(poliza.startDate ?? '')
-  const [fechaVencimiento, setFechaVencimiento] = useState(poliza.expirationDate)
-  const [prima, setPrima] = useState(centosAPesos(poliza.premiumCents))
-  const [observaciones, setObservaciones] = useState(poliza.observations ?? '')
+export default function FormularioPoliza(props: FormularioPolizaProps) {
+  const { modo, catalogos, ocupado, error, onGuardar, onCancelar } = props
+  // En edición la póliza aporta los valores iniciales; en alta arranca vacía.
+  const poliza = props.modo === 'edicion' ? props.poliza : null
+  const [numero, setNumero] = useState(poliza?.number ?? '')
+  const [companiaId, setCompaniaId] = useState<string>(poliza?.company?.id ?? '')
+  const [ramo, setRamo] = useState<string>(poliza?.ramo ?? '')
+  const [estado, setEstado] = useState<string>(poliza?.status ?? '')
+  const [moneda, setMoneda] = useState<string>(poliza?.currency ?? '')
+  const [fechaInicio, setFechaInicio] = useState(poliza?.startDate ?? '')
+  const [fechaVencimiento, setFechaVencimiento] = useState(poliza?.expirationDate ?? '')
+  const [prima, setPrima] = useState(centosAPesos(poliza?.premiumCents ?? null))
+  const [observaciones, setObservaciones] = useState(poliza?.observations ?? '')
   const [bien, setBien] = useState({
-    conBien: poliza.insuredItem !== null,
-    description: poliza.insuredItem?.description ?? '',
-    plate: poliza.insuredItem?.plate ?? '',
-    address: poliza.insuredItem?.address ?? '',
-    brand: poliza.insuredItem?.brand ?? '',
-    model: poliza.insuredItem?.model ?? '',
-    year: poliza.insuredItem?.year === null || poliza.insuredItem?.year === undefined
+    conBien: poliza?.insuredItem !== null && poliza?.insuredItem !== undefined,
+    description: poliza?.insuredItem?.description ?? '',
+    plate: poliza?.insuredItem?.plate ?? '',
+    address: poliza?.insuredItem?.address ?? '',
+    brand: poliza?.insuredItem?.brand ?? '',
+    model: poliza?.insuredItem?.model ?? '',
+    year: poliza?.insuredItem?.year === null || poliza?.insuredItem?.year === undefined
       ? ''
       : String(poliza.insuredItem.year),
   })
   const [coberturas, setCoberturas] = useState<FilaCobertura[]>(
-    poliza.coverages.map((cobertura, index) => ({
+    (poliza?.coverages ?? []).map((cobertura, index) => ({
       clave: index + 1,
       id: cobertura.id,
       planId: cobertura.planId,
@@ -76,7 +90,7 @@ export default function FormularioPoliza({
       suma: centosAPesos(cobertura.insuredSumCents),
     })),
   )
-  const siguienteClave = useRef(poliza.coverages.length + 1)
+  const siguienteClave = useRef((poliza?.coverages.length ?? 0) + 1)
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -93,33 +107,50 @@ export default function FormularioPoliza({
 
   function guardar(evento: React.FormEvent) {
     evento.preventDefault()
-    const entrada: EntradaEdicionPoliza = {
-      number: numero.trim(),
-      ramo,
-      status: estado,
-      currency: moneda,
-      expirationDate: fechaVencimiento,
-      premiumCents: pesosACentos(prima),
-      observations: observaciones.trim() ? observaciones.trim() : null,
-    }
-    if (fechaInicio) entrada.startDate = fechaInicio
-    if (companiaId) entrada.companyId = Number(companiaId)
-    entrada.insuredItem = bien.conBien
-      ? {
-          description: bien.description.trim(),
-          plate: bien.plate.trim() || null,
-          address: bien.address.trim() || null,
-          brand: bien.brand.trim() || null,
-          model: bien.model.trim() || null,
-          year: bien.year ? Number(bien.year) : null,
-        }
-      : null
     const coberturasFinales: EntradaCobertura[] = coberturas.map((fila) => ({
       ...(fila.id === undefined ? {} : { id: fila.id }),
       planId: Number(fila.planId),
       description: fila.description.trim() ? fila.description.trim() : null,
       insuredSumCents: pesosACentos(fila.suma),
     }))
+    const datosOpcionales = {
+      premiumCents: pesosACentos(prima),
+      observations: observaciones.trim() ? observaciones.trim() : null,
+      insuredItem: bien.conBien
+        ? {
+            description: bien.description.trim(),
+            plate: bien.plate.trim() || null,
+            address: bien.address.trim() || null,
+            brand: bien.brand.trim() || null,
+            model: bien.model.trim() || null,
+            year: bien.year ? Number(bien.year) : null,
+          }
+        : null,
+    }
+    if (modo === 'alta') {
+      onGuardar({
+        number: numero.trim(),
+        companyId: Number(companiaId),
+        ramo,
+        status: estado,
+        currency: moneda,
+        startDate: fechaInicio,
+        expirationDate: fechaVencimiento,
+        ...datosOpcionales,
+        coverages: coberturasFinales,
+      })
+      return
+    }
+    const entrada: EntradaEdicionPoliza = {
+      number: numero.trim(),
+      ramo,
+      status: estado,
+      currency: moneda,
+      expirationDate: fechaVencimiento,
+      ...datosOpcionales,
+    }
+    if (fechaInicio) entrada.startDate = fechaInicio
+    if (companiaId) entrada.companyId = Number(companiaId)
     onGuardar(entrada, coberturasFinales)
   }
 
@@ -138,10 +169,12 @@ export default function FormularioPoliza({
         ref={panelRef}
       >
         <h2 className="modal__titulo" id="formulario-poliza-titulo">
-          Editar póliza {poliza.number}
+          {modo === 'alta' ? 'Nueva póliza' : `Editar póliza ${poliza?.number ?? ''}`}
         </h2>
         <p className="modal__descripcion">
-          Los cambios se aplican a la póliza de la cartera. Al guardar se pide confirmación con el resumen.
+          {modo === 'alta'
+            ? 'La póliza queda en la ficha del cliente que ya está abierto. Al guardar se pide confirmación con el resumen.'
+            : 'Los cambios se aplican a la póliza de la cartera. Al guardar se pide confirmación con el resumen.'}
         </p>
 
         <form className="formulario" onSubmit={guardar}>
@@ -154,8 +187,12 @@ export default function FormularioPoliza({
               </label>
               <label className="formulario__campo">
                 Compañía
-                <select value={companiaId} onChange={(evento) => setCompaniaId(evento.target.value)}>
-                  <option value="">Sin cambio</option>
+                <select
+                  value={companiaId}
+                  onChange={(evento) => setCompaniaId(evento.target.value)}
+                  required={modo === 'alta'}
+                >
+                  <option value="">{modo === 'alta' ? 'Elegir compañía' : 'Sin cambio'}</option>
                   {catalogos.companies.map((compania) => (
                     <option key={compania.id} value={compania.id}>
                       {compania.name}
@@ -168,6 +205,7 @@ export default function FormularioPoliza({
               <label className="formulario__campo">
                 Ramo
                 <select value={ramo} onChange={(evento) => setRamo(evento.target.value)} required>
+                  <option value="">Elegir ramo</option>
                   {catalogos.ramoNames.map((nombre) => (
                     <option key={nombre} value={nombre}>
                       {nombre}
@@ -178,6 +216,7 @@ export default function FormularioPoliza({
               <label className="formulario__campo">
                 Estado
                 <select value={estado} onChange={(evento) => setEstado(evento.target.value)} required>
+                  <option value="">Elegir estado</option>
                   {catalogos.policyStatusNames.map((nombre) => (
                     <option key={nombre} value={nombre}>
                       {nombre}
@@ -188,6 +227,7 @@ export default function FormularioPoliza({
               <label className="formulario__campo">
                 Moneda
                 <select value={moneda} onChange={(evento) => setMoneda(evento.target.value)} required>
+                  <option value="">Elegir moneda</option>
                   {catalogos.currencies.map((monedaCatalogo) => (
                     <option key={monedaCatalogo.code} value={monedaCatalogo.code}>
                       {monedaCatalogo.code} — {monedaCatalogo.name}
@@ -199,7 +239,12 @@ export default function FormularioPoliza({
             <div className="formulario__fila">
               <label className="formulario__campo">
                 Inicio de vigencia
-                <input type="date" value={fechaInicio} onChange={(evento) => setFechaInicio(evento.target.value)} />
+                <input
+                  type="date"
+                  value={fechaInicio}
+                  onChange={(evento) => setFechaInicio(evento.target.value)}
+                  required={modo === 'alta'}
+                />
               </label>
               <label className="formulario__campo">
                 Vencimiento
@@ -400,7 +445,7 @@ export default function FormularioPoliza({
               Cancelar
             </button>
             <button type="submit" className="boton boton--primario" disabled={ocupado}>
-              {ocupado ? 'Guardando…' : 'Continuar'}
+              {ocupado ? 'Guardando…' : modo === 'alta' ? 'Crear póliza' : 'Continuar'}
             </button>
           </div>
         </form>

@@ -204,6 +204,16 @@ export function createApp(
       handleRequestError(error, response, next)
     }
   })
+  // Alta de una póliza de un cliente que ya existe, con su bien y sus
+  // coberturas: carga de cartera (ABM), no emisión.
+  app.post('/api/clientes/:id/polizas', async (request, response, next) => {
+    try {
+      const detail = await manageCustomerEdits.createPolicy(request.params.id, request.body)
+      response.status(201).json(detail)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
   app.patch('/api/polizas/:id', async (request, response, next) => {
     try {
       const detail = await manageCustomerEdits.updatePolicy(request.params.id, request.body)

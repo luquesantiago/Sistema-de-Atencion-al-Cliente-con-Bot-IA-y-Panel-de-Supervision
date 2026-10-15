@@ -1037,6 +1037,26 @@
   text-transform: uppercase;
 }
 
+/* Encabezado de «Pólizas»: el rótulo a la izquierda y el alta a la derecha,
+   para que la carga entre con cero pólizas o con muchas. */
+
+.detalle-panel__polizas-encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detalle-panel__polizas-encabezado .detalle-panel__subtitulo {
+  margin-bottom: 0;
+}
+
+.detalle-panel__polizas-encabezado .boton {
+  padding: 3px 9px;
+  font-size: 0.74rem;
+}
+
 /* Una tarjeta por póliza: número y estado arriba, cobertura y bien debajo */
 
 .detalle-panel__poliza {

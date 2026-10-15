@@ -14,6 +14,7 @@ import {
 } from '../components/iconos'
 import {
   crearCliente,
+  crearPoliza,
   darDeBajaCliente,
   desvincularTelefono,
   editarCliente,
@@ -27,6 +28,7 @@ import {
   type DatoPoliza,
   type DatoPolizaResumen,
   type EntradaAltaCliente,
+  type EntradaAltaPoliza,
   type EntradaCobertura,
   type EntradaEdicionCliente,
   type EntradaEdicionPoliza,
@@ -141,6 +143,7 @@ type ConfirmacionPendiente =
   | { tipo: 'baja-cliente'; lineas: LineaConfirmacion[] }
   | { tipo: 'vincular-telefono'; phone: string; lineas: LineaConfirmacion[] }
   | { tipo: 'desvincular-telefono'; phoneId: number; numero: string; lineas: LineaConfirmacion[] }
+  | { tipo: 'alta-poliza'; entrada: EntradaAltaPoliza; lineas: LineaConfirmacion[] }
   | { tipo: 'editar-poliza'; polizaId: string; entrada: EntradaEdicionPoliza; coberturas: EntradaCobertura[]; lineas: LineaConfirmacion[] }
 
 function tituloDeConfirmacion(confirmacion: ConfirmacionPendiente, cliente: ClienteDetalle | null): string {
@@ -156,6 +159,8 @@ function tituloDeConfirmacion(confirmacion: ConfirmacionPendiente, cliente: Clie
       return 'Vincular el teléfono al cliente'
     case 'desvincular-telefono':
       return `Desvincular ${confirmacion.numero} de ${nombre}`
+    case 'alta-poliza':
+      return `Crear la póliza ${confirmacion.entrada.number}`
     case 'editar-poliza':
       return 'Guardar los cambios de la póliza'
   }
@@ -165,6 +170,8 @@ function descripcionDeConfirmacion(confirmacion: ConfirmacionPendiente): string 
   switch (confirmacion.tipo) {
     case 'alta-cliente':
       return 'El cliente va a quedar en la cartera con estos datos. El DNI o el CUIT no se puede repetir.'
+    case 'alta-poliza':
+      return 'La póliza queda en la ficha del cliente con estos datos, su bien y sus coberturas.'
     case 'baja-cliente':
       return 'El cliente deja de aparecer en la cartera. No se borra su historial.'
     case 'editar-cliente':
@@ -205,6 +212,7 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
   const [modoAlta, setModoAlta] = useState(false)
   const [editandoIdentidad, setEditandoIdentidad] = useState(false)
   const [polizaEditando, setPolizaEditando] = useState<DatoPoliza | null>(null)
+  const [altaPoliza, setAltaPoliza] = useState(false)
   const [confirmacion, setConfirmacion] = useState<ConfirmacionPendiente | null>(null)
   const [guardando, setGuardando] = useState(false)
   const [errorFormulario, setErrorFormulario] = useState<string | null>(null)
@@ -301,19 +309,20 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
   }, [catalogos])
 
   const aplicarConfirmacion = useCallback(async () => {
-    if (confirmacion === null || detalle === null) return
+    if (confirmacion === null) return
     setGuardando(true)
     setErrorConfirmacion(null)
     try {
+      if (confirmacion.tipo === 'alta-cliente') {
+        const creada = await crearCliente(confirmacion.entrada)
+        setModoAlta(false)
+        setConfirmacion(null)
+        setErrorFormulario(null)
+        recargarTrasEdicion(creada, `Se creó el cliente ${nombreCompleto(creada)}.`)
+        return
+      }
+      if (detalle === null) return
       switch (confirmacion.tipo) {
-        case 'alta-cliente': {
-          const creada = await crearCliente(confirmacion.entrada)
-          setModoAlta(false)
-          setConfirmacion(null)
-          setErrorFormulario(null)
-          recargarTrasEdicion(creada, `Se creó el cliente ${nombreCompleto(creada)}.`)
-          return
-        }
         case 'editar-cliente': {
           const editada = await editarCliente(detalle.id, confirmacion.entrada)
           setEditandoIdentidad(false)
@@ -341,6 +350,14 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
           const sinTelefono = await desvincularTelefono(detalle.id, confirmacion.phoneId)
           setConfirmacion(null)
           recargarTrasEdicion(sinTelefono, `Se desvinculó el teléfono ${confirmacion.numero}.`)
+          return
+        }
+        case 'alta-poliza': {
+          const creada = await crearPoliza(detalle.id, confirmacion.entrada)
+          setAltaPoliza(false)
+          setConfirmacion(null)
+          setErrorFormulario(null)
+          recargarTrasEdicion(creada, `Se creó la póliza ${confirmacion.entrada.number} de ${nombreCompleto(creada)}.`)
           return
         }
         case 'editar-poliza': {
@@ -447,12 +464,55 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
     })
   }
 
+  // El alta nunca escribe en la ficha: todo lo que va a guardar se lista como
+  // «— → valor», igual que el resto de las confirmaciones.
+  function confirmarAltaPoliza(entrada: EntradaAltaPoliza) {
+    const compania = catalogos?.companies.find((opcione) => opcione.id === entrada.companyId)?.name
+    const lineas: LineaConfirmacion[] = [
+      { etiqueta: 'Número', antes: '—', despues: entrada.number },
+      { etiqueta: 'Compañía', antes: '—', despues: compania ?? `id ${entrada.companyId}` },
+      { etiqueta: 'Ramo', antes: '—', despues: entrada.ramo },
+      { etiqueta: 'Estado', antes: '—', despues: entrada.status },
+      { etiqueta: 'Moneda', antes: '—', despues: entrada.currency },
+      {
+        etiqueta: 'Vigencia',
+        antes: '—',
+        despues: `${fechaLegible(entrada.startDate)} a ${fechaLegible(entrada.expirationDate)}`,
+      },
+    ]
+    const prima = pesosDe(entrada.premiumCents ?? null, entrada.currency)
+    if (prima !== null) {
+      lineas.push({ etiqueta: 'Prima mensual', antes: '—', despues: prima })
+    }
+    if (entrada.insuredItem !== null && entrada.insuredItem !== undefined) {
+      lineas.push({ etiqueta: 'Bien asegurado', antes: '—', despues: entrada.insuredItem.description })
+    }
+    if (entrada.coverages.length > 0) {
+      lineas.push({
+        etiqueta: 'Coberturas',
+        antes: '—',
+        despues: `${entrada.coverages.length} activas`,
+      })
+    }
+    setErrorFormulario(null)
+    setConfirmacion({ tipo: 'alta-poliza', entrada, lineas })
+  }
+
   async function abrirEdicionPoliza(poliza: DatoPoliza) {
     setExito(null)
     setErrorFormulario(null)
     const catalogosCargados = await asegurarCatalogos()
     if (catalogosCargados === null) return
     setPolizaEditando(poliza)
+  }
+
+  // El alta se abre desde la ficha del cliente al que se le carga la póliza.
+  async function pedirAltaPoliza() {
+    setExito(null)
+    setErrorFormulario(null)
+    const catalogosCargados = await asegurarCatalogos()
+    if (catalogosCargados === null) return
+    setAltaPoliza(true)
   }
 
   function confirmarEdicionPoliza(poliza: DatoPoliza, entrada: EntradaEdicionPoliza, coberturas: EntradaCobertura[]) {
@@ -766,7 +826,12 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
                 </form>
 
                 <section className="detalle-panel__polizas">
-                  <h3 className="detalle-panel__subtitulo">Pólizas ({detalle.policies.length})</h3>
+                  <div className="detalle-panel__polizas-encabezado">
+                    <h3 className="detalle-panel__subtitulo">Pólizas ({detalle.policies.length})</h3>
+                    <button type="button" className="boton" onClick={() => void pedirAltaPoliza()}>
+                      Nueva póliza
+                    </button>
+                  </div>
                   {detalle.policies.length === 0 ? (
                     <p className="detalle-panel__aviso">Este cliente no tiene pólizas cargadas.</p>
                   ) : (
@@ -903,8 +968,23 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
         />
       ) : null}
 
+      {altaPoliza && catalogos !== null ? (
+        <FormularioPoliza
+          modo="alta"
+          catalogos={catalogos}
+          ocupado={guardando}
+          error={errorFormulario}
+          onGuardar={confirmarAltaPoliza}
+          onCancelar={() => {
+            setAltaPoliza(false)
+            setErrorFormulario(null)
+          }}
+        />
+      ) : null}
+
       {polizaEditando !== null && catalogos !== null ? (
         <FormularioPoliza
+          modo="edicion"
           poliza={polizaEditando}
           catalogos={catalogos}
           ocupado={guardando}

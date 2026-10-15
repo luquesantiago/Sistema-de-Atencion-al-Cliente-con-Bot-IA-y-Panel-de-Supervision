@@ -9,13 +9,14 @@ import {
 import { RequestManagementError } from './request-management.js'
 
 // Ediciones de cartera desde el panel de supervisión (RF-CAR-01, RF-CAR-02,
-// RF-CAR-03): alta, edición y baja de clientes, vínculos de teléfono y
+// RF-CAR-03): alta, edición y baja de clientes, vínculos de teléfono, alta y
 // edición de pólizas con su bien asegurado y sus coberturas. El DNI no se
 // modifica nunca: es el identificador del cliente (RF-ATE-03). Estas
 // mutaciones las hace el operador o el administrador desde el panel, no el
 // asistente: los pedidos que llegan por WhatsApp siguen el flujo de
-// solicitud y aprobación (RF-APR-01). La auditoría de estas ediciones queda
-// para el MVP 2.
+// solicitud y aprobación (RF-APR-01). El alta de pólizas es carga de cartera
+// (ABM), no emisión ni cotización, que siguen fuera de alcance. La auditoría
+// de estas ediciones queda para el MVP 2.
 
 const maxId = 4_294_967_295
 const maxCoverages = 50
@@ -75,6 +76,26 @@ export type CoverageInput = {
 
 export type ReplaceCoveragesInput = { policyId: number; coverages: CoverageInput[] }
 
+// Alta de una póliza de un cliente que ya existe, desde el panel. Es carga
+// de cartera (ABM), no emisión ni cotización: esos siguen fuera de alcance.
+export type CreatePolicyInput = {
+  customerId: number
+  number: string
+  companyId: number
+  ramo: Ramo
+  status: PolicyStatus
+  currency: Currency
+  // Fechas sin hora, aaaa-mm-dd. La vigencia siempre cierra.
+  startDate: string
+  expirationDate: string
+  premiumCents?: number | null
+  observations?: string | null
+  // null o ausente: la póliza no asegura un bien (por ejemplo, vida).
+  insuredItem?: InsuredItemInput | null
+  // Set completo de coberturas de la póliza; vacía si no tiene.
+  coverages: CoverageInput[]
+}
+
 export type CatalogOption = { id: number; name: string }
 
 export type Catalogs = {
@@ -93,6 +114,7 @@ export interface CustomerEditRepository {
   deactivateCustomer(id: number): Promise<void>
   linkPhone(input: LinkPhoneInput): Promise<void>
   unlinkPhone(input: UnlinkPhoneInput): Promise<void>
+  createPolicy(input: CreatePolicyInput): Promise<number>
   updatePolicy(input: UpdatePolicyInput): Promise<number>
   replaceCoverages(input: ReplaceCoveragesInput): Promise<number>
   listCatalogs(): Promise<Catalogs>
@@ -172,6 +194,51 @@ export function parseUnlinkPhone(customerId: number, phoneId: number): UnlinkPho
   return { customerId, phoneId }
 }
 
+// Alta de una póliza para un cliente que ya existe. Todos los campos del
+// contrato son obligatorios: sin ellos no hay póliza que guardar.
+export function parseCreatePolicy(customerId: number, value: unknown): CreatePolicyInput {
+  const body = parseBody(value, [
+    'number', 'companyId', 'ramo', 'status', 'currency',
+    'startDate', 'expirationDate', 'premiumCents', 'observations', 'insuredItem', 'coverages',
+  ])
+  const ramo = body.ramo
+  if (!isRamo(ramo)) throw validationError('ramo no está en el catálogo.')
+  const status = body.status
+  if (!isPolicyStatus(status)) throw validationError('status no está en el catálogo.')
+  const currency = body.currency
+  if (!isCurrency(currency)) throw validationError('currency no está en el catálogo.')
+  const startDate = parseDateOnly(body.startDate, 'startDate')
+  const expirationDate = parseDateOnly(body.expirationDate, 'expirationDate')
+  assertPolicyWindow(startDate, expirationDate)
+  const coverages = body.coverages === undefined ? [] : parseCoveragesList(body.coverages)
+  // En un alta las coberturas no existen todavía: un id en la lista sería un
+  // resto de la edición y se descarta en la validación, no en el repositorio.
+  if (coverages.some((coverage) => coverage.id !== undefined)) {
+    throw validationError('Las coberturas de una póliza nueva no pueden tener id.')
+  }
+  const input: CreatePolicyInput = {
+    customerId,
+    number: parseName(body.number, 'number', 50),
+    companyId: parseRecordId(body.companyId, 'companyId'),
+    ramo,
+    status,
+    currency,
+    startDate,
+    expirationDate,
+    coverages,
+  }
+  if (body.premiumCents !== undefined && body.premiumCents !== null) {
+    input.premiumCents = parseCents(body.premiumCents, 'premiumCents', maxPremiumCents)
+  }
+  if (body.observations !== undefined && body.observations !== null) {
+    input.observations = parseName(body.observations, 'observations', maxObservationsLength)
+  }
+  if (body.insuredItem !== undefined && body.insuredItem !== null) {
+    input.insuredItem = parseInsuredItem(body.insuredItem)
+  }
+  return input
+}
+
 export function parseUpdatePolicy(id: number, value: unknown): UpdatePolicyInput {
   const body = parseBody(value, [
     'number', 'companyId', 'ramo', 'status', 'currency',
@@ -223,17 +290,22 @@ export function parseUpdatePolicy(id: number, value: unknown): UpdatePolicyInput
 
 export function parseReplaceCoverages(policyId: number, value: unknown): ReplaceCoveragesInput {
   const body = parseBody(value, ['coverages'])
-  const coverages = body.coverages
-  if (!Array.isArray(coverages)) {
-    throw validationError('coverages debe ser una lista.')
-  }
-  if (coverages.length > maxCoverages) {
-    throw validationError(`Una póliza puede tener hasta ${maxCoverages} coberturas.`)
-  }
   return {
     policyId,
-    coverages: coverages.map((entry, index) => parseCoverage(entry, `coverages[${index}]`)),
+    coverages: parseCoveragesList(body.coverages),
   }
+}
+
+// El set completo de coberturas de una póliza: vacío si no tiene, hasta
+// maxCoverages si las tiene todas cargadas.
+function parseCoveragesList(value: unknown): CoverageInput[] {
+  if (!Array.isArray(value)) {
+    throw validationError('coverages debe ser una lista.')
+  }
+  if (value.length > maxCoverages) {
+    throw validationError(`Una póliza puede tener hasta ${maxCoverages} coberturas.`)
+  }
+  return value.map((entry, index) => parseCoverage(entry, `coverages[${index}]`))
 }
 
 // Comprueba que la vigencia cerrada tenga sentido. Se llama con las fechas

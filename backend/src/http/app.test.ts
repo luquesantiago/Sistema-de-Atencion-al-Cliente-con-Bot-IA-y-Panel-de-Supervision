@@ -6,6 +6,7 @@ import type { CustomerPolicy, CustomerRepository } from '../domain/customer.js'
 import type {
   Catalogs,
   CreateCustomerInput,
+  CreatePolicyInput,
   CustomerEditRepository,
   LinkPhoneInput,
   ReplaceCoveragesInput,
@@ -101,6 +102,7 @@ class FakeCustomerEditRepository implements CustomerEditRepository {
   public readonly deactivated: number[] = []
   public readonly linked: LinkPhoneInput[] = []
   public readonly unlinked: UnlinkPhoneInput[] = []
+  public readonly createdPolicies: CreatePolicyInput[] = []
   public readonly policyUpdates: UpdatePolicyInput[] = []
   public readonly coverageReplacements: ReplaceCoveragesInput[] = []
   // Devuelve el id 1 (Laura Gómez) para que la ficha se pueda recargar.
@@ -134,6 +136,16 @@ class FakeCustomerEditRepository implements CustomerEditRepository {
 
   public async unlinkPhone(input: UnlinkPhoneInput): Promise<void> {
     this.unlinked.push(input)
+  }
+
+  public async createPolicy(input: CreatePolicyInput): Promise<number> {
+    this.throwIfConflict()
+    // El repositorio real comprueba que el cliente exista y esté activo.
+    if (input.customerId !== this.resultCustomerId) {
+      throw new RequestManagementError(404, 'NOT_FOUND', 'No existe un cliente activo con ese identificador.')
+    }
+    this.createdPolicies.push(input)
+    return this.resultCustomerId
   }
 
   public async updatePolicy(input: UpdatePolicyInput): Promise<number> {
@@ -675,6 +687,134 @@ describe('endpoints de clientes', () => {
       policyId: 9,
       coverages: [{ planId: 2, description: 'Responsabilidad civil', insuredSumCents: 100_000_00 }],
     }])
+  })
+
+  it('da de alta una póliza en un cliente que todavía no tiene ninguna', async () => {
+    edits.resultCustomerId = 3
+    const response = await fetch(`${baseUrl}/api/clientes/3/polizas`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        number: 'POL-00999',
+        companyId: 5,
+        ramo: 'auto',
+        status: 'activa',
+        currency: 'ARS',
+        startDate: '2026-10-01',
+        expirationDate: '2027-10-01',
+        coverages: [{ planId: 2, description: null, insuredSumCents: null }],
+      }),
+    })
+
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toMatchObject({ id: '3' })
+    expect(edits.createdPolicies).toEqual([{
+      customerId: 3,
+      number: 'POL-00999',
+      companyId: 5,
+      ramo: 'auto',
+      status: 'activa',
+      currency: 'ARS',
+      startDate: '2026-10-01',
+      expirationDate: '2027-10-01',
+      coverages: [{ planId: 2, description: null, insuredSumCents: null }],
+    }])
+  })
+
+  it('no permite que el navegador meta campos de más en un alta de póliza', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/1/polizas`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        number: 'POL-00999',
+        companyId: 5,
+        ramo: 'auto',
+        status: 'activa',
+        currency: 'ARS',
+        startDate: '2026-10-01',
+        expirationDate: '2027-10-01',
+        actor: 'operador',
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(edits.createdPolicies).toEqual([])
+  })
+
+  it('rechaza un alta de póliza sin vigencia', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/1/polizas`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        number: 'POL-00999',
+        companyId: 5,
+        ramo: 'auto',
+        status: 'activa',
+        currency: 'ARS',
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(edits.createdPolicies).toEqual([])
+  })
+
+  it('reporta el conflicto de un número de póliza repetido en la compañía', async () => {
+    edits.conflict = true
+    const response = await fetch(`${baseUrl}/api/clientes/1/polizas`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        number: 'POL-00123',
+        companyId: 5,
+        ramo: 'auto',
+        status: 'activa',
+        currency: 'ARS',
+        startDate: '2026-10-01',
+        expirationDate: '2027-10-01',
+      }),
+    })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'CONFLICT' } })
+  })
+
+  it('responde 404 al dar de alta una póliza en un cliente que no existe', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/9999/polizas`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        number: 'POL-00999',
+        companyId: 5,
+        ramo: 'auto',
+        status: 'activa',
+        currency: 'ARS',
+        startDate: '2026-10-01',
+        expirationDate: '2027-10-01',
+      }),
+    })
+
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'NOT_FOUND' } })
+    expect(edits.createdPolicies).toEqual([])
+  })
+
+  it('rechaza un identificador de cliente que no sea válido', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/0/polizas`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        number: 'POL-00999',
+        companyId: 5,
+        ramo: 'auto',
+        status: 'activa',
+        currency: 'ARS',
+        startDate: '2026-10-01',
+        expirationDate: '2027-10-01',
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(edits.createdPolicies).toEqual([])
   })
 
   it('devuelve los catálogos para los formularios', async () => {

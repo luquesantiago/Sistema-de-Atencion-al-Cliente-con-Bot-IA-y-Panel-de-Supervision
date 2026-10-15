@@ -4,6 +4,7 @@ import {
   assertPolicyWindow,
   type Catalogs,
   type CreateCustomerInput,
+  type CreatePolicyInput,
   type CustomerEditRepository,
   type InsuredItemInput,
   type LinkPhoneInput,
@@ -107,6 +108,71 @@ export class PrismaCustomerEditRepository implements CustomerEditRepository {
           id_cliente_id_telefono: { id_cliente: input.customerId, id_telefono: input.phoneId },
         },
       })
+    }))
+  }
+
+  public async createPolicy(input: CreatePolicyInput): Promise<number> {
+    return this.guard(() => this.prisma.$transaction(async (transaction) => {
+      const customer = await transaction.cliente.findUnique({
+        where: { id_cliente: input.customerId },
+        select: { activo: true },
+      })
+      if (!customer || !customer.activo) {
+        throw notFound('No existe un cliente activo con ese identificador.')
+      }
+      const company = await transaction.compania_aseguradora.findUnique({
+        where: { id_compania: input.companyId },
+        select: { activo: true },
+      })
+      if (!company || !company.activo) {
+        throw validation('No existe una compañía aseguradora activa con ese identificador.')
+      }
+      for (const coverage of input.coverages) {
+        const plan = await transaction.plan.findUnique({
+          where: { id_plan: coverage.planId },
+          select: { activo: true },
+        })
+        if (!plan || !plan.activo) {
+          throw validation(`No existe un plan activo con el identificador ${coverage.planId}.`)
+        }
+      }
+      // Se resuelven antes de escribir: un ramo, estado o moneda que no está
+      // en el catálogo es un 400, no un fallo silencioso en la base.
+      const [ramo, status, currency] = await Promise.all([
+        ramoId(transaction, input.ramo),
+        policyStatusId(transaction, input.status),
+        currencyId(transaction, input.currency),
+      ])
+      const policy = await transaction.poliza.create({
+        data: {
+          numero_poliza: input.number,
+          cliente: { connect: { id_cliente: input.customerId } },
+          compania_aseguradora: { connect: { id_compania: input.companyId } },
+          ramo: { connect: { id_ramo: ramo } },
+          estado_poliza: { connect: { id_estado_poliza: status } },
+          moneda: { connect: { id_moneda: currency } },
+          fecha_inicio: dateFromOnly(input.startDate),
+          fecha_vencimiento: dateFromOnly(input.expirationDate),
+          prima_mensual: input.premiumCents === undefined || input.premiumCents === null
+            ? null
+            : centsToDecimal(input.premiumCents),
+          observaciones: input.observations ?? null,
+          ...(input.insuredItem === undefined || input.insuredItem === null
+            ? {}
+            : { bien_asegurado: { create: insuredItemData(input.insuredItem) } }),
+        },
+      })
+      for (const coverage of input.coverages) {
+        await transaction.cobertura.create({
+          data: {
+            id_poliza: policy.id_poliza,
+            id_plan: coverage.planId,
+            descripcion: coverage.description,
+            suma_asegurada: coverage.insuredSumCents === null ? null : centsToDecimal(coverage.insuredSumCents),
+          },
+        })
+      }
+      return input.customerId
     }))
   }
 
@@ -277,13 +343,9 @@ async function linkPhone(transaction: Transaction, customerId: number, phone: st
   })
 }
 
-// El bien asegurado se crea o se actualiza según si la póliza ya lo tiene.
-async function insuredItemWrite(
-  transaction: Transaction,
-  currentId: number | null,
-  item: InsuredItemInput,
-): Promise<Prisma.bien_aseguradoUpdateOneWithoutPolizaNestedInput> {
-  const data = {
+// Los datos del bien, iguales para crearlo y para editarlo.
+function insuredItemData(item: InsuredItemInput) {
+  return {
     descripcion: item.description,
     patente_matricula: item.plate,
     direccion: item.address,
@@ -292,6 +354,15 @@ async function insuredItemWrite(
     anio: item.year,
     activo: true,
   }
+}
+
+// El bien asegurado se crea o se actualiza según si la póliza ya lo tiene.
+async function insuredItemWrite(
+  transaction: Transaction,
+  currentId: number | null,
+  item: InsuredItemInput,
+): Promise<Prisma.bien_aseguradoUpdateOneWithoutPolizaNestedInput> {
+  const data = insuredItemData(item)
   if (currentId !== null) {
     return { update: { where: { id_bien: currentId }, data } }
   }

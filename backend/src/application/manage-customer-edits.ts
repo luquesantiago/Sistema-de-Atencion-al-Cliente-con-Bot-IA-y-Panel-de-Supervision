@@ -1,6 +1,7 @@
 import type { CustomerDetail, CustomerRepository } from '../domain/customer.js'
 import {
   parseCreateCustomer,
+  parseCreatePolicy,
   parseLinkPhone,
   parseReplaceCoverages,
   parseUpdateCustomer,
@@ -11,11 +12,12 @@ import {
 import { RequestManagementError } from '../domain/request-management.js'
 
 // Casos de uso de edición de cartera desde el panel (RF-CAR-01, RF-CAR-02,
-// RF-CAR-03). El cuerpo JSON pasa por los parsers del dominio, que validan y
-// normalizan; el repositorio aplica cada mutación en una transacción y acá se
-// recarga la ficha para devolverla actualizada. El DNI no se modifica nunca y
-// estos cambios no pasan por aprobación: los pedidos que llegan por WhatsApp
-// siguen el flujo de solicitud (RF-APR-01).
+// RF-CAR-03): alta, edición y baja de clientes, vínculos de teléfono, y alta
+// y edición de pólizas. El cuerpo JSON pasa por los parsers del dominio, que
+// validan y normalizan; el repositorio aplica cada mutación en una transacción
+// y acá se recarga la ficha para devolverla actualizada. El DNI no se modifica
+// nunca y estos cambios no pasan por aprobación: los pedidos que llegan por
+// WhatsApp siguen el flujo de solicitud (RF-APR-01).
 export class ManageCustomerEdits {
   public constructor(
     private readonly edits: CustomerEditRepository,
@@ -53,6 +55,13 @@ export class ManageCustomerEdits {
     const phoneId = parseId(phoneIdValue, 'teléfono')
     await this.edits.unlinkPhone({ customerId: id, phoneId })
     return this.detail(id)
+  }
+
+  public async createPolicy(customerIdValue: string, body: unknown): Promise<CustomerDetail> {
+    const customerId = parseId(customerIdValue, 'cliente')
+    const input = parseCreatePolicy(customerId, body)
+    await this.edits.createPolicy(input)
+    return this.detail(customerId)
   }
 
   public async updatePolicy(idValue: string, body: unknown): Promise<CustomerDetail> {

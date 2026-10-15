@@ -151,6 +151,23 @@ export type EntradaCobertura = {
   insuredSumCents: number | null
 }
 
+// Alta de una póliza de un cliente que ya existe: el contrato es obligatorio
+// completo y las coberturas vienen de una, aunque estén vacías.
+export type EntradaAltaPoliza = {
+  number: string
+  companyId: number
+  ramo: string
+  status: string
+  currency: string
+  /** Fechas sin hora, aaaa-mm-dd. */
+  startDate: string
+  expirationDate: string
+  premiumCents?: number | null
+  observations?: string | null
+  insuredItem?: DatoBienAsegurado | null
+  coverages: EntradaCobertura[]
+}
+
 /** Alta de un cliente desde el panel. Devuelve la ficha creada. */
 export async function crearCliente(entrada: EntradaAltaCliente): Promise<ClienteDetalle> {
   return enviar('/api/clientes', { method: 'POST', body: JSON.stringify(entrada) })
@@ -177,6 +194,14 @@ export async function vincularTelefono(id: string, phone: string): Promise<Clien
 /** Desvincula el teléfono solo de ese cliente: otros clientes pueden compartirlo. */
 export async function desvincularTelefono(id: string, phoneId: number): Promise<ClienteDetalle> {
   return enviar(`/api/clientes/${encodeURIComponent(id)}/telefonos/${phoneId}`, { method: 'DELETE' })
+}
+
+/** Da de alta una póliza del cliente con su bien y sus coberturas. Devuelve la ficha. */
+export async function crearPoliza(clienteId: string, entrada: EntradaAltaPoliza): Promise<ClienteDetalle> {
+  return enviar(`/api/clientes/${encodeURIComponent(clienteId)}/polizas`, {
+    method: 'POST',
+    body: JSON.stringify(entrada),
+  })
 }
 
 /** Edita datos de la póliza y su bien asegurado. Devuelve la ficha del dueño. */
