@@ -1082,6 +1082,358 @@
 
 /* Responsive: la navegación se reordena arriba, sin ocultar módulos */
 
+/* Bandeja de Atención: dos columnas como el mock (lista de casos y conversación). La gravedad
+   tiene cuatro niveles y siempre va con texto e ícono, no solo con color. */
+
+.chip__icono {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+/* Crítico: el único chip relleno, para que se distinga de «Alto» aun sin color */
+.chip--riesgo-fuerte {
+  border-color: var(--riesgo);
+  background: var(--riesgo);
+  color: #ffffff;
+}
+
+.chip--sin-nivel {
+  border-style: dashed;
+  color: var(--texto-tenue);
+}
+
+.bandeja {
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  height: 100svh;
+  min-height: 0;
+}
+
+.bandeja__lista {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--superficie);
+  border-right: 1px solid var(--borde);
+}
+
+.bandeja__lista-encabezado {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 18px 16px 12px;
+  border-bottom: 1px solid var(--borde);
+}
+
+.bandeja__titulo {
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.bandeja__resumen {
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.bandeja__estado {
+  padding: 16px;
+}
+
+.bandeja__casos {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.bandeja__paginas {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--borde);
+}
+
+.bandeja__aviso {
+  margin: 10px 16px 0;
+  padding: 8px 12px;
+  border: 1px solid #f0d4a4;
+  border-radius: var(--radio-chico);
+  background: var(--alerta-suave);
+  color: var(--alerta);
+  font-size: 0.83rem;
+  font-weight: 600;
+}
+
+.bandeja__sin-tomar {
+  font-weight: 700;
+  color: var(--texto);
+}
+
+.tarjeta-caso {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--borde);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tarjeta-caso:hover {
+  background: var(--superficie-alterna);
+}
+
+.tarjeta-caso:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--primario);
+}
+
+.tarjeta-caso[aria-current='true'] {
+  background: var(--primario-suave);
+  box-shadow: inset 3px 0 0 var(--primario);
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--borde);
+  color: var(--texto-suave);
+  font-weight: 650;
+}
+
+.avatar--sin-identificar {
+  background: var(--alerta-suave);
+  color: var(--alerta);
+}
+
+.tarjeta-caso__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.tarjeta-caso__fila {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tarjeta-caso__nombre {
+  overflow: hidden;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tarjeta-caso__hora {
+  flex: none;
+  color: var(--texto-tenue);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tarjeta-caso__vista {
+  overflow: hidden;
+  color: var(--texto-suave);
+  font-size: 0.83rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tarjeta-caso__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tarjeta-caso__pie {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 8px;
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.conversacion {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--fondo);
+}
+
+.conversacion__vacia {
+  margin: auto;
+  padding: 24px;
+  max-width: 420px;
+}
+
+.conversacion__encabezado {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borde);
+}
+
+.conversacion__datos {
+  flex: 1;
+  min-width: 0;
+}
+
+.conversacion__nombre {
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.conversacion__sub {
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.conversacion__volver {
+  display: none;
+}
+
+.conversacion__franja {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 10px 20px;
+  background: var(--superficie-alterna);
+  border-bottom: 1px solid var(--borde);
+  font-size: 0.83rem;
+}
+
+.conversacion__franja--riesgo {
+  background: var(--riesgo-suave);
+  border-bottom-color: #f2c2bd;
+}
+
+.conversacion__dato {
+  color: var(--texto-suave);
+}
+
+.conversacion__dato strong {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+.conversacion__estado {
+  padding: 16px 20px;
+}
+
+.hilo {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  margin: 0;
+  padding: 20px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.hilo__mensaje {
+  max-width: min(70%, 560px);
+  padding: 10px 12px;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  background: var(--superficie);
+  box-shadow: var(--sombra-tarjeta);
+  font-size: 0.88rem;
+}
+
+/* El cliente a la izquierda; el asistente y el operador a la derecha. El origen va escrito. */
+.hilo__mensaje--cliente {
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+
+.hilo__mensaje--asistente,
+.hilo__mensaje--operador {
+  align-self: flex-end;
+  border-color: var(--primario);
+  border-bottom-right-radius: 4px;
+  background: var(--primario);
+  color: #ffffff;
+}
+
+/* Los mensajes de otros casos de la misma conversación quedan atenuados y dicen de qué caso son */
+.hilo__mensaje--otro-caso {
+  opacity: 0.6;
+}
+
+.hilo__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin-top: 6px;
+  color: var(--texto-tenue);
+  font-size: 0.72rem;
+}
+
+.hilo__mensaje--asistente .hilo__meta,
+.hilo__mensaje--operador .hilo__meta {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.hilo__origen {
+  font-weight: 700;
+}
+
+.hilo__texto {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  /* Una columna por vez: la lista o la conversación elegida */
+  .bandeja {
+    grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+
+  .bandeja--con-caso .bandeja__lista,
+  .bandeja:not(.bandeja--con-caso) .conversacion {
+    display: none;
+  }
+
+  .bandeja__lista {
+    border-right: 0;
+  }
+
+  .conversacion__volver {
+    display: inline-flex;
+  }
+
+  .hilo__mensaje {
+    max-width: 88%;
+  }
+}
+
 @media (max-width: 900px) {
   .panel {
     grid-template-columns: minmax(0, 1fr);

@@ -1,5 +1,6 @@
 import express, { type ErrorRequestHandler, type NextFunction, type RequestHandler, type Response } from 'express'
 import { ManageCustomers } from '../application/manage-customers.js'
+import { ManageInbox } from '../application/manage-inbox.js'
 import { ManageRequests } from '../application/manage-requests.js'
 import type { ProcessIncomingMessage } from '../application/process-incoming-message.js'
 import {
@@ -20,6 +21,7 @@ export function createApp(
   whatsapp: WhatsAppWebhookOptions,
   manageRequests: ManageRequests,
   manageCustomers: ManageCustomers,
+  manageInbox: ManageInbox,
 ) {
   const app = express()
   const senders = new KeyedQueue()
@@ -147,6 +149,23 @@ export function createApp(
     try {
       const detail = await manageCustomers.findCustomerDetail(request.params.id)
       response.status(200).json(detail)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  // Bandeja de Atención, de solo lectura (RF-SUP-01, RF-SUP-02, RF-DER-02).
+  app.get('/api/bandeja', async (request, response, next) => {
+    try {
+      const page = parsePage(request.query.limit, request.query.offset)
+      const result = await manageInbox.listCases(page)
+      response.status(200).json({ items: result.items, total: result.total, ...page })
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.get('/api/bandeja/:idCaso', async (request, response, next) => {
+    try {
+      response.status(200).json(await manageInbox.findCase(request.params.idCaso))
     } catch (error) {
       handleRequestError(error, response, next)
     }

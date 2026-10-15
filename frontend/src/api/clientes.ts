@@ -8,9 +8,13 @@
  * campos ausentes llegan como `null` y no se inventan valores en su lugar.
  */
 
+
 // La lista muestra número y estado; la API también trae `ramo` (el tipo de
 // póliza, que la ficha presenta como «Cobertura») y `expirationDate`, con el
 // que se calcula si la póliza está vencida.
+
+import { leer } from './respuesta'
+
 export type DatoPolizaResumen = {
   number: string
   ramo: string
@@ -95,18 +99,4 @@ export async function listarClientes(consulta: ConsultaClientes): Promise<Pagina
 export async function obtenerCliente(id: string): Promise<ClienteDetalle> {
   const respuesta = await fetch(`/api/clientes/${encodeURIComponent(id)}`)
   return (await leer<ClienteDetalle>(respuesta)) as ClienteDetalle
-}
-
-async function leer<T>(respuesta: Response): Promise<T> {
-  if (!respuesta.ok) {
-    let mensaje = `El servidor respondió ${respuesta.status}.`
-    try {
-      const cuerpo = (await respuesta.json()) as { error?: { message?: string } }
-      if (cuerpo.error?.message) mensaje = cuerpo.error.message
-    } catch {
-      // Sin cuerpo JSON: se usa el mensaje genérico.
-    }
-    throw new Error(mensaje)
-  }
-  return (await respuesta.json()) as T
 }

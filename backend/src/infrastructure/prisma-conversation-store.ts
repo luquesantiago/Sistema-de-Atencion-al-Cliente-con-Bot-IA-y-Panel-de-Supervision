@@ -14,6 +14,7 @@ import {
   type Settings,
 } from '../domain/conversation.js'
 import { isIntent } from '../domain/intent.js'
+import type { RiskLevel } from '../domain/risk-level.js'
 
 // Error sin datos del cliente: el manejador de errores de app.ts lo vuelca al log, y un
 // error de Prisma puede traer los argumentos de la consulta (textos, DNI, teléfonos).
@@ -259,7 +260,11 @@ async function write(tx: Prisma.TransactionClient, changes: ConversationChanges)
   if (changes.handoff) {
     await tx.caso.update({
       where: { id_caso: caseId(changes.handoff.case) },
-      data: { fecha_derivacion: at, motivo_derivacion: changes.handoff.reason.slice(0, 255) },
+      data: {
+        fecha_derivacion: at,
+        motivo_derivacion: changes.handoff.reason.slice(0, 255),
+        id_nivel_riesgo: await catalogs.riskLevel(changes.handoff.riskLevel),
+      },
     })
     await tx.conversacion.update({ where: { id_conversacion: conversationId }, data: { asistente_suspendido: true } })
   }
@@ -277,7 +282,7 @@ async function write(tx: Prisma.TransactionClient, changes: ConversationChanges)
   }
 
   if (changes.phoneChangeRequest) {
-    const { case: ref, customerId } = changes.phoneChangeRequest
+    const { case: ref, customerId, riskLevel } = changes.phoneChangeRequest
     const phoneChange = await catalogs.phoneChangeAction()
     const pending = await catalogs.pendingRequest()
     const existing = await tx.solicitud_accion.findFirst({
@@ -289,6 +294,7 @@ async function write(tx: Prisma.TransactionClient, changes: ConversationChanges)
       select: { id_solicitud: true },
     })
     if (!existing) {
+      await tx.caso.update({ where: { id_caso: caseId(ref) }, data: { id_nivel_riesgo: await catalogs.riskLevel(riskLevel) } })
       await tx.solicitud_accion.create({
         data: {
           id_caso: caseId(ref),
@@ -325,6 +331,9 @@ async function catalogIds(tx: Prisma.TransactionClient) {
     pendingRequest: async () => required((await tx.estado_solicitud.findUnique({
       where: { nombre: 'pendiente' }, select: { id_estado_solicitud: true },
     }))?.id_estado_solicitud, 'estado de solicitud pendiente'),
+    riskLevel: async (name: RiskLevel) => required((await tx.nivel_riesgo.findUnique({
+      where: { nombre: name }, select: { id_nivel_riesgo: true },
+    }))?.id_nivel_riesgo, `nivel de riesgo ${name}`),
     phoneChangeAction: async () => required((await tx.tipo_accion.findUnique({
       where: { nombre: 'cambio de teléfono' }, select: { id_tipo_accion: true },
     }))?.id_tipo_accion, 'tipo de acción cambio de teléfono'),

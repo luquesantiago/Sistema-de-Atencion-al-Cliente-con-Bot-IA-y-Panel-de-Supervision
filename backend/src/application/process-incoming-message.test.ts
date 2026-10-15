@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgencyInfo } from '../domain/agency-info.js'
-import type { AiClient, ContextMessage, CustomerStatus, RewriteInput } from '../domain/ai-client.js'
+import type { AiClient, ContextMessage, CustomerStatus, IntentClassification, RewriteInput } from '../domain/ai-client.js'
 import type { Customer, CustomerPolicy } from '../domain/customer.js'
 import type { Intent } from '../domain/intent.js'
+import type { Urgency } from '../domain/risk-level.js'
 import {
   approvalNotice,
   clarificationRequest,
@@ -72,6 +73,7 @@ class FakeAi implements AiClient {
   public customerStatuses = new Map<string, CustomerStatus>()
   public customerStatusError: Error | null = null
   public intents = new Map<string, Intent>()
+  public urgencies = new Map<string, Urgency | null>()
   public classifyError: Error | null = null
   public rewriteResult: ((input: RewriteInput) => string) | Error = (input) => input.template
 
@@ -81,11 +83,12 @@ class FakeAi implements AiClient {
     return this.customerStatuses.get(reply) ?? 'UNRELATED'
   }
 
-  public async classifyIntent(text: string, context: readonly ContextMessage[]): Promise<Intent> {
+  public async classifyIntent(text: string, context: readonly ContextMessage[]): Promise<IntentClassification> {
     this.classified.push(text)
     this.contexts.push([...context])
     if (this.classifyError) throw this.classifyError
-    return this.decide?.(text, context) ?? this.intents.get(text) ?? 'otra consulta'
+    const intent = this.decide?.(text, context) ?? this.intents.get(text) ?? 'otra consulta'
+    return { intent, urgency: this.urgencies.get(text) ?? null }
   }
 
   public async rewrite(input: RewriteInput): Promise<string> {
@@ -542,7 +545,7 @@ describe('silencio (RF-DER-03)', () => {
     const openedAt = new Date('2026-09-01T12:00:00Z')
     store.seedConversation(
       { phone, customerId: null, suspended: true, startedAt: openedAt, endedAt: null },
-      [{ type: 'siniestro', openedAt, handedOffAt: openedAt, handoffReason: null, closedAt: null, unattendedAlert: false }],
+      [{ type: 'siniestro', openedAt, handedOffAt: openedAt, handoffReason: null, riskLevel: null, closedAt: null, unattendedAlert: false }],
     )
     await expect(send('¿novedades?')).resolves.toMatchObject({ status: 'SILENCED' })
     expect(whatsapp.sent).toEqual([])
@@ -1249,5 +1252,100 @@ describe('información de la agencia antes de identificarse (RF-ATE-06, RF-ATE-0
     const conversation = await openConversation()
     const derived = conversation.cases.find((item) => item.handedOff)
     expect(conversation.messages.at(-1)).toMatchObject({ text: '¿qué seguros tienen?', caseId: derived?.id })
+  })
+})
+
+describe('nivel de riesgo al derivar (RF-DER-01)', () => {
+  function derivedCase() {
+    return store.snapshot().cases.find((item) => item.handedOffAt !== null)
+  }
+
+  async function deriveIdentified(text: string, intent: Intent, urgency: Urgency | null = null) {
+    link(phone, ana)
+    ai.intents.set(text, intent)
+    ai.urgencies.set(text, urgency)
+    return send(text)
+  }
+
+  it.each<[string, Intent, string]>([
+    ['me cobraron de más', 'reclamo', 'alto'],
+    ['¿cuánto sale asegurar la moto?', 'cotización', 'medio'],
+    ['¿qué me cubre el seguro?', 'cobertura', 'medio'],
+    ['quiero pagar con tarjeta', 'otra consulta', 'bajo'],
+  ])('«%s» (%s) queda derivado con nivel %s', async (text, intent, level) => {
+    await expect(deriveIdentified(text, intent)).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
+    expect(derivedCase()?.riskLevel).toBe(level)
+    expect(lastText()).toBe(handoffMessage)
+  })
+
+  it('un siniestro grave queda crítico y el cliente recibe el mensaje de derivación de siempre', async () => {
+    await expect(deriveIdentified('choqué y hay un herido', 'siniestro', 'grave')).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
+    expect(derivedCase()?.riskLevel).toBe('crítico')
+    expect(lastText()).toBe(handoffMessage)
+  })
+
+  it.each<Urgency | null>(['normal', null])('un siniestro con urgencia %s queda en el piso: alto', async (urgency) => {
+    await expect(deriveIdentified('me rayaron el auto', 'siniestro', urgency)).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
+    expect(derivedCase()?.riskLevel).toBe('alto')
+  })
+
+  it('la urgencia grave en un reclamo no cambia ni el nivel ni la acción', async () => {
+    await expect(deriveIdentified('es urgente, me cobraron mal', 'reclamo', 'grave'))
+      .resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'intención: reclamo' })
+    expect(derivedCase()?.riskLevel).toBe('alto')
+  })
+
+  it('una baja queda pendiente de aprobación con nivel medio', async () => {
+    await expect(deriveIdentified('quiero dar de baja la póliza', 'baja')).resolves.toMatchObject({ status: 'APPROVAL_NOTICE_SENT' })
+    expect(derivedCase()?.riskLevel).toBe('medio')
+  })
+
+  it('el tercer mensaje seguido que no se entiende queda bajo', async () => {
+    link(phone, ana)
+    ai.intents.set('eso', 'no se entiende')
+    await send('eso')
+    await send('eso')
+    await expect(send('eso')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'no se entendió la consulta' })
+    expect(derivedCase()?.riskLevel).toBe('bajo')
+  })
+
+  it('una falla del proveedor al decidir queda baja', async () => {
+    link(phone, ana)
+    ai.classifyError = new Error('Groq no respondió')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla del proveedor al decidir' })
+    expect(derivedCase()?.riskLevel).toBe('bajo')
+  })
+
+  it('el cuarto DNI no reconocido queda medio', async () => {
+    ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
+    await send('Hola')
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await send('ya soy cliente')
+      await send(`3011122${attempt}`)
+    }
+    await send('ya soy cliente')
+    await expect(send('30111229')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'DNI no reconocido' })
+    expect(derivedCase()?.riskLevel).toBe('medio')
+  })
+
+  it('el alta de un cliente nuevo queda media', async () => {
+    ai.customerStatuses.set('Soy nuevo cliente', 'NEW_CUSTOMER')
+    await send('Hola')
+    await send('Soy nuevo cliente')
+    await send('Laura Inventada')
+    await send('99000010')
+    await expect(sendPhoto()).resolves.toMatchObject({ status: 'PROSPECT_HANDED_OFF' })
+    expect(derivedCase()).toMatchObject({ handoffReason: 'cliente nuevo', riskLevel: 'medio' })
+  })
+
+  it('la solicitud de cambio de teléfono queda baja, sin derivar', async () => {
+    ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
+    ai.intents.set('Hola', 'saludo')
+    await send('Hola')
+    await send('ya soy cliente')
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING' })
+    const requestCase = store.snapshot().cases.find((item) => item.type === 'cambio de teléfono')
+    expect(requestCase).toMatchObject({ riskLevel: 'bajo', handedOffAt: null })
+    expect((await openConversation()).suspended).toBe(false)
   })
 })
