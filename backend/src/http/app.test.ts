@@ -26,6 +26,8 @@ import {
 import type { WhatsAppClient } from '../domain/whatsapp-client.js'
 import { ManageCustomers } from '../application/manage-customers.js'
 import { ManageCustomerEdits } from '../application/manage-customer-edits.js'
+import { ManageInbox } from '../application/manage-inbox.js'
+import type { InboxConversation, InboxEntry, InboxPage, InboxRepository } from '../domain/inbox.js'
 import { ManageRequests } from '../application/manage-requests.js'
 import { ProcessIncomingMessage } from '../application/process-incoming-message.js'
 import { InMemoryAgencyInfoSource } from '../infrastructure/in-memory-agency-info.js'
@@ -38,10 +40,23 @@ class FakeAi implements AiClient {
     return 'UNRELATED'
   }
   public async classifyIntent(_text: string) {
-    return 'otra consulta' as const
+    return { intent: 'otra consulta' as const, urgency: null }
   }
   public async rewrite(_input: RewriteInput): Promise<string> {
     return ''
+  }
+}
+
+// Bandeja en memoria: la página es la que pide la prueba, ya ordenada. Datos ficticios.
+class FakeInbox implements InboxRepository {
+  public constructor(public entries: InboxEntry[] = [], public conversation: InboxConversation | null = null) {}
+
+  public async listPage(page: PageRequest): Promise<InboxPage> {
+    return { entries: this.entries.slice(page.offset, page.offset + page.limit), total: this.entries.length }
+  }
+
+  public async findConversation(caseId: number): Promise<InboxConversation | null> {
+    return this.conversation?.entry.caseId === caseId ? this.conversation : null
   }
 }
 
@@ -187,6 +202,7 @@ describe('endpoints de trámites', () => {
       new ManageRequests(repository, whatsapp),
       new ManageCustomers(customers),
       new ManageCustomerEdits(new FakeCustomerEditRepository(), customers),
+      new ManageInbox(new FakeInbox()),
     )
     server = app.listen(0)
     await once(server, 'listening')
@@ -381,6 +397,7 @@ describe('endpoints de clientes', () => {
       new ManageRequests(new FakeRequestRepository(), whatsapp),
       new ManageCustomers(customers),
       new ManageCustomerEdits(edits, customers),
+      new ManageInbox(new FakeInbox()),
     )
     server = app.listen(0)
     await once(server, 'listening')
@@ -835,5 +852,98 @@ describe('endpoints de clientes', () => {
       companies: [{ id: 5, name: 'Seguros Castaño' }],
       plans: [{ id: 2, name: 'Básico' }],
     })
+  })
+})
+
+describe('Bandeja de Atención', () => {
+  let server: ReturnType<ReturnType<typeof createApp>['listen']>
+  let baseUrl: string
+
+  const reclamo: InboxEntry = {
+    caseId: 12,
+    conversationId: 4,
+    severity: 'alto',
+    customer: { id: 7, name: 'Ana Prueba', document: '99000001' },
+    phone: '5491100000001',
+    queryType: 'reclamo',
+    handoffReason: 'intención: reclamo',
+    handedOffAt: new Date('2026-10-15T13:00:00.000Z'),
+    takenAt: null,
+    assignee: null,
+    hasPendingProspect: false,
+    pendingPhoneChangeAt: null,
+    lastMessage: { text: 'me cobraron de más', origin: 'cliente', at: new Date('2026-10-15T13:00:00.000Z') },
+  }
+
+  beforeEach(async () => {
+    const customers: CustomerRepository = new InMemoryCustomerRepository([])
+    const whatsapp = new FakeWhatsApp()
+    const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, hours: [] })
+    const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), agency, new FakeAi(), whatsapp)
+    const inbox = new FakeInbox([reclamo, { ...reclamo, caseId: 13, severity: null }], {
+      entry: reclamo,
+      messages: [{ id: 1, caseId: 12, origin: 'cliente', text: 'me cobraron de más', at: new Date('2026-10-15T13:00:00.000Z') }],
+    })
+    const app = createApp(
+      assistant,
+      { secret: 'test', findPhoneByLid: async () => null },
+      new ManageRequests(new FakeRequestRepository(), whatsapp),
+      new ManageCustomers(customers),
+      new ManageCustomerEdits(new FakeCustomerEditRepository(), customers),
+      new ManageInbox(inbox),
+    )
+    server = app.listen(0)
+    await once(server, 'listening')
+    const address = server.address() as AddressInfo
+    baseUrl = `http://127.0.0.1:${address.port}`
+  })
+
+  afterEach(async () => {
+    server.close()
+    await once(server, 'close')
+  })
+
+  it('lista los casos con total y paginación, con las fechas en ISO UTC', async () => {
+    const response = await fetch(`${baseUrl}/api/bandeja?limit=1&offset=0`)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      items: [{
+        caseId: 12,
+        severity: 'alto',
+        label: null,
+        customer: { id: 7, name: 'Ana Prueba', document: '99000001' },
+        phone: '5491100000001',
+        queryType: 'reclamo',
+        handoffReason: 'intención: reclamo',
+        lastMessage: { text: 'me cobraron de más', origin: 'cliente', at: '2026-10-15T13:00:00.000Z' },
+        assignee: null,
+        takenAt: null,
+        waitingSince: '2026-10-15T13:00:00.000Z',
+      }],
+      total: 2,
+      limit: 1,
+      offset: 0,
+    })
+  })
+
+  it('devuelve el detalle con la conversación', async () => {
+    const response = await fetch(`${baseUrl}/api/bandeja/12`)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      case: { caseId: 12, severity: 'alto' },
+      messages: [{ id: 1, origin: 'cliente', inCase: true, at: '2026-10-15T13:00:00.000Z' }],
+    })
+  })
+
+  it.each(['/api/bandeja?limit=0', '/api/bandeja?offset=-1', '/api/bandeja/abc'])('%s da 400', async (path) => {
+    const response = await fetch(`${baseUrl}${path}`)
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_ERROR' } })
+  })
+
+  it('un caso que no está en la bandeja da 404', async () => {
+    const response = await fetch(`${baseUrl}/api/bandeja/99`)
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'NOT_FOUND' } })
   })
 })
