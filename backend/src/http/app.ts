@@ -1,5 +1,6 @@
 import express, { type ErrorRequestHandler, type NextFunction, type RequestHandler, type Response } from 'express'
 import { ManageCustomers } from '../application/manage-customers.js'
+import { ManageCustomerEdits } from '../application/manage-customer-edits.js'
 import { ManageRequests } from '../application/manage-requests.js'
 import type { ProcessIncomingMessage } from '../application/process-incoming-message.js'
 import {
@@ -20,6 +21,7 @@ export function createApp(
   whatsapp: WhatsAppWebhookOptions,
   manageRequests: ManageRequests,
   manageCustomers: ManageCustomers,
+  manageCustomerEdits: ManageCustomerEdits,
 ) {
   const app = express()
   const senders = new KeyedQueue()
@@ -146,6 +148,73 @@ export function createApp(
   app.get('/api/clientes/:id', async (request, response, next) => {
     try {
       const detail = await manageCustomers.findCustomerDetail(request.params.id)
+      response.status(200).json(detail)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  // Catálogos para los formularios de edición del panel: ramos, estados de
+  // póliza, monedas, compañías y planes.
+  app.get('/api/catalogos', async (_request, response, next) => {
+    try {
+      response.status(200).json(await manageCustomerEdits.listCatalogs())
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  // Ediciones de cartera desde el panel (RF-CAR-01, RF-CAR-02, RF-CAR-03).
+  // Cada respuesta devuelve la ficha actualizada del cliente.
+  app.post('/api/clientes', async (request, response, next) => {
+    try {
+      const detail = await manageCustomerEdits.createCustomer(request.body)
+      response.status(201).json(detail)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.patch('/api/clientes/:id', async (request, response, next) => {
+    try {
+      const detail = await manageCustomerEdits.updateCustomer(request.params.id, request.body)
+      response.status(200).json(detail)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.delete('/api/clientes/:id', async (request, response, next) => {
+    try {
+      const result = await manageCustomerEdits.deactivateCustomer(request.params.id)
+      response.status(200).json(result)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.post('/api/clientes/:id/telefonos', async (request, response, next) => {
+    try {
+      const detail = await manageCustomerEdits.linkPhone(request.params.id, request.body)
+      response.status(200).json(detail)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.delete('/api/clientes/:id/telefonos/:telefonoId', async (request, response, next) => {
+    try {
+      const detail = await manageCustomerEdits.unlinkPhone(request.params.id, request.params.telefonoId)
+      response.status(200).json(detail)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.patch('/api/polizas/:id', async (request, response, next) => {
+    try {
+      const detail = await manageCustomerEdits.updatePolicy(request.params.id, request.body)
+      response.status(200).json(detail)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.put('/api/polizas/:id/coberturas', async (request, response, next) => {
+    try {
+      const detail = await manageCustomerEdits.replaceCoverages(request.params.id, request.body)
       response.status(200).json(detail)
     } catch (error) {
       handleRequestError(error, response, next)

@@ -4,15 +4,27 @@ import type { AddressInfo } from 'node:net'
 import type { AiClient, CustomerStatus, RewriteInput } from '../domain/ai-client.js'
 import type { CustomerPolicy, CustomerRepository } from '../domain/customer.js'
 import type {
-  PageRequest,
-  PendingPhoneChange,
-  PendingProspect,
-  PhoneChangeDecisionInput,
-  ProspectDecisionInput,
-  RequestManagementRepository,
+  Catalogs,
+  CreateCustomerInput,
+  CustomerEditRepository,
+  LinkPhoneInput,
+  ReplaceCoveragesInput,
+  UnlinkPhoneInput,
+  UpdateCustomerInput,
+  UpdatePolicyInput,
+} from '../domain/customer-edits.js'
+import {
+  RequestManagementError,
+  type PageRequest,
+  type PendingPhoneChange,
+  type PendingProspect,
+  type PhoneChangeDecisionInput,
+  type ProspectDecisionInput,
+  type RequestManagementRepository,
 } from '../domain/request-management.js'
 import type { WhatsAppClient } from '../domain/whatsapp-client.js'
 import { ManageCustomers } from '../application/manage-customers.js'
+import { ManageCustomerEdits } from '../application/manage-customer-edits.js'
 import { ManageRequests } from '../application/manage-requests.js'
 import { ProcessIncomingMessage } from '../application/process-incoming-message.js'
 import { InMemoryAgencyInfoSource } from '../infrastructure/in-memory-agency-info.js'
@@ -81,6 +93,70 @@ class FakeRequestRepository implements RequestManagementRepository {
   }
 }
 
+// Doble de prueba de las ediciones de cartera: registra cada entrada y
+// devuelve el id del cliente que el caso de uso debe recargar.
+class FakeCustomerEditRepository implements CustomerEditRepository {
+  public readonly created: CreateCustomerInput[] = []
+  public readonly updated: UpdateCustomerInput[] = []
+  public readonly deactivated: number[] = []
+  public readonly linked: LinkPhoneInput[] = []
+  public readonly unlinked: UnlinkPhoneInput[] = []
+  public readonly policyUpdates: UpdatePolicyInput[] = []
+  public readonly coverageReplacements: ReplaceCoveragesInput[] = []
+  // Devuelve el id 1 (Laura Gómez) para que la ficha se pueda recargar.
+  public resultCustomerId = 1
+  public conflict = false
+  public catalogs: Catalogs = {
+    ramoNames: ['auto', 'hogar'],
+    policyStatusNames: ['activa', 'dada de baja'],
+    currencies: [{ code: 'ARS', name: 'Peso argentino' }],
+    companies: [{ id: 5, name: 'Seguros Castaño' }],
+    plans: [{ id: 2, name: 'Básico' }],
+  }
+
+  public async createCustomer(input: CreateCustomerInput): Promise<number> {
+    this.created.push(input)
+    return this.resultCustomerId
+  }
+
+  public async updateCustomer(input: UpdateCustomerInput): Promise<void> {
+    this.throwIfConflict()
+    this.updated.push(input)
+  }
+
+  public async deactivateCustomer(id: number): Promise<void> {
+    this.deactivated.push(id)
+  }
+
+  public async linkPhone(input: LinkPhoneInput): Promise<void> {
+    this.linked.push(input)
+  }
+
+  public async unlinkPhone(input: UnlinkPhoneInput): Promise<void> {
+    this.unlinked.push(input)
+  }
+
+  public async updatePolicy(input: UpdatePolicyInput): Promise<number> {
+    this.policyUpdates.push(input)
+    return this.resultCustomerId
+  }
+
+  public async replaceCoverages(input: ReplaceCoveragesInput): Promise<number> {
+    this.coverageReplacements.push(input)
+    return this.resultCustomerId
+  }
+
+  public async listCatalogs(): Promise<Catalogs> {
+    return this.catalogs
+  }
+
+  private throwIfConflict(): void {
+    if (this.conflict) {
+      throw new RequestManagementError(409, 'CONFLICT', 'Ya existe un registro con esos datos únicos.')
+    }
+  }
+}
+
 describe('endpoints de trámites', () => {
   let repository: FakeRequestRepository
   let whatsapp: FakeWhatsApp
@@ -98,6 +174,7 @@ describe('endpoints de trámites', () => {
       { secret: 'test', findPhoneByLid: async () => null },
       new ManageRequests(repository, whatsapp),
       new ManageCustomers(customers),
+      new ManageCustomerEdits(new FakeCustomerEditRepository(), customers),
     )
     server = app.listen(0)
     await once(server, 'listening')
@@ -253,6 +330,7 @@ describe('endpoints de trámites', () => {
 
 describe('endpoints de clientes', () => {
   let customers: InMemoryCustomerRepository
+  let edits: FakeCustomerEditRepository
   let server: ReturnType<ReturnType<typeof createApp>['listen']>
   let baseUrl: string
 
@@ -281,6 +359,7 @@ describe('endpoints de clientes', () => {
     customers.addPhoneLink(1, 17, '5491155551001')
     customers.addPhoneLink(2, 17, '5491155551001')
 
+    edits = new FakeCustomerEditRepository()
     const whatsapp = new FakeWhatsApp()
     const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, hours: [] })
     const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), agency, new FakeAi(), whatsapp)
@@ -289,6 +368,7 @@ describe('endpoints de clientes', () => {
       { secret: 'test', findPhoneByLid: async () => null },
       new ManageRequests(new FakeRequestRepository(), whatsapp),
       new ManageCustomers(customers),
+      new ManageCustomerEdits(edits, customers),
     )
     server = app.listen(0)
     await once(server, 'listening')
@@ -410,12 +490,18 @@ describe('endpoints de clientes', () => {
       phones: [{ id: 17, number: '5491155551001' }],
       policies: [
         {
+          id: '1',
           number: 'POL-00123',
           ramo: 'auto',
           status: 'activa',
+          currency: 'ARS',
+          company: null,
           startDate: null,
           expirationDate: '2026-06-20',
+          premiumCents: null,
+          observations: null,
           insuredItem: null,
+          coverages: [],
         },
       ],
     })
@@ -441,5 +527,166 @@ describe('endpoints de clientes', () => {
 
     expect(response.status).toBe(404)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'NOT_FOUND' } })
+  })
+
+  it('crea un cliente persona con los datos normalizados y devuelve su ficha', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        kind: 'persona',
+        dni: '30.111.222',
+        lastName: 'Gómez',
+        firstName: 'Ana',
+        phone: '+54 9 11 5555-1234',
+      }),
+    })
+
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toMatchObject({ id: '1', dni: '30111222' })
+    expect(edits.created).toEqual([{
+      kind: 'persona',
+      dni: '30111222',
+      lastName: 'Gómez',
+      firstName: 'Ana',
+      phone: '5491155551234',
+    }])
+  })
+
+  it('no permite que el navegador meta campos de más en un alta', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        kind: 'persona',
+        dni: '30111222',
+        lastName: 'Gómez',
+        firstName: 'Ana',
+        actor: 'admin',
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(edits.created).toEqual([])
+  })
+
+  it('edita el nombre de una persona sin tocar el DNI', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/1`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lastName: 'Gómez', firstName: 'Ana María' }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ id: '1' })
+    expect(edits.updated).toEqual([{
+      id: 1,
+      changes: { kind: 'persona', lastName: 'Gómez', firstName: 'Ana María' },
+    }])
+  })
+
+  it('rechaza una edición que quiera cambiar el DNI', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/1`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ dni: '30999888' }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(edits.updated).toEqual([])
+  })
+
+  it('rechaza un identificador de cliente que no sea válido', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/0`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lastName: 'Gómez', firstName: 'Ana' }),
+    })
+
+    expect(response.status).toBe(400)
+    expect(edits.updated).toEqual([])
+  })
+
+  it('reporta el conflicto de un dato único repetido', async () => {
+    edits.conflict = true
+    const response = await fetch(`${baseUrl}/api/clientes/1`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lastName: 'Gómez', firstName: 'Ana' }),
+    })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'CONFLICT' } })
+  })
+
+  it('da de baja un cliente y responde con su identificador', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/1`, { method: 'DELETE' })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ id: '1' })
+    expect(edits.deactivated).toEqual([1])
+  })
+
+  it('vincula un teléfono al cliente', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/1/telefonos`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone: '(011) 5555-9876' }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(edits.linked).toEqual([{ customerId: 1, phone: '01155559876' }])
+  })
+
+  it('desvincula solo el teléfono indicado del cliente', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/1/telefonos/17`, { method: 'DELETE' })
+
+    expect(response.status).toBe(200)
+    expect(edits.unlinked).toEqual([{ customerId: 1, phoneId: 17 }])
+  })
+
+  it('edita una póliza y devuelve la ficha del dueño', async () => {
+    const response = await fetch(`${baseUrl}/api/polizas/9`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'dada de baja', expirationDate: '2027-06-20' }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ id: '1' })
+    expect(edits.policyUpdates).toEqual([{
+      id: 9,
+      status: 'dada de baja',
+      expirationDate: '2027-06-20',
+    }])
+  })
+
+  it('reemplaza las coberturas de una póliza', async () => {
+    const response = await fetch(`${baseUrl}/api/polizas/9/coberturas`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        coverages: [{ planId: 2, description: 'Responsabilidad civil', insuredSumCents: 100_000_00 }],
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(edits.coverageReplacements).toEqual([{
+      policyId: 9,
+      coverages: [{ planId: 2, description: 'Responsabilidad civil', insuredSumCents: 100_000_00 }],
+    }])
+  })
+
+  it('devuelve los catálogos para los formularios', async () => {
+    const response = await fetch(`${baseUrl}/api/catalogos`)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      ramoNames: ['auto', 'hogar'],
+      policyStatusNames: ['activa', 'dada de baja'],
+      currencies: [{ code: 'ARS', name: 'Peso argentino' }],
+      companies: [{ id: 5, name: 'Seguros Castaño' }],
+      plans: [{ id: 2, name: 'Básico' }],
+    })
   })
 })

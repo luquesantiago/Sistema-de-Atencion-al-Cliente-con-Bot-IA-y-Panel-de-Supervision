@@ -74,15 +74,23 @@ export class InMemoryCustomerRepository implements CustomerRepository {
       firstName: customer.firstName,
       lastName: customer.lastName,
       phones: this.phonesOf(customer.id),
-      // Las fixtures no traen vigencia ni bien asegurado: la ficha lo dice
-      // con null en lugar de inventar datos (el API real sí los tiene).
-      policies: customer.policies.map((policy) => ({
+      // Las fixtures no traen vigencia, compañía, prima, bien asegurado ni
+      // coberturas: la ficha lo dice con null o lista vacía en lugar de
+      // inventar datos (el API real sí los tiene). El id de póliza tampoco
+      // viene de las fixtures: se usa el índice, que sirve para las pruebas.
+      policies: customer.policies.map((policy, index) => ({
+        id: String(index + 1),
         number: policy.number,
         ramo: policy.ramo,
         status: policy.status,
+        currency: policy.currency,
+        company: null,
         startDate: null,
         expirationDate: policy.expirationDate,
+        premiumCents: null,
+        observations: null,
         insuredItem: null,
+        coverages: [],
       })),
     }
   }

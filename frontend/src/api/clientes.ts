@@ -30,16 +30,36 @@ export type DatoBienAsegurado = {
   year: number | null
 }
 
+// Cobertura activa de la póliza, como la muestra la ficha para poder
+// editarla. Los importes van en centavos enteros.
+export type DatoCobertura = {
+  id: number
+  planId: number
+  planName: string
+  description: string | null
+  insuredSumCents: number | null
+}
+
 export type DatoPoliza = {
+  /** Id numérico de la póliza, el que usan las ediciones del panel. */
+  id: string
   number: string
   /** El tipo de póliza: el panel lo muestra como «Cobertura». */
   ramo: string
   status: string
+  /** Código de moneda, por ejemplo ARS. */
+  currency: string
+  /** Compañía dueña del registro; puede faltar en los datos de prueba. */
+  company: { id: string; name: string } | null
   /** Inicio de la vigencia, aaaa-mm-dd. Puede ser null. */
   startDate: string | null
   /** Fecha sin hora, aaaa-mm-dd. */
   expirationDate: string
+  /** Prima mensual en centavos; null si no está cargada. */
+  premiumCents: number | null
+  observations: string | null
   insuredItem: DatoBienAsegurado | null
+  coverages: DatoCobertura[]
 }
 
 export type ClienteLista = {
@@ -95,6 +115,89 @@ export async function listarClientes(consulta: ConsultaClientes): Promise<Pagina
 export async function obtenerCliente(id: string): Promise<ClienteDetalle> {
   const respuesta = await fetch(`/api/clientes/${encodeURIComponent(id)}`)
   return (await leer<ClienteDetalle>(respuesta)) as ClienteDetalle
+}
+
+// Entradas de las ediciones del panel: el backend las valida y normaliza.
+// El DNI no se puede modificar nunca: es el identificador del cliente.
+
+export type EntradaAltaCliente =
+  | { kind: 'persona'; dni: string; lastName: string; firstName: string; phone?: string }
+  | { kind: 'empresa'; cuit: string; razonSocial: string; phone?: string }
+
+export type EntradaEdicionCliente =
+  | { lastName: string; firstName: string }
+  | { cuit: string; razonSocial: string }
+
+export type EntradaEdicionPoliza = {
+  number?: string
+  companyId?: number
+  ramo?: string
+  status?: string
+  currency?: string
+  /** Fechas sin hora, aaaa-mm-dd. */
+  startDate?: string
+  expirationDate?: string
+  /** Prima en centavos; null la borra. */
+  premiumCents?: number | null
+  observations?: string | null
+  /** null desconecta el bien; objeto lo crea o lo actualiza. */
+  insuredItem?: DatoBienAsegurado | null
+}
+
+export type EntradaCobertura = {
+  id?: number
+  planId: number
+  description: string | null
+  insuredSumCents: number | null
+}
+
+/** Alta de un cliente desde el panel. Devuelve la ficha creada. */
+export async function crearCliente(entrada: EntradaAltaCliente): Promise<ClienteDetalle> {
+  return enviar('/api/clientes', { method: 'POST', body: JSON.stringify(entrada) })
+}
+
+/** Edita el nombre y apellido de una persona, o el CUIT y la razón social de una empresa. */
+export async function editarCliente(id: string, entrada: EntradaEdicionCliente): Promise<ClienteDetalle> {
+  return enviar(`/api/clientes/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(entrada) })
+}
+
+/** Baja lógica: el cliente deja de aparecer en la cartera. */
+export async function darDeBajaCliente(id: string): Promise<{ id: string }> {
+  return enviar(`/api/clientes/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+/** Vincula un teléfono al cliente; el número se guarda normalizado. */
+export async function vincularTelefono(id: string, phone: string): Promise<ClienteDetalle> {
+  return enviar(`/api/clientes/${encodeURIComponent(id)}/telefonos`, {
+    method: 'POST',
+    body: JSON.stringify({ phone }),
+  })
+}
+
+/** Desvincula el teléfono solo de ese cliente: otros clientes pueden compartirlo. */
+export async function desvincularTelefono(id: string, phoneId: number): Promise<ClienteDetalle> {
+  return enviar(`/api/clientes/${encodeURIComponent(id)}/telefonos/${phoneId}`, { method: 'DELETE' })
+}
+
+/** Edita datos de la póliza y su bien asegurado. Devuelve la ficha del dueño. */
+export async function editarPoliza(id: string, entrada: EntradaEdicionPoliza): Promise<ClienteDetalle> {
+  return enviar(`/api/polizas/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(entrada) })
+}
+
+/** Reemplaza el set de coberturas: las quitadas quedan dadas de baja. */
+export async function reemplazarCoberturas(id: string, coverages: EntradaCobertura[]): Promise<ClienteDetalle> {
+  return enviar(`/api/polizas/${encodeURIComponent(id)}/coberturas`, {
+    method: 'PUT',
+    body: JSON.stringify({ coverages }),
+  })
+}
+
+async function enviar<T>(path: string, init: RequestInit): Promise<T> {
+  const respuesta = await fetch(path, {
+    ...init,
+    headers: { 'content-type': 'application/json', ...init.headers },
+  })
+  return (await leer<T>(respuesta)) as T
 }
 
 async function leer<T>(respuesta: Response): Promise<T> {

@@ -72,7 +72,7 @@ La identidad fija de prueba debe reemplazarse por autenticación y autorización
 
 ## Cartera de clientes
 
-Endpoints de solo lectura para la pantalla Base de Clientes del panel (RF-CAR-01, RF-CAR-02 y RF-CAR-03). La cartera se identifica por DNI; el teléfono no identifica y un número compartido puede devolver más de un cliente. No hay altas, bajas ni modificaciones por estos endpoints: la cartera se carga con la migración.
+Endpoints de solo lectura y de edición para la pantalla Base de Clientes del panel (RF-CAR-01, RF-CAR-02 y RF-CAR-03). La cartera se identifica por DNI; el teléfono no identifica y un número compartido puede devolver más de un cliente. El panel permite alta y baja lógica de clientes, edición de la identidad, vínculos de teléfono y edición de pólizas (bien asegurado y coberturas). Son ediciones directas del operador o del administrador, sin solicitud ni aprobación (la regla 8 solo cubre los pedidos que llegan por WhatsApp desde el asistente) y sin motivo ni auditoría: la auditoría de estas ediciones queda para el MVP 2 (tabla `auditoria`). La cartera histórica se carga con la migración.
 
 ### Listar clientes
 
