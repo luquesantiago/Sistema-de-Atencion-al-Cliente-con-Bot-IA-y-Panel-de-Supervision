@@ -91,6 +91,9 @@ services:
       WAHA_SESSION_CONFIG_IGNORE_CHANNELS: "true"
       WAHA_SESSION_CONFIG_IGNORE_BROADCAST: "true"
       WAHA_EVENTS_DOWNLOAD_MEDIA: "false"
+      # El panel pide las imágenes al momento (downloadMedia) y WAHA las deja en su /tmp:
+      # que se borren a los 30 segundos, así no queda una copia (RF-ATE-05).
+      WHATSAPP_FILES_LIFETIME: "30"
 
 volumes:
   db_data:

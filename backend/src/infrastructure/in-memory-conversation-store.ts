@@ -35,7 +35,7 @@ export type StoredCase = {
   unattendedAlert: boolean
 }
 
-export type StoredMessage = { id: number; caseId: number; origin: MessageOrigin; text: string; sentAt: Date }
+export type StoredMessage = { id: number; caseId: number; origin: MessageOrigin; text: string; sentAt: Date; imageRef?: string }
 export type StoredReply = { id: number; queryMessageId: number; sentMessageId: number | null; text: string; at: Date }
 export type StoredProspect = { id: number; caseId: number; name: string; dni: string; status: 'pendiente' | 'confirmado' | 'descartado' }
 export type StoredPhoneChange = {
@@ -210,7 +210,14 @@ function apply(state: ConversationState, changes: ConversationChanges): SavedCon
     if (target.type === null) target.type = type
   }
 
-  const incoming: StoredMessage = { id: newId(), caseId: caseOf(changes.incoming.case).id, origin: 'cliente', text: changes.incoming.text, sentAt: at }
+  const incoming: StoredMessage = {
+    id: newId(),
+    caseId: caseOf(changes.incoming.case).id,
+    origin: 'cliente',
+    text: changes.incoming.text,
+    sentAt: at,
+    ...(changes.incoming.imageRef ? { imageRef: changes.incoming.imageRef } : {}),
+  }
   state.messages.push(incoming)
   const queryId = (ref: QueryRef) => (ref === 'incoming' ? incoming.id : ref.existing)
 

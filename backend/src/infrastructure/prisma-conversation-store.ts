@@ -232,6 +232,7 @@ async function write(tx: Prisma.TransactionClient, changes: ConversationChanges)
       id_origen_mensaje: catalogs.origin('cliente'),
       contenido: changes.incoming.text,
       fecha_hora: at,
+      id_imagen_whatsapp: changes.incoming.imageRef ?? null,
     },
     select: { id_mensaje: true },
   })

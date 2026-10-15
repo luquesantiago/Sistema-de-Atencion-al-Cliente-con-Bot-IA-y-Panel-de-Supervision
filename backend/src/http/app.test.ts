@@ -68,6 +68,10 @@ class FakeWhatsApp implements WhatsAppClient {
     if (this.fail) throw new Error('WAHA unavailable')
     this.sent.push({ to, text })
   }
+
+  public async downloadImage(): Promise<null> {
+    return null
+  }
 }
 
 class FakeRequestRepository implements RequestManagementRepository {

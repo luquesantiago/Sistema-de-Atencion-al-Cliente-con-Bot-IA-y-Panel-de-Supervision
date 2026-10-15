@@ -78,7 +78,9 @@ export type ConversationChanges = {
   customerId?: number
   newCases: Array<{ type: QueryType | null }>
   caseTypes: Array<{ case: CaseRef; type: QueryType }>
-  incoming: { case: CaseRef; text: string }
+  // imageRef: el id del mensaje de WhatsApp de una imagen que el flujo procesa, para verla
+  // desde el panel sin guardarla (change bandeja-atender-casos, decisión 7).
+  incoming: { case: CaseRef; text: string; imageRef?: string }
   // Redacción que rechazó el control: queda como respuesta no enviada.
   rejectedDraft?: { text: string; answers: QueryRef }
   // Se envían en este orden.
