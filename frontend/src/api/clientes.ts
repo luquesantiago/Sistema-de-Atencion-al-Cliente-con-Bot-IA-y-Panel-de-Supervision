@@ -9,11 +9,14 @@
  */
 
 // La lista muestra número y estado; la API también trae `ramo` (el tipo de
-// póliza), que la ficha presenta como «Cobertura».
+// póliza, que la ficha presenta como «Cobertura») y `expirationDate`, con el
+// que se calcula si la póliza está vencida.
 export type DatoPolizaResumen = {
   number: string
   ramo: string
   status: string
+  /** Fecha sin hora, aaaa-mm-dd. */
+  expirationDate: string
 }
 
 // El bien que asegura la póliza: patente para autos y motos, dirección para

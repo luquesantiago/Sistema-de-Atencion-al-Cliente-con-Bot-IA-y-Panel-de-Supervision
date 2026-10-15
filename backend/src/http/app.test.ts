@@ -320,7 +320,7 @@ describe('endpoints de clientes', () => {
           firstName: 'Laura',
           lastName: 'Gómez',
           phones: ['5491155551001'],
-          policies: [{ number: 'POL-00123', ramo: 'auto', status: 'activa' }],
+          policies: [{ number: 'POL-00123', ramo: 'auto', status: 'activa', expirationDate: '2026-06-20' }],
         },
       ],
       total: 3,

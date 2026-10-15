@@ -22,11 +22,13 @@ export type CustomerPolicy = {
 }
 
 // Resumen que lleva el listado del panel: una línea por póliza con su tipo
-// (ramo) y su estado.
+// (ramo), su estado y su vencimiento, con el que se calcula si está vencida.
 export type CustomerPolicySummary = {
   number: string
   ramo: Ramo
   status: PolicyStatus
+  // Fecha sin hora, aaaa-mm-dd.
+  expirationDate: string
 }
 
 // El bien que asegura la póliza: patente para autos y motos, dirección para

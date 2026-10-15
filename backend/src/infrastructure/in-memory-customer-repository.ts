@@ -128,6 +128,7 @@ function toInMemoryListItem(customer: Customer, phones: Array<{ id: number; numb
       number: policy.number,
       ramo: policy.ramo,
       status: policy.status,
+      expirationDate: policy.expirationDate,
     })),
   }
 }

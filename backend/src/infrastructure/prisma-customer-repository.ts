@@ -72,6 +72,7 @@ export class PrismaCustomerRepository implements CustomerRepository {
             orderBy: { numero_poliza: 'asc' },
             select: {
               numero_poliza: true,
+              fecha_vencimiento: true,
               ramo: { select: { nombre: true } },
               estado_poliza: { select: { nombre: true } },
             },
@@ -150,9 +151,10 @@ type PolicyRecord = {
   estado_poliza: { nombre: string }
 }
 
-// Lo que trae el listado: tipo y estado de cada póliza del cliente.
+// Lo que trae el listado: tipo, estado y vencimiento de cada póliza del cliente.
 type PolicySummaryRecord = {
   numero_poliza: string
+  fecha_vencimiento: Date
   ramo: { nombre: string }
   estado_poliza: { nombre: string }
 }
@@ -209,7 +211,12 @@ function toPolicySummary(policy: PolicySummaryRecord): CustomerPolicySummary {
   if (!isRamo(policy.ramo.nombre) || !isPolicyStatus(policy.estado_poliza.nombre)) {
     throw new Error(`La póliza ${policy.numero_poliza} contiene valores fuera de catálogo`)
   }
-  return { number: policy.numero_poliza, ramo: policy.ramo.nombre, status: policy.estado_poliza.nombre }
+  return {
+    number: policy.numero_poliza,
+    ramo: policy.ramo.nombre,
+    status: policy.estado_poliza.nombre,
+    expirationDate: policy.fecha_vencimiento.toISOString().slice(0, 10),
+  }
 }
 
 function toPolicyDetail(policy: PolicyDetailRecord): PolicyDetail {
