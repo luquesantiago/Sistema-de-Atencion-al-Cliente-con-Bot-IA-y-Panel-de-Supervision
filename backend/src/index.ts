@@ -10,6 +10,7 @@ import { OpenAiCompatibleClient } from './infrastructure/openai-compatible-clien
 import { PrismaAgencyInfoSource } from './infrastructure/prisma-agency-info.js'
 import { PrismaConversationStore } from './infrastructure/prisma-conversation-store.js'
 import { PrismaCustomerRepository } from './infrastructure/prisma-customer-repository.js'
+import { findTestOperatorId } from './infrastructure/prisma-case-closing.js'
 import { PrismaInboxRepository } from './infrastructure/prisma-inbox-repository.js'
 import { PrismaRequestManagementRepository } from './infrastructure/prisma-request-management-repository.js'
 import { WahaWhatsAppClient } from './infrastructure/waha-whatsapp-client.js'
@@ -35,11 +36,13 @@ const processIncomingMessage = new ProcessIncomingMessage(
 )
 const manageRequests = new ManageRequests(new PrismaRequestManagementRepository(prisma), whatsapp)
 const manageCustomers = new ManageCustomers(customerRepository)
-const manageInbox = new ManageInbox(new PrismaInboxRepository(prisma))
+const manageInbox = new ManageInbox(new PrismaInboxRepository(prisma), whatsapp)
+// Quién actúa desde el panel: el usuario de prueba operador hasta el login del Parcial 2.
+const resolvePanelActor = async () => ({ userId: await findTestOperatorId(prisma) })
 
 createApp(processIncomingMessage, {
   secret: config.whatsappWebhookSecret,
   findPhoneByLid: (lid) => whatsapp.findPhoneByLid(lid),
-}, manageRequests, manageCustomers, manageInbox).listen(config.port, () => {
+}, manageRequests, manageCustomers, manageInbox, resolvePanelActor).listen(config.port, () => {
   console.log(`Backend listening on port ${config.port}`)
 })

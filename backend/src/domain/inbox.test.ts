@@ -14,7 +14,7 @@ function entry(overrides: Partial<InboxEntry> = {}): InboxEntry {
     handedOffAt: new Date('2026-10-15T13:00:00.000Z'),
     takenAt: null,
     assignee: null,
-    hasPendingProspect: false,
+    prospectState: null,
     pendingPhoneChangeAt: null,
     lastMessage: null,
     ...overrides,
@@ -23,7 +23,15 @@ function entry(overrides: Partial<InboxEntry> = {}): InboxEntry {
 
 describe('inboxLabel', () => {
   it('el alta pendiente de un cliente nuevo', () => {
-    expect(inboxLabel(entry({ queryType: null, hasPendingProspect: true }))).toBe('alta-pendiente')
+    expect(inboxLabel(entry({ queryType: null, prospectState: 'pendiente' }))).toBe('alta-pendiente')
+  })
+
+  it('el alta rechazada que sigue abierta', () => {
+    expect(inboxLabel(entry({ queryType: null, prospectState: 'descartado' }))).toBe('alta-rechazada')
+  })
+
+  it('un caso sin prospecto no es un alta pendiente ni rechazada', () => {
+    expect(inboxLabel(entry({ queryType: null, prospectState: null }))).toBeNull()
   })
 
   it.each(['baja', 'modificación'] as const)('la %s derivada es un pedido pendiente de aprobación', (queryType) => {
