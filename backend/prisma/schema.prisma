@@ -211,15 +211,16 @@ model horario_atencion {
 }
 
 model mensaje {
-  id_mensaje        Int            @id @default(autoincrement()) @db.UnsignedInt
-  id_caso           Int            @db.UnsignedInt
-  id_origen_mensaje Int            @db.UnsignedInt
-  contenido         String         @db.Text
-  fecha_hora        DateTime       @default(now())
-  caso              caso           @relation(fields: [id_caso], references: [id_caso], onDelete: NoAction, onUpdate: NoAction, map: "fk_mensaje_caso")
-  origen_mensaje    origen_mensaje @relation(fields: [id_origen_mensaje], references: [id_origen_mensaje], onDelete: NoAction, onUpdate: NoAction, map: "fk_mensaje_origen")
-  respuestas        respuesta[]    @relation("respuesta_id_mensaje_consultaTomensaje")
-  respuesta_enviada respuesta?     @relation("respuesta_id_mensaje_enviadoTomensaje")
+  id_mensaje         Int            @id @default(autoincrement()) @db.UnsignedInt
+  id_caso            Int            @db.UnsignedInt
+  id_origen_mensaje  Int            @db.UnsignedInt
+  contenido          String         @db.Text
+  fecha_hora         DateTime       @default(now())
+  id_imagen_whatsapp String?        @db.VarChar(255)
+  caso               caso           @relation(fields: [id_caso], references: [id_caso], onDelete: NoAction, onUpdate: NoAction, map: "fk_mensaje_caso")
+  origen_mensaje     origen_mensaje @relation(fields: [id_origen_mensaje], references: [id_origen_mensaje], onDelete: NoAction, onUpdate: NoAction, map: "fk_mensaje_origen")
+  respuestas         respuesta[]    @relation("respuesta_id_mensaje_consultaTomensaje")
+  respuesta_enviada  respuesta?     @relation("respuesta_id_mensaje_enviadoTomensaje")
 
   @@index([id_origen_mensaje], map: "fk_mensaje_origen")
   @@index([id_caso, fecha_hora], map: "ix_mensaje_caso_fecha")

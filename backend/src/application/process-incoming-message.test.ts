@@ -25,7 +25,7 @@ import type { WhatsAppClient } from '../domain/whatsapp-client.js'
 import { InMemoryAgencyInfoSource } from '../infrastructure/in-memory-agency-info.js'
 import { InMemoryConversationStore } from '../infrastructure/in-memory-conversation-store.js'
 import { InMemoryCustomerRepository } from '../infrastructure/in-memory-customer-repository.js'
-import { ProcessIncomingMessage } from './process-incoming-message.js'
+import { imageRefOf, ProcessIncomingMessage } from './process-incoming-message.js'
 
 // Clientes ficticios, solo para estas pruebas.
 const ana: Customer = {
@@ -108,6 +108,10 @@ class FakeWhatsApp implements WhatsAppClient {
       throw new Error('WAHA no respondió')
     }
     this.sent.push({ phone: to, text })
+  }
+
+  public async downloadImage(): Promise<null> {
+    return null
   }
 
   public textsTo(to: string): string[] {
@@ -416,6 +420,9 @@ describe('cliente nuevo (RF-ATE-05)', () => {
     expect(derived?.handoffReason).toBe('cliente nuevo')
     expect(state.prospects).toEqual([{ id: expect.any(Number), caseId: derived?.id, name: 'Laura Inventada', dni: '99000010', status: 'pendiente' }])
     expect(conversation.messages.some((message) => message.text.includes('foto de su DNI'))).toBe(true)
+    const photo = state.messages.find((message) => message.text.includes('foto de su DNI'))
+    expect(photo?.imageRef).toMatch(/^foto-\d+$/)
+    expect(state.messages.filter((message) => message.imageRef !== undefined)).toEqual([photo])
     expect(await customers.findByDni('99000010')).toBeNull()
     expect(ai.customerStatusClassified).toEqual(['Soy nuevo cliente'])
   })
@@ -488,6 +495,9 @@ describe('silencio (RF-DER-03)', () => {
     expect(silenced.map((message) => message.caseId)).toEqual([derived?.id, derived?.id])
     expect(silenced[0]?.text).toBe('¿hola? ¿cuándo vence?')
     expect(silenced[1]?.text).toContain('imagen')
+    const stored = store.snapshot().messages
+    expect(stored.find((message) => message.id === silenced[1]?.id)?.imageRef).toMatch(/^foto-\d+$/)
+    expect(stored.find((message) => message.id === silenced[0]?.id)?.imageRef).toBeUndefined()
     expect(store.snapshot().replies.filter((reply) => silenced.some((message) => message.id === reply.queryMessageId))).toEqual([])
 
     restart()
@@ -994,6 +1004,12 @@ describe('fallas', () => {
     await expect(send('hola', phone, 'msg-repetido')).resolves.toMatchObject({ status: 'DUPLICATE_IGNORED' })
     expect(whatsapp.textsTo(phone)).toEqual([customerStatusQuestion])
     expect(store.snapshot().messages.filter((message) => message.origin === 'cliente')).toHaveLength(1)
+  })
+
+  it('la referencia de la imagen es el id del mensaje, solo para imágenes y si entra en la columna', () => {
+    expect(imageRefOf({ messageId: 'false_1@lid_ABC', phone, text: '', media: 'image' })).toBe('false_1@lid_ABC')
+    expect(imageRefOf({ messageId: 'msg-1', phone, text: 'hola' })).toBeNull()
+    expect(imageRefOf({ messageId: 'x'.repeat(256), phone, text: '', media: 'image' })).toBeNull()
   })
 
   it('una imagen fuera de la etapa de la foto no se procesa ni se guarda', async () => {

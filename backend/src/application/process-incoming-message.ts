@@ -134,6 +134,12 @@ class Turn {
     return { existing: choice.caseId }
   }
 
+  // Solo llegan acá las imágenes que el flujo procesa: la foto del DNI y la que llega en silencio.
+  public keepImageRef(message: IncomingWhatsAppMessage): void {
+    const ref = imageRefOf(message)
+    if (ref) this.changes.incoming.imageRef = ref
+  }
+
   public receiveIn(ref: CaseRef): void {
     this.changes.incoming.case = ref
     this.incomingPlaced = true
@@ -187,6 +193,7 @@ export class ProcessIncomingMessage {
 
     if (open?.suspended) {
       const turn = new Turn(open, message.phone, at, messageTextForCase(message), undefined)
+      turn.keepImageRef(message)
       turn.receiveIn(turn.caseFor({ kind: 'suspended' }))
       await this.conversations.save(turn.changes, async () => {})
       console.log('[asistente] conversación en silencio: mensaje guardado sin respuesta')
@@ -213,6 +220,7 @@ export class ProcessIncomingMessage {
 
     const text = message.media === 'image' ? prospectPhotoText : message.text
     const turn = new Turn(conversation, message.phone, at, text, closePrevious)
+    turn.keepImageRef(message)
     const result = await this.decide(turn, stage, message, settings)
     if (!turn.hasIncomingCase) turn.receiveIn(turn.caseFor({ kind: 'identifying' }))
 
@@ -670,6 +678,13 @@ function resolvePending(identification: Identification, saved: SavedConversation
   const { pending } = identification
   if (pending?.answers !== 'incoming') return identification
   return { ...identification, pending: { answers: { existing: saved.incomingMessageId }, text: pending.text } }
+}
+
+// El id del mensaje de WhatsApp de una imagen, si entra en la columna (VARCHAR(255)).
+export function imageRefOf(message: IncomingWhatsAppMessage): string | null {
+  if (message.media !== 'image') return null
+  const ref = message.messageId.trim()
+  return ref.length > 0 && ref.length <= 255 ? ref : null
 }
 
 function messageTextForCase(message: IncomingWhatsAppMessage): string {

@@ -267,6 +267,7 @@ package "Atencion" #F8FDF7 {
     * id_origen_mensaje : INT <<FK>>
     * contenido : TEXT
     * fecha_hora : DATETIME
+    id_imagen_whatsapp : VARCHAR(255)
   }
 
   entity "estado_prospecto" as estado_prospecto {
