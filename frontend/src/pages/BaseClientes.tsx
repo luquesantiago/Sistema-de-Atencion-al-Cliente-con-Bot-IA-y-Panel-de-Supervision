@@ -3,6 +3,13 @@ import type { Modulo } from '../navigation'
 import PageHeader from '../components/PageHeader'
 import EstadoPanel from '../components/EstadoPanel'
 import {
+  IconoActiva,
+  IconoBaja,
+  IconoInfo,
+  IconoSuspendida,
+  IconoVencida,
+} from '../components/iconos'
+import {
   listarClientes,
   obtenerCliente,
   type ClienteDetalle,
@@ -30,17 +37,57 @@ function fechaLegible(iso: string): string {
   return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`
 }
 
-function tonoDeEstado(status: string): string {
-  if (status === 'activa') return 'chip chip--exito'
-  if (status === 'suspendida por mora') return 'chip chip--alerta'
-  return 'chip chip--neutro'
+// Fecha de hoy en Argentina, aaaa-mm-dd: igual que el backend
+// (templates.ts, argentinaToday), aunque el navegador esté en otra zona.
+function hoyEnArgentina(): string {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date())
+  const parte = (tipo: string) => partes.find((item) => item.type === tipo)?.value ?? ''
+  return `${parte('year')}-${parte('month')}-${parte('day')}`
+}
+
+// Misma regla que el asistente (domain/templates.ts): solo una póliza activa
+// cuya vigencia ya pasó se muestra como «vencida»; suspendida y dada de baja
+// conservan su estado aunque estén vencidas.
+function estadoMostrado(poliza: { status: string; expirationDate: string }): string {
+  return poliza.status === 'activa' && poliza.expirationDate < hoyEnArgentina()
+    ? 'vencida'
+    : poliza.status
+}
+
+// Color e icono de cada estado. El texto siempre acompaña: nunca solo color.
+const ESTADOS_POLIZA: Record<string, {
+  clase: string
+  texto: string
+  icono: (props: { className?: string }) => ReactNode
+}> = {
+  activa: { clase: 'chip chip--exito', texto: 'activa', icono: IconoActiva },
+  vencida: { clase: 'chip chip--alerta', texto: 'vencida', icono: IconoVencida },
+  'suspendida por mora': { clase: 'chip chip--riesgo', texto: 'suspendida por mora', icono: IconoSuspendida },
+  'dada de baja': { clase: 'chip chip--neutro', texto: 'dada de baja', icono: IconoBaja },
+}
+
+function chipDePoliza(poliza: { status: string; expirationDate: string }): ReactNode {
+  const estado = estadoMostrado(poliza)
+  const { clase, texto, icono: Icono } = ESTADOS_POLIZA[estado] ??
+    { clase: 'chip chip--neutro', texto: estado, icono: IconoInfo }
+  return (
+    <span className={clase}>
+      <Icono className="chip__icono" />
+      {texto}
+    </span>
+  )
 }
 
 function mensajeDeError(error: unknown, textoPorDefecto: string): string {
   return error instanceof Error ? error.message : textoPorDefecto
 }
 
-// Una línea por póliza en la lista: número, tipo y estado. Nunca un conteo
+// Una línea por póliza en la lista: número y estado. Nunca un conteo
 // suelto: el operador tiene que ver de qué se trata cada póliza.
 function resumenDePolizas(polizas: DatoPolizaResumen[]): ReactNode {
   if (polizas.length === 0) {
@@ -50,10 +97,8 @@ function resumenDePolizas(polizas: DatoPolizaResumen[]): ReactNode {
     <ul className="tabla__polizas">
       {polizas.map((poliza) => (
         <li key={poliza.number} className="tabla__poliza">
-          <span className="tabla__poliza-tipo">
-            {poliza.number} · {poliza.ramo}
-          </span>
-          <span className={tonoDeEstado(poliza.status)}>{poliza.status}</span>
+          <span className="tabla__poliza-numero">{poliza.number}</span>
+          {chipDePoliza(poliza)}
         </li>
       ))}
     </ul>
@@ -224,10 +269,16 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
                   <td className="tabla__accion">
                     <button
                       type="button"
-                      className="tabla__ver"
+                      className={`tabla__ver${activo ? ' tabla__ver--activo' : ''}`}
                       aria-expanded={activo}
                       onClick={(evento) => {
                         evento.stopPropagation()
+                        // «Viendo» alterna: tocarlo cierra la ficha, igual que el
+                        // botón Cerrar del panel, y vuelve la lista completa.
+                        if (activo) {
+                          cerrarDetalle()
+                          return
+                        }
                         void abrirDetalle(cliente)
                       }}
                     >
@@ -267,14 +318,10 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
           className="busqueda__campo"
           type="search"
           autoComplete="off"
-          placeholder="Nombre, apellido, razón social, DNI, CUIT o teléfono"
+          placeholder="Buscar por nombre, apellido o razón social; DNI, CUIT o teléfono (con o sin puntos)"
           value={texto}
           onChange={(evento) => setTexto(evento.target.value)}
         />
-        <p className="busqueda__pista">
-          El texto compara nombre, apellido y razón social. Con dígitos también compara DNI, CUIT y
-          teléfono, con o sin puntos.
-        </p>
       </div>
 
       <div className={`cartera${seleccionado !== null ? ' cartera--con-detalle' : ''}`}>
@@ -328,7 +375,7 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
                       <article key={poliza.number} className="detalle-panel__poliza">
                         <header className="detalle-panel__poliza-encabezado">
                           <h4 className="detalle-panel__poliza-numero">{poliza.number}</h4>
-                          <span className={tonoDeEstado(poliza.status)}>{poliza.status}</span>
+                          {chipDePoliza(poliza)}
                         </header>
 
                         <dl className="detalle-panel__datos">

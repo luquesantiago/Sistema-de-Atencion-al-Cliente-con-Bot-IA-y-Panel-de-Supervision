@@ -90,12 +90,12 @@ Devuelve `{ items, total, limit, offset }`, ordenados por apellido (o razón soc
   "lastName": "Gómez",
   "phones": ["5491155551001"],
   "policies": [
-    { "number": "POL-00123", "ramo": "auto", "status": "activa" }
+    { "number": "POL-00123", "ramo": "auto", "status": "activa", "expirationDate": "2025-01-15" }
   ]
 }
 ```
 
-Las empresas vienen con `cuit` y `razonSocial` y `dni` en `null`. `phones` y `policies` solo incluyen teléfonos y pólizas activos: cada póliza del listado trae tipo (`ramo`) y estado, que es lo que muestra la tabla del panel. Una búsqueda sin coincidencias devuelve `items: []` y `total: 0`, no un `404`.
+Las empresas vienen con `cuit` y `razonSocial` y `dni` en `null`. `phones` y `policies` solo incluyen teléfonos y pólizas activos: cada póliza del listado trae tipo (`ramo`), estado y `expirationDate`, con el que el panel muestra «vencida» aplicando la misma regla del asistente (`isExpired`/`displayStatus` en `src/domain/templates.ts`: solo una póliza `activa` ya vencida se muestra como vencida). Una búsqueda sin coincidencias devuelve `items: []` y `total: 0`, no un `404`.
 
 ### Detalle de un cliente
 

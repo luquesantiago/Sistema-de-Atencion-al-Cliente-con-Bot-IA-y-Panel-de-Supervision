@@ -119,8 +119,8 @@ describe('mappers de la cartera', () => {
       apellido: null,
       cliente_telefono: [{ telefono: { numero: '5491155552002' } }],
       poliza: [
-        { numero_poliza: 'POL-00500', ramo: { nombre: 'comercio' }, estado_poliza: { nombre: 'activa' } },
-        { numero_poliza: 'POL-00501', ramo: { nombre: 'hogar' }, estado_poliza: { nombre: 'dada de baja' } },
+        { numero_poliza: 'POL-00500', fecha_vencimiento: new Date('2026-03-01T00:00:00.000Z'), ramo: { nombre: 'comercio' }, estado_poliza: { nombre: 'activa' } },
+        { numero_poliza: 'POL-00501', fecha_vencimiento: new Date('2026-06-15T00:00:00.000Z'), ramo: { nombre: 'hogar' }, estado_poliza: { nombre: 'dada de baja' } },
       ],
     }
 
@@ -133,8 +133,8 @@ describe('mappers de la cartera', () => {
       lastName: null,
       phones: ['5491155552002'],
       policies: [
-        { number: 'POL-00500', ramo: 'comercio', status: 'activa' },
-        { number: 'POL-00501', ramo: 'hogar', status: 'dada de baja' },
+        { number: 'POL-00500', ramo: 'comercio', status: 'activa', expirationDate: '2026-03-01' },
+        { number: 'POL-00501', ramo: 'hogar', status: 'dada de baja', expirationDate: '2026-06-15' },
       ],
     })
   })
@@ -243,7 +243,12 @@ describe('mappers de la cartera', () => {
       nombre: 'Sofía',
       apellido: 'Benítez',
       cliente_telefono: [],
-      poliza: [{ numero_poliza: 'POL-00501', ramo: { nombre: 'pirata' }, estado_poliza: { nombre: 'activa' } }],
+      poliza: [{
+        numero_poliza: 'POL-00501',
+        fecha_vencimiento: new Date('2026-03-01T00:00:00.000Z'),
+        ramo: { nombre: 'pirata' },
+        estado_poliza: { nombre: 'activa' },
+      }],
     }
 
     expect(() => toListItem(record)).toThrow('fuera de catálogo')
