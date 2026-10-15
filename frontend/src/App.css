@@ -1546,6 +1546,208 @@
   overflow-wrap: anywhere;
 }
 
+/* Acciones sobre el caso (change bandeja-atender-casos) */
+
+/* El equipo, en azul marino: se distingue del asistente también por el texto «Operador · nombre» */
+.hilo__mensaje--operador {
+  border-color: var(--nav-fondo-alto);
+  background: var(--nav-fondo-alto);
+}
+
+.hilo__imagen {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  margin-top: 8px;
+  border-radius: var(--radio-chico);
+  background: var(--superficie);
+  object-fit: contain;
+}
+
+.hilo__imagen-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 8px;
+}
+
+.hilo__imagen-aviso {
+  margin-top: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.boton--chico {
+  padding: 4px 10px;
+  font-size: 0.8rem;
+}
+
+.conversacion__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px 8px;
+}
+
+.conversacion__sin-cierre {
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+}
+
+.aviso-accion {
+  margin: 10px 16px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-chico);
+  font-size: 0.83rem;
+  font-weight: 600;
+}
+
+.aviso-accion--exito {
+  border-color: #b5dec8;
+  background: var(--exito-suave);
+  color: var(--exito);
+}
+
+.aviso-accion--alerta {
+  border-color: #f0d4a4;
+  background: var(--alerta-suave);
+  color: var(--alerta);
+}
+
+.aviso-accion--riesgo {
+  border-color: #f2c2bd;
+  background: var(--riesgo-suave);
+  color: var(--riesgo);
+}
+
+.respuesta {
+  padding: 12px 20px 14px;
+  background: var(--superficie);
+  border-top: 1px solid var(--borde);
+}
+
+.respuesta__etiqueta {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.respuesta__fila {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.respuesta__texto,
+.dialogo__campo textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 11px;
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio-chico);
+  background: var(--superficie);
+  color: var(--texto);
+  font: inherit;
+  font-size: 0.88rem;
+  resize: vertical;
+}
+
+.respuesta__texto[disabled] {
+  background: var(--superficie-alterna);
+  cursor: not-allowed;
+}
+
+.respuesta__ayuda,
+.dialogo__ayuda {
+  margin-top: 6px;
+  color: var(--texto-suave);
+  font-size: 0.78rem;
+}
+
+.dialogo {
+  width: min(520px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.18);
+  color: var(--texto);
+}
+
+.dialogo::backdrop {
+  background: rgba(15, 37, 64, 0.45);
+}
+
+.dialogo__cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 22px;
+}
+
+.dialogo__titulo {
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.dialogo__texto {
+  color: var(--texto-suave);
+  font-size: 0.88rem;
+}
+
+.dialogo__texto--alerta {
+  color: var(--alerta);
+  font-weight: 600;
+}
+
+.dialogo__campo label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.dialogo__alertas {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid #f2c2bd;
+  border-radius: var(--radio-chico);
+  background: var(--riesgo-suave);
+  font-size: 0.85rem;
+}
+
+.dialogo__alertas legend {
+  padding: 0 4px;
+  color: var(--riesgo);
+  font-weight: 650;
+}
+
+.dialogo__alertas ul {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.dialogo__casilla {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.dialogo__botones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @media (max-width: 900px) {
   /* Una columna por vez: la lista o la conversación elegida */
   .bandeja {

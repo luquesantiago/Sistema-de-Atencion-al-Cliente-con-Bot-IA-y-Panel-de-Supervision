@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { queryTypeRiskLevels } from '../domain/inbox.js'
 import {
+  closingNote,
   inboxCountQuery,
   inboxOrderQuery,
   severityByQueryTypeSql,
   toEntries,
   toInboxEntry,
   toInboxMessage,
+  toActionState,
+  toInboxAlert,
   toOrderedCase,
+  type InboxActionRecord,
   type InboxCaseRecord,
+  type InboxMessageRecord,
 } from './prisma-inbox-repository.js'
 
 // Filas armadas en la prueba, sin base. Datos ficticios.
@@ -78,7 +83,7 @@ describe('toInboxEntry', () => {
   it('una fila derivada con cliente, responsable y último mensaje se mapea completa', () => {
     const entry = toInboxEntry(record({
       fecha_toma: new Date('2026-10-15T13:10:00.000Z'),
-      usuario: { nombre: 'Graciela', apellido: 'Castaño' },
+      usuario: { id_usuario: 20, nombre: 'Graciela', apellido: 'Castaño' },
     }), 'alto')
     expect(entry).toEqual({
       caseId: 12,
@@ -90,8 +95,8 @@ describe('toInboxEntry', () => {
       handoffReason: 'intención: reclamo',
       handedOffAt: new Date('2026-10-15T13:00:00.000Z'),
       takenAt: new Date('2026-10-15T13:10:00.000Z'),
-      assignee: { name: 'Graciela Castaño' },
-      hasPendingProspect: false,
+      assignee: { id: 20, name: 'Graciela Castaño' },
+      prospectState: null,
       pendingPhoneChangeAt: null,
       lastMessage: { text: 'me cobraron de más', origin: 'cliente', at: new Date('2026-10-15T13:00:00.000Z') },
     })
@@ -120,7 +125,7 @@ describe('toInboxEntry', () => {
       solicitud_accion: [{ fecha_solicitud: new Date('2026-10-15T12:00:00.000Z') }],
       mensaje: [{ contenido: long, fecha_hora: new Date('2026-10-15T13:00:00.000Z'), origen_mensaje: { nombre: 'asistente' } }],
     }), null)
-    expect(entry.hasPendingProspect).toBe(true)
+    expect(entry.prospectState).toBe('pendiente')
     expect(entry.pendingPhoneChangeAt).toEqual(new Date('2026-10-15T12:00:00.000Z'))
     expect(entry.lastMessage?.text).toHaveLength(160)
     expect(entry.lastMessage?.text.endsWith('…')).toBe(true)
@@ -129,7 +134,103 @@ describe('toInboxEntry', () => {
 
   it('un tipo de consulta o un origen fuera de catálogo lanza', () => {
     expect(() => toInboxEntry(record({ tipo_consulta: { nombre: 'inventado' } }), null)).toThrow()
-    expect(() => toInboxMessage({ id_mensaje: 1, id_caso: 1, contenido: 'x', fecha_hora: new Date(), origen_mensaje: { nombre: 'bot' } })).toThrow()
+    expect(() => toInboxMessage(messageRecord({ origen_mensaje: { nombre: 'bot' } }))).toThrow()
+  })
+
+  it('un prospecto descartado es un alta rechazada y uno confirmado no cuenta', () => {
+    expect(toInboxEntry(record({ prospecto: { estado_prospecto: { nombre: 'descartado' } } }), 'medio').prospectState).toBe('descartado')
+    expect(toInboxEntry(record({ prospecto: { estado_prospecto: { nombre: 'confirmado' } } }), 'medio').prospectState).toBeNull()
+  })
+})
+
+function messageRecord(overrides: Partial<InboxMessageRecord> = {}): InboxMessageRecord {
+  return {
+    id_mensaje: 1,
+    id_caso: 12,
+    contenido: 'El cliente envió una imagen por WhatsApp; el archivo no se almacena en el sistema.',
+    fecha_hora: new Date('2026-10-15T13:00:00.000Z'),
+    id_imagen_whatsapp: null,
+    origen_mensaje: { nombre: 'cliente' },
+    respuesta_enviada: null,
+    ...overrides,
+  }
+}
+
+describe('toInboxMessage', () => {
+  it('un mensaje con imagen se marca, sin exponer la referencia', () => {
+    const message = toInboxMessage(messageRecord({ id_imagen_whatsapp: 'false_99000000000000@lid_ABC' }))
+    expect(message.hasImage).toBe(true)
+    expect(JSON.stringify(message)).not.toContain('ABC')
+  })
+
+  it('un mensaje sin referencia no tiene imagen', () => {
+    expect(toInboxMessage(messageRecord()).hasImage).toBe(false)
+  })
+
+  it('un mensaje de operador trae el nombre del empleado', () => {
+    const message = toInboxMessage(messageRecord({
+      contenido: 'Hola, le escribo por su reclamo.',
+      origen_mensaje: { nombre: 'operador' },
+      respuesta_enviada: { usuario: { nombre: 'Operador', apellido: 'Prueba' } },
+    }))
+    expect(message).toMatchObject({ origin: 'operador', author: { name: 'Operador Prueba' }, hasImage: false })
+  })
+})
+
+describe('acciones', () => {
+  function actionRecord(overrides: Partial<InboxActionRecord> = {}): InboxActionRecord {
+    return {
+      id_caso: 12,
+      id_conversacion: 4,
+      fecha_derivacion: new Date('2026-10-15T13:00:00.000Z'),
+      fecha_toma: null,
+      id_usuario_asignado: null,
+      prospecto: null,
+      alerta: [],
+      mensaje: [{ id_mensaje: 3 }],
+      conversacion: { telefono: { numero: '5491100000001' } },
+      ...overrides,
+    }
+  }
+
+  it('el estado de un alta rechazada con alertas sin atender', () => {
+    const state = toActionState(actionRecord({
+      id_usuario_asignado: 10,
+      prospecto: { id_prospecto: 5, observaciones: null, estado_prospecto: { nombre: 'descartado' } },
+      alerta: [{ id_alerta: 1 }, { id_alerta: 2 }],
+    }), true)
+    expect(state).toMatchObject({
+      caseId: 12,
+      inInbox: true,
+      handedOff: true,
+      assigneeId: 10,
+      prospectState: 'descartado',
+      unattendedAlerts: 2,
+      hasCustomerMessage: true,
+      phone: '5491100000001',
+    })
+  })
+
+  it('un caso sin derivar ni mensajes del cliente', () => {
+    expect(toActionState(actionRecord({ fecha_derivacion: null, mensaje: [] }), false)).toMatchObject({
+      inInbox: false,
+      handedOff: false,
+      hasCustomerMessage: false,
+    })
+  })
+
+  it('la nota del cierre tiene quién, cuándo y el motivo', () => {
+    expect(closingNote('operador', new Date('2026-10-15T14:00:00.000Z'), 'Lo cargué a mano')).toBe(
+      'Caso cerrado desde la bandeja por operador el 2026-10-15T14:00:00.000Z. Motivo: Lo cargué a mano',
+    )
+  })
+
+  it('las alertas sin atender llevan tipo y nivel; un nivel fuera de catálogo lanza', () => {
+    expect(toInboxAlert({ tipo_alerta: { nombre: 'Dato no verificable' }, nivel_riesgo: { nombre: 'alto' } })).toEqual({
+      type: 'Dato no verificable',
+      level: 'alto',
+    })
+    expect(() => toInboxAlert({ tipo_alerta: { nombre: 'x' }, nivel_riesgo: { nombre: 'urgente' } })).toThrow()
   })
 })
 

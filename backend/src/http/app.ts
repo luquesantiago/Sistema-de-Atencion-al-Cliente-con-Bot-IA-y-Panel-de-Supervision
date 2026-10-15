@@ -3,6 +3,7 @@ import { ManageCustomers } from '../application/manage-customers.js'
 import { ManageCustomerEdits } from '../application/manage-customer-edits.js'
 import { ManageInbox } from '../application/manage-inbox.js'
 import { ManageRequests } from '../application/manage-requests.js'
+import type { PanelActor } from '../domain/case-actions.js'
 import type { ProcessIncomingMessage } from '../application/process-incoming-message.js'
 import {
   RequestManagementError,
@@ -24,6 +25,8 @@ export function createApp(
   manageCustomers: ManageCustomers,
   manageCustomerEdits: ManageCustomerEdits,
   manageInbox: ManageInbox,
+  // Mientras no haya autenticación, el usuario de prueba operador (change bandeja-atender-casos, decisión 1).
+  resolvePanelActor: () => Promise<PanelActor>,
 ) {
   const app = express()
   const senders = new KeyedQueue()
@@ -96,6 +99,7 @@ export function createApp(
       response.status(200).json({
         id: result.id,
         decision: result.decision,
+        casoId: result.casoId,
         ...(result.clienteId === undefined ? {} : { clienteId: result.clienteId }),
       })
     } catch (error) {
@@ -232,11 +236,12 @@ export function createApp(
       handleRequestError(error, response, next)
     }
   })
-  // Bandeja de Atención, de solo lectura (RF-SUP-01, RF-SUP-02, RF-DER-02).
+  // Bandeja de Atención (RF-SUP-01, RF-SUP-02, RF-DER-02, RF-DER-03, RF-SUP-04). Quién actúa lo
+  // resuelve resolvePanelActor: nunca sale del cuerpo del pedido.
   app.get('/api/bandeja', async (request, response, next) => {
     try {
       const page = parsePage(request.query.limit, request.query.offset)
-      const result = await manageInbox.listCases(page)
+      const result = await manageInbox.listCases(page, await resolvePanelActor())
       response.status(200).json({ items: result.items, total: result.total, ...page })
     } catch (error) {
       handleRequestError(error, response, next)
@@ -244,7 +249,59 @@ export function createApp(
   })
   app.get('/api/bandeja/:idCaso', async (request, response, next) => {
     try {
-      response.status(200).json(await manageInbox.findCase(request.params.idCaso))
+      response.status(200).json(await manageInbox.findCase(request.params.idCaso, await resolvePanelActor()))
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.post('/api/bandeja/:idCaso/toma', async (request, response, next) => {
+    try {
+      if (request.body !== undefined) parseBody(request.body, [])
+      response.status(200).json(await manageInbox.take(request.params.idCaso, await resolvePanelActor()))
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.post('/api/bandeja/:idCaso/respuestas', async (request, response, next) => {
+    try {
+      const body = parseBody(request.body, ['texto'])
+      const result = await manageInbox.reply(request.params.idCaso, await resolvePanelActor(), body.texto)
+      response.status(result.saved ? 201 : 200).json(result)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.post('/api/bandeja/:idCaso/cierre', async (request, response, next) => {
+    try {
+      const body = request.body === undefined ? {} : parseBody(request.body, ['motivo', 'alertasRevisadas'])
+      if (body.motivo !== undefined && body.motivo !== null && typeof body.motivo !== 'string') {
+        throw new RequestManagementError(400, 'VALIDATION_ERROR', 'El motivo debe ser un texto.')
+      }
+      if (body.alertasRevisadas !== undefined && typeof body.alertasRevisadas !== 'boolean') {
+        throw new RequestManagementError(400, 'VALIDATION_ERROR', 'alertasRevisadas debe ser verdadero o falso.')
+      }
+      const result = await manageInbox.close(request.params.idCaso, await resolvePanelActor(), {
+        reason: typeof body.motivo === 'string' ? body.motivo : null,
+        alertsReviewed: body.alertasRevisadas === true,
+      })
+      response.status(200).json(result)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  // La imagen se pide a WhatsApp en el momento: no se guarda ni se deja en caché (RF-ATE-05).
+  app.get('/api/bandeja/:idCaso/mensajes/:idMensaje/imagen', async (request, response, next) => {
+    try {
+      const image = await manageInbox.findImage(request.params.idCaso, request.params.idMensaje)
+      response
+        .status(200)
+        .set({
+          'Content-Type': image.mimeType,
+          'Cache-Control': 'no-store',
+          'X-Content-Type-Options': 'nosniff',
+          'Content-Disposition': 'inline',
+        })
+        .send(Buffer.from(image.data))
     } catch (error) {
       handleRequestError(error, response, next)
     }

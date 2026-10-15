@@ -1,7 +1,6 @@
 import { Prisma, type PrismaClient } from '../generated/prisma/client.js'
 import {
   RequestManagementError,
-  type DecisionResult,
   type PageRequest,
   type PhoneChangeNotification,
   type PendingPhoneChange,
@@ -9,8 +8,10 @@ import {
   type PhoneChangeDecisionInput,
   type PhoneChangeDecisionResult,
   type ProspectDecisionInput,
+  type ProspectDecisionResult,
   type RequestManagementRepository,
 } from '../domain/request-management.js'
+import { closeCase, findTestOperatorId, releaseSilence, takeCase } from './prisma-case-closing.js'
 
 export class PrismaRequestManagementRepository implements RequestManagementRepository {
   public constructor(private readonly prisma: PrismaClient) {}
@@ -115,7 +116,7 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
     })
   }
 
-  public async decideProspect(input: ProspectDecisionInput): Promise<DecisionResult> {
+  public async decideProspect(input: ProspectDecisionInput): Promise<ProspectDecisionResult> {
     return this.prisma.$transaction(async (transaction) => {
       const prospect = await transaction.prospecto.findUnique({
         where: { id_prospecto: input.id },
@@ -142,7 +143,7 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
       if (prospect.estado_prospecto.nombre !== 'pendiente' || prospect.caso.fecha_cierre) {
         throw new RequestManagementError(409, 'CONFLICT', 'El prospecto ya no está pendiente.')
       }
-      const operatorId = await findOperatorId(transaction)
+      const operatorId = await findTestOperatorId(transaction)
       const state = await transaction.estado_prospecto.findUnique({
         where: { nombre: input.decision === 'aprobar' ? 'confirmado' : 'descartado' },
         select: { id_estado_prospecto: true },
@@ -215,9 +216,20 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
           data: { id_cliente: customerId },
         })
       }
-      await closeCase(transaction, prospect.caso, operatorId, decidedAt)
-      await releaseSilence(transaction, prospect.caso.id_conversacion)
-      return { id: prospect.id_prospecto, decision: input.decision, ...(customerId ? { clienteId: customerId } : {}) }
+      if (input.decision === 'aprobar') {
+        await closeCase(transaction, prospect.caso, operatorId, decidedAt)
+        await releaseSilence(transaction, prospect.caso.id_conversacion)
+      } else {
+        // El rechazo deja el caso abierto y en silencio, a cargo de quien rechazó, para que le
+        // explique el motivo al cliente desde la bandeja (change bandeja-atender-casos, decisión 6).
+        await takeCase(transaction, prospect.caso, operatorId, decidedAt)
+      }
+      return {
+        id: prospect.id_prospecto,
+        decision: input.decision,
+        casoId: prospect.caso.id_caso,
+        ...(customerId ? { clienteId: customerId } : {}),
+      }
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   }
 
@@ -278,7 +290,7 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
           throw new RequestManagementError(409, 'CONFLICT', 'Uno o más teléfonos seleccionados ya no están vinculados a este cliente.')
         }
       }
-      const operatorId = await findOperatorId(transaction)
+      const operatorId = await findTestOperatorId(transaction)
       const state = await transaction.estado_solicitud.findUnique({
         where: { nombre: input.decision === 'aprobar' ? 'aprobada' : 'rechazada' },
         select: { id_estado_solicitud: true },
@@ -376,43 +388,4 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
       decision: request.estado_solicitud.nombre === 'aprobada' ? 'aprobar' : 'rechazar',
     }
   }
-}
-
-async function findOperatorId(transaction: Prisma.TransactionClient): Promise<number> {
-  const operator = await transaction.usuario.findFirst({
-    where: { nombre_usuario: 'operador', activo: true, rol: { is: { nombre: 'operador' } } },
-    select: { id_usuario: true },
-  })
-  if (!operator) throw new Error('No está configurado el usuario de prueba operador.')
-  return operator.id_usuario
-}
-
-async function closeCase(
-  transaction: Prisma.TransactionClient,
-  caseRecord: { id_caso: number; fecha_toma: Date | null },
-  operatorId: number,
-  closedAt: Date,
-): Promise<void> {
-  await transaction.caso.update({
-    where: { id_caso: caseRecord.id_caso },
-    data: {
-      id_usuario_asignado: operatorId,
-      fecha_toma: caseRecord.fecha_toma ?? closedAt,
-      fecha_cierre: closedAt,
-    },
-  })
-}
-
-// Contrato del cierre de casos (design.md, decisión 5): si la conversación sigue abierta y
-// ya no le queda un caso derivado sin cerrar, el asistente vuelve a atenderla.
-async function releaseSilence(transaction: Prisma.TransactionClient, conversationId: number): Promise<void> {
-  const openHandoff = await transaction.caso.findFirst({
-    where: { id_conversacion: conversationId, fecha_derivacion: { not: null }, fecha_cierre: null },
-    select: { id_caso: true },
-  })
-  if (openHandoff) return
-  await transaction.conversacion.updateMany({
-    where: { id_conversacion: conversationId, fecha_fin: null },
-    data: { asistente_suspendido: false },
-  })
 }

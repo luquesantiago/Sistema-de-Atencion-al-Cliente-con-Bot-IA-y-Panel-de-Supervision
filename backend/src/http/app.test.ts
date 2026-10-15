@@ -23,11 +23,20 @@ import {
   type ProspectDecisionInput,
   type RequestManagementRepository,
 } from '../domain/request-management.js'
-import type { WhatsAppClient } from '../domain/whatsapp-client.js'
+import type { WhatsAppClient, WhatsAppImage } from '../domain/whatsapp-client.js'
 import { ManageCustomers } from '../application/manage-customers.js'
 import { ManageCustomerEdits } from '../application/manage-customer-edits.js'
 import { ManageInbox } from '../application/manage-inbox.js'
-import type { InboxConversation, InboxEntry, InboxPage, InboxRepository } from '../domain/inbox.js'
+import { decideClose, type CloseInput, type PanelActor } from '../domain/case-actions.js'
+import type {
+  CloseOutcome,
+  InboxActionState,
+  InboxConversation,
+  InboxEntry,
+  InboxImageRef,
+  InboxPage,
+  InboxRepository,
+} from '../domain/inbox.js'
 import { ManageRequests } from '../application/manage-requests.js'
 import { ProcessIncomingMessage } from '../application/process-incoming-message.js'
 import { InMemoryAgencyInfoSource } from '../infrastructure/in-memory-agency-info.js'
@@ -58,7 +67,35 @@ class FakeInbox implements InboxRepository {
   public async findConversation(caseId: number): Promise<InboxConversation | null> {
     return this.conversation?.entry.caseId === caseId ? this.conversation : null
   }
+
+  public state: InboxActionState | null = null
+  public image: InboxImageRef | null = null
+
+  public async findActionState(caseId: number): Promise<InboxActionState | null> {
+    return this.state?.caseId === caseId ? this.state : null
+  }
+
+  public async take(_caseId: number, actor: PanelActor): Promise<boolean> {
+    if (this.state) this.state = { ...this.state, assigneeId: actor.userId }
+    return this.state !== null
+  }
+
+  public async close(caseId: number, actor: PanelActor, input: CloseInput, at: Date): Promise<CloseOutcome> {
+    if (this.state?.caseId !== caseId) return { ok: false, error: 'not-in-inbox' }
+    const plan = decideClose(this.state, actor, input)
+    return plan.ok ? { ok: true, closedAt: at } : { ok: false, error: plan.error }
+  }
+
+  public async recordOperatorReply(): Promise<{ messageId: number }> {
+    return { messageId: 77 }
+  }
+
+  public async findImage(): Promise<InboxImageRef | null> {
+    return this.image
+  }
 }
+
+const panelActor = async () => ({ userId: 10 })
 
 class FakeWhatsApp implements WhatsAppClient {
   public readonly sent: Array<{ to: string; text: string }> = []
@@ -69,8 +106,10 @@ class FakeWhatsApp implements WhatsAppClient {
     this.sent.push({ to, text })
   }
 
-  public async downloadImage(): Promise<null> {
-    return null
+  public image: WhatsAppImage | null = null
+
+  public async downloadImage(): Promise<WhatsAppImage | null> {
+    return this.image
   }
 }
 
@@ -94,7 +133,7 @@ class FakeRequestRepository implements RequestManagementRepository {
 
   public async decideProspect(input: ProspectDecisionInput) {
     this.prospectDecisions.push(input)
-    return { id: input.id, decision: input.decision, ...(input.decision === 'aprobar' ? { clienteId: 44 } : {}) }
+    return { id: input.id, decision: input.decision, casoId: 31, ...(input.decision === 'aprobar' ? { clienteId: 44 } : {}) }
   }
 
   public async decidePhoneChange(input: PhoneChangeDecisionInput) {
@@ -206,7 +245,8 @@ describe('endpoints de trámites', () => {
       new ManageRequests(repository, whatsapp),
       new ManageCustomers(customers),
       new ManageCustomerEdits(new FakeCustomerEditRepository(), customers),
-      new ManageInbox(new FakeInbox()),
+      new ManageInbox(new FakeInbox(), whatsapp),
+      panelActor,
     )
     server = app.listen(0)
     await once(server, 'listening')
@@ -271,7 +311,7 @@ describe('endpoints de trámites', () => {
     })
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ id: 8, decision: 'aprobar', clienteId: 44 })
+    await expect(response.json()).resolves.toEqual({ id: 8, decision: 'aprobar', casoId: 31, clienteId: 44 })
     expect(repository.prospectDecisions).toEqual([{
       id: 8,
       decision: 'aprobar',
@@ -279,6 +319,17 @@ describe('endpoints de trámites', () => {
       nombre: 'Laura',
       apellido: 'Díaz',
     }])
+  })
+
+  it('al rechazar el alta devuelve el caso, para abrirlo en la bandeja', async () => {
+    const response = await fetch(`${baseUrl}/api/tramites/prospectos/8/decision`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'rechazar', fundamento: 'La foto no coincide' }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ id: 8, decision: 'rechazar', casoId: 31 })
   })
 
   it('no permite que el navegador elija el actor o rol de la decisión', async () => {
@@ -401,7 +452,8 @@ describe('endpoints de clientes', () => {
       new ManageRequests(new FakeRequestRepository(), whatsapp),
       new ManageCustomers(customers),
       new ManageCustomerEdits(edits, customers),
-      new ManageInbox(new FakeInbox()),
+      new ManageInbox(new FakeInbox(), whatsapp),
+      panelActor,
     )
     server = app.listen(0)
     await once(server, 'listening')
@@ -874,27 +926,50 @@ describe('Bandeja de Atención', () => {
     handedOffAt: new Date('2026-10-15T13:00:00.000Z'),
     takenAt: null,
     assignee: null,
-    hasPendingProspect: false,
+    prospectState: null,
     pendingPhoneChangeAt: null,
     lastMessage: { text: 'me cobraron de más', origin: 'cliente', at: new Date('2026-10-15T13:00:00.000Z') },
   }
+  let inbox: FakeInbox
+  let whatsapp: FakeWhatsApp
 
   beforeEach(async () => {
     const customers: CustomerRepository = new InMemoryCustomerRepository([])
-    const whatsapp = new FakeWhatsApp()
+    whatsapp = new FakeWhatsApp()
     const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, hours: [] })
     const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), agency, new FakeAi(), whatsapp)
-    const inbox = new FakeInbox([reclamo, { ...reclamo, caseId: 13, severity: null }], {
+    inbox = new FakeInbox([reclamo, { ...reclamo, caseId: 13, severity: null }], {
       entry: reclamo,
-      messages: [{ id: 1, caseId: 12, origin: 'cliente', text: 'me cobraron de más', at: new Date('2026-10-15T13:00:00.000Z') }],
+      alerts: [],
+      messages: [{
+        id: 1,
+        caseId: 12,
+        origin: 'cliente',
+        text: 'me cobraron de más',
+        at: new Date('2026-10-15T13:00:00.000Z'),
+        hasImage: false,
+        author: null,
+      }],
     })
+    inbox.state = {
+      caseId: 12,
+      inInbox: true,
+      handedOff: true,
+      assigneeId: null,
+      prospectState: null,
+      unattendedAlerts: 0,
+      hasCustomerMessage: true,
+      phone: '5491100000001',
+      takenAt: null,
+    }
     const app = createApp(
       assistant,
       { secret: 'test', findPhoneByLid: async () => null },
       new ManageRequests(new FakeRequestRepository(), whatsapp),
       new ManageCustomers(customers),
       new ManageCustomerEdits(new FakeCustomerEditRepository(), customers),
-      new ManageInbox(inbox),
+      new ManageInbox(inbox, whatsapp),
+      panelActor,
     )
     server = app.listen(0)
     await once(server, 'listening')
@@ -919,8 +994,10 @@ describe('Bandeja de Atención', () => {
         phone: '5491100000001',
         queryType: 'reclamo',
         handoffReason: 'intención: reclamo',
+        handedOff: true,
         lastMessage: { text: 'me cobraron de más', origin: 'cliente', at: '2026-10-15T13:00:00.000Z' },
         assignee: null,
+        assignedToMe: false,
         takenAt: null,
         waitingSince: '2026-10-15T13:00:00.000Z',
       }],
@@ -947,6 +1024,86 @@ describe('Bandeja de Atención', () => {
 
   it('un caso que no está en la bandeja da 404', async () => {
     const response = await fetch(`${baseUrl}/api/bandeja/99`)
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'NOT_FOUND' } })
+  })
+
+  function post(path: string, body?: unknown) {
+    return fetch(`${baseUrl}${path}`, {
+      method: 'POST',
+      ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+    })
+  }
+
+  it('toma un caso y devuelve el ítem', async () => {
+    const response = await post('/api/bandeja/12/toma')
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ caseId: 12 })
+    expect(inbox.state?.assigneeId).toBe(10)
+  })
+
+  it('contesta: 201 con el mensaje guardado y el texto enviado por WhatsApp', async () => {
+    const response = await post('/api/bandeja/12/respuestas', { texto: 'Hola, le escribo por su reclamo.' })
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toEqual({ sent: true, saved: true, messageId: 77 })
+    expect(whatsapp.sent).toEqual([{ to: '5491100000001', text: 'Hola, le escribo por su reclamo.' }])
+  })
+
+  it('si WhatsApp falla al contestar, 502', async () => {
+    whatsapp.fail = true
+    const response = await post('/api/bandeja/12/respuestas', { texto: 'Hola' })
+    expect(response.status).toBe(502)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'WHATSAPP_ERROR' } })
+  })
+
+  it.each([
+    ['texto vacío', { texto: '  ' }],
+    ['campo desconocido', { texto: 'Hola', usuario: 'admin' }],
+  ])('contestar con %s da 400', async (_name, body) => {
+    const response = await post('/api/bandeja/12/respuestas', body)
+    expect(response.status).toBe(400)
+    expect(whatsapp.sent).toEqual([])
+  })
+
+  it('cerrar un caso sin tomar da 409; tomado, 200', async () => {
+    const before = await post('/api/bandeja/12/cierre', {})
+    expect(before.status).toBe(409)
+    await post('/api/bandeja/12/toma')
+    const after = await post('/api/bandeja/12/cierre', {})
+    expect(after.status).toBe(200)
+    await expect(after.json()).resolves.toMatchObject({ caseId: 12 })
+  })
+
+  it('cerrar con alertasRevisadas que no es booleano da 400', async () => {
+    const response = await post('/api/bandeja/12/cierre', { alertasRevisadas: 'sí' })
+    expect(response.status).toBe(400)
+  })
+
+  it('las acciones con un id inválido dan 400 y con un caso fuera de la bandeja, 404', async () => {
+    expect((await post('/api/bandeja/abc/toma')).status).toBe(400)
+    expect((await post('/api/bandeja/99/cierre', {})).status).toBe(404)
+  })
+
+  it('la imagen sale con su tipo y sin caché', async () => {
+    inbox.image = { ref: 'false_1@lid_ABC', phone: '5491100000001' }
+    whatsapp.image = { mimeType: 'image/jpeg', data: new Uint8Array([0xff, 0xd8, 0xff]) }
+    const response = await fetch(`${baseUrl}/api/bandeja/12/mensajes/1/imagen`)
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toBe('image/jpeg')
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(response.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([0xff, 0xd8, 0xff])
+  })
+
+  it('una imagen que ya no está disponible da 404 IMAGE_UNAVAILABLE', async () => {
+    inbox.image = { ref: 'false_1@lid_ABC', phone: '5491100000001' }
+    const response = await fetch(`${baseUrl}/api/bandeja/12/mensajes/1/imagen`)
+    expect(response.status).toBe(404)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'IMAGE_UNAVAILABLE' } })
+  })
+
+  it('una imagen que no es de la conversación da 404 NOT_FOUND', async () => {
+    const response = await fetch(`${baseUrl}/api/bandeja/12/mensajes/1/imagen`)
     expect(response.status).toBe(404)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'NOT_FOUND' } })
   })
