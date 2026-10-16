@@ -15,6 +15,13 @@ import {
 } from '../domain/customer-edits.js'
 import { RequestManagementError } from '../domain/request-management.js'
 
+// El número de póliza es POL-<n> con 5 dígitos, como los de la cartera
+// migrada (POL-00123). La única compañía de la cartera es Seguros Castaño:
+// el alta desde el panel no la elige, la fija el sistema.
+const prefijoPoliza = 'POL-'
+const digitsPoliza = 5
+const companiaDeCartera = 1
+
 // Escrituras de cartera del panel sobre MySQL. Cada operación corre en una
 // transacción: o se aplica entera o no se aplica. Un DNI, CUIT, teléfono o
 // patente repetido es un conflicto (409), igual que una decisión tomada por
@@ -121,11 +128,11 @@ export class PrismaCustomerEditRepository implements CustomerEditRepository {
         throw notFound('No existe un cliente activo con ese identificador.')
       }
       const company = await transaction.compania_aseguradora.findUnique({
-        where: { id_compania: input.companyId },
+        where: { id_compania: companiaDeCartera },
         select: { activo: true },
       })
       if (!company || !company.activo) {
-        throw validation('No existe una compañía aseguradora activa con ese identificador.')
+        throw validation('La compañía de la cartera no está activa.')
       }
       for (const coverage of input.coverages) {
         const plan = await transaction.plan.findUnique({
@@ -145,9 +152,9 @@ export class PrismaCustomerEditRepository implements CustomerEditRepository {
       ])
       const policy = await transaction.poliza.create({
         data: {
-          numero_poliza: input.number,
+          numero_poliza: await nextPolicyNumber(transaction),
           cliente: { connect: { id_cliente: input.customerId } },
-          compania_aseguradora: { connect: { id_compania: input.companyId } },
+          compania_aseguradora: { connect: { id_compania: companiaDeCartera } },
           ramo: { connect: { id_ramo: ramo } },
           estado_poliza: { connect: { id_estado_poliza: status } },
           moneda: { connect: { id_moneda: currency } },
@@ -326,6 +333,25 @@ export class PrismaCustomerEditRepository implements CustomerEditRepository {
 }
 
 type Transaction = Prisma.TransactionClient
+
+// El próximo número de póliza: POL-<última + 1>, con el mismo largo que las
+// que ya existen (POL-00123 → POL-00124). Se calcula dentro de la transacción
+// del alta, pero una creación simultánea puede pisar la misma: el único de la
+// base la convierte en un 409 y el operador reintenta.
+async function nextPolicyNumber(transaction: Transaction): Promise<string> {
+  const existentes = await transaction.poliza.findMany({
+    where: { numero_poliza: { startsWith: prefijoPoliza } },
+    select: { numero_poliza: true },
+  })
+  let maximo = 0
+  for (const { numero_poliza: numero } of existentes) {
+    const sufijo = numero.slice(prefijoPoliza.length)
+    if (!/^\d+$/.test(sufijo)) continue
+    const valor = Number.parseInt(sufijo, 10)
+    if (valor > maximo) maximo = valor
+  }
+  return `${prefijoPoliza}${String(maximo + 1).padStart(digitsPoliza, '0')}`
+}
 
 // Crea el teléfono si no existe y lo vincula al cliente. Un número ya
 // vinculado al mismo cliente es un conflicto.

@@ -244,10 +244,9 @@ describe('parseReplaceCoverages', () => {
 })
 
 describe('parseCreatePolicy', () => {
-  // Cuerpo completo de un alta: obligatorios + opcionales.
+  // Cuerpo completo de un alta: obligatorios + opcionales. Sin número ni
+  // compañía: los asigna el sistema.
   const altaCompleta = () => ({
-    number: 'POL-00999',
-    companyId: 1,
     ramo: 'auto',
     status: 'activa',
     currency: 'ARS',
@@ -263,8 +262,6 @@ describe('parseCreatePolicy', () => {
     const input = parseCreatePolicy(7, altaCompleta())
     expect(input).toEqual({
       customerId: 7,
-      number: 'POL-00999',
-      companyId: 1,
       ramo: 'auto',
       status: 'activa',
       currency: 'ARS',
@@ -286,8 +283,6 @@ describe('parseCreatePolicy', () => {
 
   it('acepta el mínimo: sin coberturas, sin bien y sin prima', () => {
     const input = parseCreatePolicy(3, {
-      number: 'POL-01000',
-      companyId: 1,
       ramo: 'vida',
       status: 'activa',
       currency: 'ARS',
@@ -296,8 +291,6 @@ describe('parseCreatePolicy', () => {
     })
     expect(input).toEqual({
       customerId: 3,
-      number: 'POL-01000',
-      companyId: 1,
       ramo: 'vida',
       status: 'activa',
       currency: 'ARS',
@@ -307,14 +300,12 @@ describe('parseCreatePolicy', () => {
     })
   })
 
-  it('normaliza el número con espacios de sobra', () => {
-    const input = parseCreatePolicy(1, { ...altaCompleta(), number: '  POL-00999  ' })
-    expect(input.number).toBe('POL-00999')
+  it('rechaza un alta con número: lo asigna el sistema', () => {
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), number: 'POL-00999' }))
   })
 
-  it('rechaza un alta sin número', () => {
-    const { number: _number, ...sinNumero } = altaCompleta()
-    expectValidationError(() => parseCreatePolicy(1, sinNumero))
+  it('rechaza un alta con compañía: la fija el sistema', () => {
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), companyId: 1 }))
   })
 
   it('rechaza un alta sin vigencia', () => {
@@ -322,8 +313,12 @@ describe('parseCreatePolicy', () => {
     expectValidationError(() => parseCreatePolicy(1, sinInicio))
   })
 
-  it('rechaza una compañía que no sea un identificador', () => {
-    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), companyId: 'todos' }))
+  it('rechaza un bien asegurado en una póliza de vida', () => {
+    expectValidationError(() => parseCreatePolicy(1, {
+      ...altaCompleta(),
+      ramo: 'vida',
+      insuredItem: { description: 'Persona', plate: null, address: null, brand: null, model: null, year: null },
+    }))
   })
 
   it('rechaza un ramo fuera de catálogo', () => {

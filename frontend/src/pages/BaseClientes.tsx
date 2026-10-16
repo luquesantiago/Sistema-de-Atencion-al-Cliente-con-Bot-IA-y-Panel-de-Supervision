@@ -160,7 +160,7 @@ function tituloDeConfirmacion(confirmacion: ConfirmacionPendiente, cliente: Clie
     case 'desvincular-telefono':
       return `Desvincular ${confirmacion.numero} de ${nombre}`
     case 'alta-poliza':
-      return `Crear la póliza ${confirmacion.entrada.number}`
+      return 'Crear la póliza nueva en la cartera'
     case 'editar-poliza':
       return 'Guardar los cambios de la póliza'
   }
@@ -357,7 +357,7 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
           setAltaPoliza(false)
           setConfirmacion(null)
           setErrorFormulario(null)
-          recargarTrasEdicion(creada, `Se creó la póliza ${confirmacion.entrada.number} de ${nombreCompleto(creada)}.`)
+          recargarTrasEdicion(creada, `Se creó una póliza nueva de ${nombreCompleto(creada)}.`)
           return
         }
         case 'editar-poliza': {
@@ -467,11 +467,8 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
   // El alta nunca escribe en la ficha: todo lo que va a guardar se lista como
   // «— → valor», igual que el resto de las confirmaciones.
   function confirmarAltaPoliza(entrada: EntradaAltaPoliza) {
-    const compania = catalogos?.companies.find((opcione) => opcione.id === entrada.companyId)?.name
     const lineas: LineaConfirmacion[] = [
-      { etiqueta: 'Número', antes: '—', despues: entrada.number },
-      { etiqueta: 'Compañía', antes: '—', despues: compania ?? `id ${entrada.companyId}` },
-      { etiqueta: 'Ramo', antes: '—', despues: entrada.ramo },
+      { etiqueta: 'Categoría', antes: '—', despues: entrada.ramo },
       { etiqueta: 'Estado', antes: '—', despues: entrada.status },
       { etiqueta: 'Moneda', antes: '—', despues: entrada.currency },
       {
@@ -480,9 +477,9 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
         despues: `${fechaLegible(entrada.startDate)} a ${fechaLegible(entrada.expirationDate)}`,
       },
     ]
-    const prima = pesosDe(entrada.premiumCents ?? null, entrada.currency)
-    if (prima !== null) {
-      lineas.push({ etiqueta: 'Prima mensual', antes: '—', despues: prima })
+    const cuota = pesosDe(entrada.premiumCents ?? null, entrada.currency)
+    if (cuota !== null) {
+      lineas.push({ etiqueta: 'Cuota mensual', antes: '—', despues: cuota })
     }
     if (entrada.insuredItem !== null && entrada.insuredItem !== undefined) {
       lineas.push({ etiqueta: 'Bien asegurado', antes: '—', despues: entrada.insuredItem.description })
@@ -520,15 +517,8 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
     if (entrada.number !== undefined && entrada.number !== poliza.number) {
       lineas.push({ etiqueta: 'Número', antes: poliza.number, despues: entrada.number })
     }
-    if (entrada.companyId !== undefined && entrada.companyId !== Number(poliza.company?.id)) {
-      lineas.push({
-        etiqueta: 'Compañía',
-        antes: poliza.company?.name ?? '—',
-        despues: `id ${entrada.companyId}`,
-      })
-    }
     if (entrada.ramo !== undefined && entrada.ramo !== poliza.ramo) {
-      lineas.push({ etiqueta: 'Ramo', antes: poliza.ramo, despues: entrada.ramo })
+      lineas.push({ etiqueta: 'Categoría', antes: poliza.ramo, despues: entrada.ramo })
     }
     if (entrada.status !== undefined && entrada.status !== poliza.status) {
       lineas.push({ etiqueta: 'Estado', antes: poliza.status, despues: entrada.status })
@@ -553,7 +543,7 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
     }
     if ((entrada.premiumCents ?? null) !== poliza.premiumCents) {
       lineas.push({
-        etiqueta: 'Prima mensual',
+        etiqueta: 'Cuota mensual',
         antes: pesosDe(poliza.premiumCents, poliza.currency) ?? '—',
         despues: pesosDe(entrada.premiumCents ?? null, entrada.currency ?? poliza.currency) ?? '—',
       })
@@ -845,7 +835,7 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
                           </header>
 
                           <dl className="detalle-panel__datos">
-                            <dt>Cobertura</dt>
+                            <dt>Categoría</dt>
                             <dd>{poliza.ramo}</dd>
 
                             <dt>Vigencia</dt>
@@ -853,7 +843,7 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
 
                             {prima !== null ? (
                               <>
-                                <dt>Prima mensual</dt>
+                                <dt>Cuota mensual</dt>
                                 <dd>{prima}</dd>
                               </>
                             ) : null}

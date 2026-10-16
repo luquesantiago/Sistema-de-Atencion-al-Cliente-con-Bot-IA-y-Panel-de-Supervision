@@ -9,7 +9,7 @@
  */
 
 // La lista muestra número y estado; la API también trae `ramo` (el tipo de
-// póliza, que la ficha presenta como «Cobertura») y `expirationDate`, con el
+// póliza, que la ficha presenta como «Categoría») y `expirationDate`, con el
 // que se calcula si la póliza está vencida.
 export type DatoPolizaResumen = {
   number: string
@@ -19,8 +19,9 @@ export type DatoPolizaResumen = {
   expirationDate: string
 }
 
-// El bien que asegura la póliza: patente para autos y motos, dirección para
-// inmuebles y comercios. Los ramos que no aseguran un bien (vida) traen null.
+// El bien que asegura la póliza: patente para autos y motos, matrícula para
+// embarcaciones, dirección para inmuebles y comercios. Las pólizas de vida no
+// aseguran un bien y traen null.
 export type DatoBienAsegurado = {
   description: string
   plate: string | null
@@ -44,7 +45,7 @@ export type DatoPoliza = {
   /** Id numérico de la póliza, el que usan las ediciones del panel. */
   id: string
   number: string
-  /** El tipo de póliza: el panel lo muestra como «Cobertura». */
+  /** El tipo de póliza: el panel lo muestra como «Categoría». */
   ramo: string
   status: string
   /** Código de moneda, por ejemplo ARS. */
@@ -55,7 +56,7 @@ export type DatoPoliza = {
   startDate: string | null
   /** Fecha sin hora, aaaa-mm-dd. */
   expirationDate: string
-  /** Prima mensual en centavos; null si no está cargada. */
+  /** Cuota mensual en centavos; null si no está cargada. */
   premiumCents: number | null
   observations: string | null
   insuredItem: DatoBienAsegurado | null
@@ -130,14 +131,13 @@ export type EntradaEdicionCliente =
 
 export type EntradaEdicionPoliza = {
   number?: string
-  companyId?: number
   ramo?: string
   status?: string
   currency?: string
   /** Fechas sin hora, aaaa-mm-dd. */
   startDate?: string
   expirationDate?: string
-  /** Prima en centavos; null la borra. */
+  /** Cuota mensual en centavos; null la borra. */
   premiumCents?: number | null
   observations?: string | null
   /** null desconecta el bien; objeto lo crea o lo actualiza. */
@@ -152,10 +152,9 @@ export type EntradaCobertura = {
 }
 
 // Alta de una póliza de un cliente que ya existe: el contrato es obligatorio
-// completo y las coberturas vienen de una, aunque estén vacías.
+// completo y las coberturas vienen de una, aunque estén vacías. Sin número
+// ni compañía: los asigna el sistema (POL-<siguiente>, Seguros Castaño).
 export type EntradaAltaPoliza = {
-  number: string
-  companyId: number
   ramo: string
   status: string
   currency: string

@@ -78,10 +78,9 @@ export type ReplaceCoveragesInput = { policyId: number; coverages: CoverageInput
 
 // Alta de una póliza de un cliente que ya existe, desde el panel. Es carga
 // de cartera (ABM), no emisión ni cotización: esos siguen fuera de alcance.
+// El número de póliza y la compañía no se piden: los fija el sistema.
 export type CreatePolicyInput = {
   customerId: number
-  number: string
-  companyId: number
   ramo: Ramo
   status: PolicyStatus
   currency: Currency
@@ -94,6 +93,8 @@ export type CreatePolicyInput = {
   insuredItem?: InsuredItemInput | null
   // Set completo de coberturas de la póliza; vacía si no tiene.
   coverages: CoverageInput[]
+  // El número de póliza lo asigna el repositorio: POL-<siguiente>. La
+  // compañía tampoco la elige quien carga: es siempre la de la cartera.
 }
 
 export type CatalogOption = { id: number; name: string }
@@ -194,13 +195,22 @@ export function parseUnlinkPhone(customerId: number, phoneId: number): UnlinkPho
   return { customerId, phoneId }
 }
 
-// Alta de una póliza para un cliente que ya existe. Todos los campos del
-// contrato son obligatorios: sin ellos no hay póliza que guardar.
+// Alta de una póliza para un cliente que ya existe. El número lo asigna el
+// sistema y la compañía es siempre la de la cartera: quien carga elige el
+// resto del contrato, que en un alta es obligatorio entero.
 export function parseCreatePolicy(customerId: number, value: unknown): CreatePolicyInput {
   const body = parseBody(value, [
     'number', 'companyId', 'ramo', 'status', 'currency',
     'startDate', 'expirationDate', 'premiumCents', 'observations', 'insuredItem', 'coverages',
   ])
+  // Se permiten en el listado para explicar el rechazo: si el navegador manda
+  // uno de estos, el error tiene que decir que los fija el sistema.
+  if ('number' in body) {
+    throw validationError('El número de póliza lo asigna el sistema automáticamente.')
+  }
+  if ('companyId' in body) {
+    throw validationError('La compañía de la póliza la fija el sistema: es la de la cartera.')
+  }
   const ramo = body.ramo
   if (!isRamo(ramo)) throw validationError('ramo no está en el catálogo.')
   const status = body.status
@@ -218,8 +228,6 @@ export function parseCreatePolicy(customerId: number, value: unknown): CreatePol
   }
   const input: CreatePolicyInput = {
     customerId,
-    number: parseName(body.number, 'number', 50),
-    companyId: parseRecordId(body.companyId, 'companyId'),
     ramo,
     status,
     currency,
@@ -235,6 +243,11 @@ export function parseCreatePolicy(customerId: number, value: unknown): CreatePol
   }
   if (body.insuredItem !== undefined && body.insuredItem !== null) {
     input.insuredItem = parseInsuredItem(body.insuredItem)
+  }
+  // Vida asegura una persona, no un bien: el panel no lo deja cargar y esta
+  // regla lo defiende si alguien manda el dato de otra manera.
+  if (ramo === 'vida' && input.insuredItem !== undefined) {
+    throw validationError('Las pólizas de vida no tienen bien asegurado.')
   }
   return input
 }

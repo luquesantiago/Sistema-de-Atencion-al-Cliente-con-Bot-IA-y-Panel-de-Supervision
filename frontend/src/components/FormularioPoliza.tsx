@@ -51,6 +51,32 @@ function centosAPesos(centavos: number | null): string {
   return centavos === null ? '' : (centavos / 100).toFixed(2)
 }
 
+// Qué datos pide el bien asegurado según la categoría de seguro. Las
+// pólizas de vida aseguran a una persona, no a un bien, y no tienen nada
+// que cargar acá.
+type FormatoBien = {
+  /** Etiqueta de la matrícula del bien: patente para vehículos, matrícula para embarcaciones. */
+  matricula: string | null
+  direccion: boolean
+  vehiculo: boolean
+}
+
+const bienPorCategoria: Record<string, FormatoBien> = {
+  auto: { matricula: 'Patente', direccion: false, vehiculo: true },
+  moto: { matricula: 'Patente', direccion: false, vehiculo: true },
+  embarcaciones: { matricula: 'Matrícula', direccion: false, vehiculo: true },
+  hogar: { matricula: null, direccion: true, vehiculo: false },
+  comercio: { matricula: null, direccion: true, vehiculo: false },
+}
+
+function esVida(ramo: string): boolean {
+  return ramo === 'vida'
+}
+
+function formatoDeBien(ramo: string): FormatoBien | null {
+  return bienPorCategoria[ramo] ?? null
+}
+
 /**
  * Formulario de alta y de edición de una póliza: datos generales, bien
  * asegurado y coberturas. Las coberturas se mandan completas: las que se
@@ -60,9 +86,9 @@ function centosAPesos(centavos: number | null): string {
 export default function FormularioPoliza(props: FormularioPolizaProps) {
   const { modo, catalogos, ocupado, error, onGuardar, onCancelar } = props
   // En edición la póliza aporta los valores iniciales; en alta arranca vacía.
+  // El número solo se muestra al editar: en un alta lo asigna el sistema.
   const poliza = props.modo === 'edicion' ? props.poliza : null
   const [numero, setNumero] = useState(poliza?.number ?? '')
-  const [companiaId, setCompaniaId] = useState<string>(poliza?.company?.id ?? '')
   const [ramo, setRamo] = useState<string>(poliza?.ramo ?? '')
   const [estado, setEstado] = useState<string>(poliza?.status ?? '')
   const [moneda, setMoneda] = useState<string>(poliza?.currency ?? '')
@@ -92,6 +118,10 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
   )
   const siguienteClave = useRef((poliza?.coverages.length ?? 0) + 1)
   const panelRef = useRef<HTMLDivElement>(null)
+  // Datos del bien que pide la categoría elegida; null si todavía no se eligió.
+  const formatoBien = formatoDeBien(ramo)
+  // Vida asegura a una persona, no a un bien: se desmarca sin guardar el dato.
+  const conBien = esVida(ramo) ? false : bien.conBien
 
   useEffect(() => {
     panelRef.current?.querySelector<HTMLElement>('input, select, textarea')?.focus()
@@ -116,7 +146,7 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
     const datosOpcionales = {
       premiumCents: pesosACentos(prima),
       observations: observaciones.trim() ? observaciones.trim() : null,
-      insuredItem: bien.conBien
+      insuredItem: conBien
         ? {
             description: bien.description.trim(),
             plate: bien.plate.trim() || null,
@@ -129,8 +159,6 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
     }
     if (modo === 'alta') {
       onGuardar({
-        number: numero.trim(),
-        companyId: Number(companiaId),
         ramo,
         status: estado,
         currency: moneda,
@@ -150,7 +178,6 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
       ...datosOpcionales,
     }
     if (fechaInicio) entrada.startDate = fechaInicio
-    if (companiaId) entrada.companyId = Number(companiaId)
     onGuardar(entrada, coberturasFinales)
   }
 
@@ -173,39 +200,28 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
         </h2>
         <p className="modal__descripcion">
           {modo === 'alta'
-            ? 'La póliza queda en la ficha del cliente que ya está abierto. Al guardar se pide confirmación con el resumen.'
+            ? 'La póliza queda en la ficha del cliente que ya está abierto. El número de póliza lo asigna el sistema y la compañía es la de la cartera.'
             : 'Los cambios se aplican a la póliza de la cartera. Al guardar se pide confirmación con el resumen.'}
         </p>
 
         <form className="formulario" onSubmit={guardar}>
           <fieldset className="formulario__grupo">
             <legend>Datos de la póliza</legend>
-            <div className="formulario__fila">
+            {modo === 'edicion' ? (
               <label className="formulario__campo">
                 Número
                 <input type="text" autoComplete="off" value={numero} onChange={(evento) => setNumero(evento.target.value)} required />
               </label>
-              <label className="formulario__campo">
-                Compañía
-                <select
-                  value={companiaId}
-                  onChange={(evento) => setCompaniaId(evento.target.value)}
-                  required={modo === 'alta'}
-                >
-                  <option value="">{modo === 'alta' ? 'Elegir compañía' : 'Sin cambio'}</option>
-                  {catalogos.companies.map((compania) => (
-                    <option key={compania.id} value={compania.id}>
-                      {compania.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
+            ) : (
+              <p className="formulario__solo-lectura">
+                Número de póliza: lo asigna el sistema al guardar.
+              </p>
+            )}
             <div className="formulario__fila">
               <label className="formulario__campo">
-                Ramo
+                Categoría
                 <select value={ramo} onChange={(evento) => setRamo(evento.target.value)} required>
-                  <option value="">Elegir ramo</option>
+                  <option value="">Elegir categoría</option>
                   {catalogos.ramoNames.map((nombre) => (
                     <option key={nombre} value={nombre}>
                       {nombre}
@@ -256,7 +272,7 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
                 />
               </label>
               <label className="formulario__campo">
-                Prima mensual
+                Cuota mensual
                 <input
                   type="number"
                   min="0"
@@ -280,78 +296,96 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
 
           <fieldset className="formulario__grupo">
             <legend>Bien asegurado</legend>
-            <label className="formulario__opcion">
-              <input
-                type="checkbox"
-                checked={bien.conBien}
-                onChange={(evento) => setBien((previo) => ({ ...previo, conBien: evento.target.checked }))}
-              />
-              Esta póliza asegura un bien (patente, dirección u otro)
-            </label>
-            {bien.conBien ? (
+            {esVida(ramo) ? (
+              <p className="formulario__ayuda">
+                Las pólizas de vida no aseguran un bien: no cargan nada acá.
+              </p>
+            ) : formatoBien === null ? (
+              <p className="formulario__ayuda">
+                Elegí la categoría de la póliza para cargar el bien que asegura.
+              </p>
+            ) : (
               <>
-                <div className="formulario__fila">
-                  <label className="formulario__campo">
-                    Descripción
-                    <input
-                      type="text"
-                      autoComplete="off"
-                      value={bien.description}
-                      onChange={(evento) => setBien((previo) => ({ ...previo, description: evento.target.value }))}
-                      required
-                    />
-                  </label>
-                  <label className="formulario__campo">
-                    Patente o matrícula
-                    <input
-                      type="text"
-                      autoComplete="off"
-                      value={bien.plate}
-                      onChange={(evento) => setBien((previo) => ({ ...previo, plate: evento.target.value }))}
-                    />
-                  </label>
-                </div>
-                <div className="formulario__fila">
-                  <label className="formulario__campo">
-                    Marca
-                    <input
-                      type="text"
-                      autoComplete="off"
-                      value={bien.brand}
-                      onChange={(evento) => setBien((previo) => ({ ...previo, brand: evento.target.value }))}
-                    />
-                  </label>
-                  <label className="formulario__campo">
-                    Modelo
-                    <input
-                      type="text"
-                      autoComplete="off"
-                      value={bien.model}
-                      onChange={(evento) => setBien((previo) => ({ ...previo, model: evento.target.value }))}
-                    />
-                  </label>
-                  <label className="formulario__campo">
-                    Año
-                    <input
-                      type="number"
-                      min="1885"
-                      max="2100"
-                      value={bien.year}
-                      onChange={(evento) => setBien((previo) => ({ ...previo, year: evento.target.value }))}
-                    />
-                  </label>
-                </div>
-                <label className="formulario__campo">
-                  Dirección
+                <label className="formulario__opcion">
                   <input
-                    type="text"
-                    autoComplete="off"
-                    value={bien.address}
-                    onChange={(evento) => setBien((previo) => ({ ...previo, address: evento.target.value }))}
+                    type="checkbox"
+                    checked={conBien}
+                    onChange={(evento) => setBien((previo) => ({ ...previo, conBien: evento.target.checked }))}
                   />
+                  Esta póliza asegura un bien
                 </label>
+                {conBien ? (
+                  <>
+                    <div className="formulario__fila">
+                      <label className="formulario__campo">
+                        Descripción
+                        <input
+                          type="text"
+                          autoComplete="off"
+                          value={bien.description}
+                          onChange={(evento) => setBien((previo) => ({ ...previo, description: evento.target.value }))}
+                          required
+                        />
+                      </label>
+                      {formatoBien.matricula !== null ? (
+                        <label className="formulario__campo">
+                          {formatoBien.matricula}
+                          <input
+                            type="text"
+                            autoComplete="off"
+                            value={bien.plate}
+                            onChange={(evento) => setBien((previo) => ({ ...previo, plate: evento.target.value }))}
+                          />
+                        </label>
+                      ) : null}
+                    </div>
+                    {formatoBien.vehiculo ? (
+                      <div className="formulario__fila">
+                        <label className="formulario__campo">
+                          Marca
+                          <input
+                            type="text"
+                            autoComplete="off"
+                            value={bien.brand}
+                            onChange={(evento) => setBien((previo) => ({ ...previo, brand: evento.target.value }))}
+                          />
+                        </label>
+                        <label className="formulario__campo">
+                          Modelo
+                          <input
+                            type="text"
+                            autoComplete="off"
+                            value={bien.model}
+                            onChange={(evento) => setBien((previo) => ({ ...previo, model: evento.target.value }))}
+                          />
+                        </label>
+                        <label className="formulario__campo">
+                          Año
+                          <input
+                            type="number"
+                            min="1885"
+                            max="2100"
+                            value={bien.year}
+                            onChange={(evento) => setBien((previo) => ({ ...previo, year: evento.target.value }))}
+                          />
+                        </label>
+                      </div>
+                    ) : null}
+                    {formatoBien.direccion ? (
+                      <label className="formulario__campo">
+                        Dirección
+                        <input
+                          type="text"
+                          autoComplete="off"
+                          value={bien.address}
+                          onChange={(evento) => setBien((previo) => ({ ...previo, address: evento.target.value }))}
+                        />
+                      </label>
+                    ) : null}
+                  </>
+                ) : null}
               </>
-            ) : null}
+            )}
           </fieldset>
 
           <fieldset className="formulario__grupo">

@@ -695,8 +695,6 @@ describe('endpoints de clientes', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        number: 'POL-00999',
-        companyId: 5,
         ramo: 'auto',
         status: 'activa',
         currency: 'ARS',
@@ -710,8 +708,6 @@ describe('endpoints de clientes', () => {
     await expect(response.json()).resolves.toMatchObject({ id: '3' })
     expect(edits.createdPolicies).toEqual([{
       customerId: 3,
-      number: 'POL-00999',
-      companyId: 5,
       ramo: 'auto',
       status: 'activa',
       currency: 'ARS',
@@ -726,8 +722,6 @@ describe('endpoints de clientes', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        number: 'POL-00999',
-        companyId: 5,
         ramo: 'auto',
         status: 'activa',
         currency: 'ARS',
@@ -741,13 +735,32 @@ describe('endpoints de clientes', () => {
     expect(edits.createdPolicies).toEqual([])
   })
 
-  it('rechaza un alta de póliza sin vigencia', async () => {
+  it('rechaza un alta de póliza con número: lo asigna el sistema', async () => {
     const response = await fetch(`${baseUrl}/api/clientes/1/polizas`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         number: 'POL-00999',
-        companyId: 5,
+        ramo: 'auto',
+        status: 'activa',
+        currency: 'ARS',
+        startDate: '2026-10-01',
+        expirationDate: '2027-10-01',
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { message: 'El número de póliza lo asigna el sistema automáticamente.' },
+    })
+    expect(edits.createdPolicies).toEqual([])
+  })
+
+  it('rechaza un alta de póliza sin vigencia', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/1/polizas`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
         ramo: 'auto',
         status: 'activa',
         currency: 'ARS',
@@ -758,14 +771,12 @@ describe('endpoints de clientes', () => {
     expect(edits.createdPolicies).toEqual([])
   })
 
-  it('reporta el conflicto de un número de póliza repetido en la compañía', async () => {
+  it('reporta el conflicto cuando el número que asigna el sistema está tomado', async () => {
     edits.conflict = true
     const response = await fetch(`${baseUrl}/api/clientes/1/polizas`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        number: 'POL-00123',
-        companyId: 5,
         ramo: 'auto',
         status: 'activa',
         currency: 'ARS',
@@ -783,8 +794,6 @@ describe('endpoints de clientes', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        number: 'POL-00999',
-        companyId: 5,
         ramo: 'auto',
         status: 'activa',
         currency: 'ARS',
@@ -803,8 +812,6 @@ describe('endpoints de clientes', () => {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        number: 'POL-00999',
-        companyId: 5,
         ramo: 'auto',
         status: 'activa',
         currency: 'ARS',
