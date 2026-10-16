@@ -1,9 +1,12 @@
 // Valores de los catálogos estado_poliza y ramo (migración 20260928140100).
 export const policyStatuses = ['activa', 'suspendida por mora', 'dada de baja'] as const
 export const ramos = ['auto', 'moto', 'vida', 'hogar', 'embarcaciones', 'comercio'] as const
+// Códigos del catálogo moneda (migración 20260928140100).
+export const currencies = ['ARS', 'USD'] as const
 
 export type PolicyStatus = (typeof policyStatuses)[number]
 export type Ramo = (typeof ramos)[number]
+export type Currency = (typeof currencies)[number]
 
 export function isPolicyStatus(value: unknown): value is PolicyStatus {
   return policyStatuses.some((status) => status === value)
@@ -13,20 +16,38 @@ export function isRamo(value: unknown): value is Ramo {
   return ramos.some((ramo) => ramo === value)
 }
 
+export function isCurrency(value: unknown): value is Currency {
+  return currencies.some((currency) => currency === value)
+}
+
+// Una fila de cuota. El importe va en centavos enteros, para sumar sin error de redondeo.
+export type Installment = {
+  number: number
+  // Fecha sin hora, aaaa-mm-dd.
+  dueDate: string
+  amountCents: number
+  paid: boolean
+}
+
 export type CustomerPolicy = {
   number: string
   ramo: Ramo
   status: PolicyStatus
   // Fecha sin hora, aaaa-mm-dd. «Vencida» no es un estado: se calcula con esta fecha.
   expirationDate: string
+  currency: Currency
+  // Ordenadas por número de cuota. Vacía si la póliza no tiene cuotas registradas.
+  installments: Installment[]
 }
 
 // Resumen que lleva el listado del panel: una línea por póliza con su tipo
-// (ramo) y su estado.
+// (ramo), su estado y su vencimiento, con el que se calcula si está vencida.
 export type CustomerPolicySummary = {
   number: string
   ramo: Ramo
   status: PolicyStatus
+  // Fecha sin hora, aaaa-mm-dd.
+  expirationDate: string
 }
 
 // El bien que asegura la póliza: patente para autos y motos, dirección para
@@ -40,15 +61,35 @@ export type InsuredItemDetail = {
   year: number | null
 }
 
-// Póliza como la muestra la ficha del panel: vigencia y bien incluidos.
+// Cobertura activa de la póliza, como la muestra la ficha del panel para
+// poder editarla. El importe va en centavos enteros.
+export type CoverageDetail = {
+  id: number
+  planId: number
+  planName: string
+  description: string | null
+  insuredSumCents: number | null
+}
+
+// Póliza como la muestra la ficha del panel y como la edita el formulario:
+// vigencia, compañía, moneda, prima, bien y coberturas incluidos. El id es
+// el que usan las ediciones del panel.
 export type PolicyDetail = {
+  id: string
   number: string
   ramo: Ramo
   status: PolicyStatus
+  currency: Currency
+  /** Compañía dueña del registro de la póliza. */
+  company: { id: string; name: string } | null
   // Fecha de inicio aaaa-mm-dd. Las fixtures de prueba no la tienen y queda null.
   startDate: string | null
   expirationDate: string
+  // Prima mensual en centavos; null si no está cargada.
+  premiumCents: number | null
+  observations: string | null
   insuredItem: InsuredItemDetail | null
+  coverages: CoverageDetail[]
 }
 
 export type Customer = {

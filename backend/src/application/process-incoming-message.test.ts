@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgencyInfo } from '../domain/agency-info.js'
 import type { AiClient, ContextMessage, CustomerStatus, RewriteInput } from '../domain/ai-client.js'
-import type { Customer } from '../domain/customer.js'
+import type { Customer, CustomerPolicy } from '../domain/customer.js'
 import type { Intent } from '../domain/intent.js'
 import {
   approvalNotice,
@@ -33,8 +33,8 @@ const ana: Customer = {
   firstName: 'Ana',
   lastName: 'Ficticia',
   policies: [
-    { number: 'POL-90001', ramo: 'auto', status: 'activa', expirationDate: '2027-03-15' },
-    { number: 'POL-90002', ramo: 'hogar', status: 'activa', expirationDate: '2026-09-01' },
+    { number: 'POL-90001', ramo: 'auto', status: 'activa', expirationDate: '2027-03-15', currency: 'ARS', installments: [] },
+    { number: 'POL-90002', ramo: 'hogar', status: 'activa', expirationDate: '2026-09-01', currency: 'ARS', installments: [] },
   ],
 }
 const bruno: Customer = {
@@ -42,7 +42,7 @@ const bruno: Customer = {
   dni: '99000002',
   firstName: 'Bruno',
   lastName: 'Ficticio',
-  policies: [{ number: 'POL-90003', ramo: 'moto', status: 'suspendida por mora', expirationDate: '2026-12-10' }],
+  policies: [{ number: 'POL-90003', ramo: 'moto', status: 'suspendida por mora', expirationDate: '2026-12-10', currency: 'ARS', installments: [] }],
 }
 const carla: Customer = { id: 3, dni: '99000003', firstName: 'Carla', lastName: 'Ficticia', policies: [] }
 
@@ -837,6 +837,118 @@ describe('respuestas (RF-ATE-02, RF-ATE-04)', () => {
     await expect(send(text)).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: `intención: ${intent}` })
     expect(lastText()).toBe(handoffMessage)
     expect(ai.rewritten).toEqual([])
+  })
+})
+
+describe('saldo (RF-ATE-01, RF-ATE-02)', () => {
+  // Hoy es el 07/10/2026 en Argentina: la cuota que vence hoy es por vencer.
+  const diegoPolicy: CustomerPolicy = {
+    number: 'POL-90010',
+    ramo: 'auto',
+    status: 'activa',
+    expirationDate: '2027-08-07',
+    currency: 'ARS',
+    installments: [
+      { number: 1, dueDate: '2026-08-07', amountCents: 4500000, paid: true },
+      { number: 2, dueDate: '2026-09-07', amountCents: 4500000, paid: false },
+      { number: 3, dueDate: '2026-10-07', amountCents: 4500000, paid: false },
+    ],
+  }
+  const diego: Customer = { id: 4, dni: '99000004', firstName: 'Diego', lastName: 'Ficticio', policies: [diegoPolicy] }
+  const elena: Customer = {
+    id: 5,
+    dni: '99000005',
+    firstName: 'Elena',
+    lastName: 'Ficticia',
+    policies: [{
+      number: 'POL-90011',
+      ramo: 'hogar',
+      status: 'activa',
+      expirationDate: '2027-01-10',
+      currency: 'USD',
+      installments: [{ number: 1, dueDate: '2026-09-10', amountCents: 2000, paid: true }],
+    }],
+  }
+  // Una póliza con cuotas y otra sin ninguna cuota registrada.
+  const fede: Customer = {
+    id: 6,
+    dni: '99000006',
+    firstName: 'Fede',
+    lastName: 'Ficticio',
+    policies: [
+      { ...diegoPolicy, number: 'POL-90012' },
+      { number: 'POL-90013', ramo: 'moto', status: 'activa', expirationDate: '2027-02-01', currency: 'ARS', installments: [] },
+    ],
+  }
+
+  beforeEach(() => {
+    customers = new InMemoryCustomerRepository([carla, diego, elena, fede])
+    restart()
+    ai.intents.set('¿cuánto debo?', 'saldo')
+  })
+
+  it('responde las cuotas vencidas y por vencer, en un caso de tipo saldo, sin derivar', async () => {
+    link(phone, diego)
+    await expect(send('¿cuánto debo?')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saldo' })
+    expect(lastText()).toBe(
+      [
+        'Diego, este es el detalle de las cuotas sin pagar de sus pólizas:',
+        '- POL-90010 (auto): 1 cuota vencida sin pagar por $ 45.000,00 y 1 cuota por vencer por $ 45.000,00.',
+      ].join('\n'),
+    )
+    const conversation = await openConversation()
+    expect(conversation.suspended).toBe(false)
+    expect(conversation.cases).toEqual([expect.objectContaining({ type: 'saldo', handedOff: false })])
+  })
+
+  it('con todas las cuotas pagas dice que no tiene ninguna pendiente', async () => {
+    link(phone, elena)
+    await expect(send('¿cuánto debo?')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saldo' })
+    expect(lastText()).toContain('- POL-90011 (hogar): no tiene ninguna cuota pendiente de pago.')
+  })
+
+  it('una póliza sin cuotas registradas deriva sin pedir la redacción y deja la conversación en silencio', async () => {
+    link(phone, fede)
+    await expect(send('¿cuánto debo?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'póliza sin cuotas registradas' })
+    expect(lastText()).toBe(handoffMessage)
+    expect(ai.rewritten).toEqual([])
+    expect((await openConversation()).suspended).toBe(true)
+  })
+
+  it('un cliente sin pólizas deriva como siempre', async () => {
+    link(phone, carla)
+    await expect(send('¿cuánto debo?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'cliente sin pólizas' })
+    expect(ai.rewritten).toEqual([])
+    expect((await openConversation()).suspended).toBe(true)
+  })
+
+  it('una redacción que cambia un importe no se envía, queda guardada y se deriva', async () => {
+    link(phone, diego)
+    ai.rewriteResult = (input) => input.template.replace('$ 45.000,00 y', '$ 40.000,00 y')
+    await expect(send('¿cuánto debo?')).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
+    expect(lastText()).toBe(handoffMessage)
+    expect(whatsapp.textsTo(phone).some((text) => text.includes('40.000,00'))).toBe(false)
+
+    const state = store.snapshot()
+    expect(state.replies.find((reply) => reply.sentMessageId === null)?.text).toContain('$ 40.000,00')
+    expect(state.cases.find((item) => item.handedOffAt !== null)?.handoffReason).toBe('redacción rechazada: datos distintos de la plantilla')
+    expect((await openConversation()).suspended).toBe(true)
+  })
+
+  it('una redacción que intercambia vencidas y por vencer se deriva', async () => {
+    link(phone, diego)
+    ai.rewriteResult = () =>
+      'Diego, en la POL-90010 de auto tiene 1 cuota por vencer por $ 45.000,00 y 1 cuota vencida sin pagar por $ 45.000,00.'
+    await expect(send('¿cuánto debo?')).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
+    expect(lastText()).toBe(handoffMessage)
+  })
+
+  it('se envía una redacción que conserva importes, cantidades y orden', async () => {
+    link(phone, diego)
+    ai.rewriteResult = () =>
+      'Diego, le cuento: en la POL-90010 de auto tiene 1 cuota vencida sin pagar por $ 45.000,00 y 1 cuota por vencer por $ 45.000,00.'
+    await expect(send('¿cuánto debo?')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saldo' })
+    expect(lastText()).toContain('le cuento')
   })
 })
 

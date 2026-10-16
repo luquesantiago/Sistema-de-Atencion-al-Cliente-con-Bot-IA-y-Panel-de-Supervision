@@ -125,6 +125,45 @@ export function IconoCandado({ className }: IconoProps) {
   )
 }
 
+// Estados de póliza: texto, icono y color, nunca solo color.
+export function IconoActiva({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="m8.2 12.3 2.5 2.5 5.1-5.3" />
+    </PanelIcono>
+  )
+}
+
+export function IconoVencida({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.4V12l3.1 1.9" />
+    </PanelIcono>
+  )
+}
+
+export function IconoSuspendida({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <path d="M12 4.6 21 19.4H3z" />
+      <path d="M12 10.2v3.9" />
+      <path d="M12 16.7h.01" />
+    </PanelIcono>
+  )
+}
+
+export function IconoBaja({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="m9.3 9.3 5.4 5.4" />
+      <path d="m14.7 9.3-5.4 5.4" />
+    </PanelIcono>
+  )
+}
+
 const ICONOS: Record<ModuloPanel, (props: IconoProps) => ReactNode> = {
   dashboard: IconoDashboard,
   bandeja: IconoBandeja,

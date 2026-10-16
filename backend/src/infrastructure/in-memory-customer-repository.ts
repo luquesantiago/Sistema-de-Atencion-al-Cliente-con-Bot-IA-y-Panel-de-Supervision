@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import {
+  isCurrency,
   isPolicyStatus,
   isRamo,
   type Customer,
@@ -9,6 +10,7 @@ import {
   type CustomerPage,
   type CustomerPolicy,
   type CustomerRepository,
+  type Installment,
 } from '../domain/customer.js'
 
 // Doble de prueba de la cartera: el asistente usa PrismaCustomerRepository. El cargador de
@@ -72,9 +74,24 @@ export class InMemoryCustomerRepository implements CustomerRepository {
       firstName: customer.firstName,
       lastName: customer.lastName,
       phones: this.phonesOf(customer.id),
-      // Las fixtures no traen vigencia ni bien asegurado: la ficha lo dice
-      // con null en lugar de inventar datos (el API real sí los tiene).
-      policies: customer.policies.map((policy) => ({ ...policy, startDate: null, insuredItem: null })),
+      // Las fixtures no traen vigencia, compañía, prima, bien asegurado ni
+      // coberturas: la ficha lo dice con null o lista vacía en lugar de
+      // inventar datos (el API real sí los tiene). El id de póliza tampoco
+      // viene de las fixtures: se usa el índice, que sirve para las pruebas.
+      policies: customer.policies.map((policy, index) => ({
+        id: String(index + 1),
+        number: policy.number,
+        ramo: policy.ramo,
+        status: policy.status,
+        currency: policy.currency,
+        company: null,
+        startDate: null,
+        expirationDate: policy.expirationDate,
+        premiumCents: null,
+        observations: null,
+        insuredItem: null,
+        coverages: [],
+      })),
     }
   }
 
@@ -128,6 +145,7 @@ function toInMemoryListItem(customer: Customer, phones: Array<{ id: number; numb
       number: policy.number,
       ramo: policy.ramo,
       status: policy.status,
+      expirationDate: policy.expirationDate,
     })),
   }
 }
@@ -165,16 +183,44 @@ function parsePolicy(value: unknown, path: string): CustomerPolicy {
   if (!isRecord(value)) throw new Error(`${path} no es un objeto`)
   const ramo = value.ramo
   const status = value.status
-  const expirationDate = requiredString(value, 'expirationDate', path)
+  const currency = value.currency
+  const installments = value.installments
+  const expirationDate = requiredDate(value, 'expirationDate', path)
   if (!isRamo(ramo)) throw new Error(`${path}.ramo no está en el catálogo`)
   if (!isPolicyStatus(status)) throw new Error(`${path}.status no está en el catálogo`)
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(expirationDate)) throw new Error(`${path}.expirationDate tiene que ser aaaa-mm-dd`)
+  if (!isCurrency(currency)) throw new Error(`${path}.currency no está en el catálogo`)
+  if (!Array.isArray(installments)) throw new Error(`${path}.installments no es un arreglo`)
   return {
     number: requiredString(value, 'number', path),
     ramo,
     status,
     expirationDate,
+    currency,
+    installments: installments
+      .map((installment, index) => parseInstallment(installment, `${path}.installments[${index}]`))
+      .sort((a, b) => a.number - b.number),
   }
+}
+
+function parseInstallment(value: unknown, path: string): Installment {
+  if (!isRecord(value)) throw new Error(`${path} no es un objeto`)
+  const amountCents = value.amountCents
+  if (typeof amountCents !== 'number' || !Number.isSafeInteger(amountCents) || amountCents < 0) {
+    throw new Error(`${path}.amountCents tiene que ser un entero no negativo`)
+  }
+  if (typeof value.paid !== 'boolean') throw new Error(`${path}.paid tiene que ser true o false`)
+  return {
+    number: requiredPositiveInteger(value, 'number', path),
+    dueDate: requiredDate(value, 'dueDate', path),
+    amountCents,
+    paid: value.paid,
+  }
+}
+
+function requiredDate(record: Record<string, unknown>, key: string, path: string): string {
+  const value = requiredString(record, key, path)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error(`${path}.${key} tiene que ser aaaa-mm-dd`)
+  return value
 }
 
 function requiredString(record: Record<string, unknown>, key: string, path: string): string {

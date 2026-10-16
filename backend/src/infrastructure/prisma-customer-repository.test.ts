@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { Prisma } from '../generated/prisma/client.js'
 import {
   customerFromRecord,
   toDetail,
@@ -16,6 +17,8 @@ function policy(numero: string, overrides: Partial<CustomerRecord['poliza'][numb
     activo: true,
     ramo: { nombre: 'auto' },
     estado_poliza: { nombre: 'activa' },
+    moneda: { codigo: 'ARS' },
+    cuota: [],
     ...overrides,
   }
 }
@@ -46,8 +49,8 @@ describe('customerFromRecord', () => {
       firstName: 'Ana',
       lastName: 'Ficticia',
       policies: [
-        { number: 'POL-00126', ramo: 'auto', status: 'suspendida por mora', expirationDate: '2027-03-15' },
-        { number: 'POL-00131', ramo: 'hogar', status: 'activa', expirationDate: '2026-09-01' },
+        { number: 'POL-00126', ramo: 'auto', status: 'suspendida por mora', expirationDate: '2027-03-15', currency: 'ARS', installments: [] },
+        { number: 'POL-00131', ramo: 'hogar', status: 'activa', expirationDate: '2026-09-01', currency: 'ARS', installments: [] },
       ],
     })
   })
@@ -70,6 +73,35 @@ describe('customerFromRecord', () => {
       .toThrow('fuera de catálogo')
   })
 
+  it('da la moneda y las cuotas, con el importe en centavos exactos y si están pagas', () => {
+    const customer = customerFromRecord(record({
+      poliza: [policy('POL-00126', {
+        moneda: { codigo: 'USD' },
+        cuota: [
+          { numero_cuota: 2, fecha_vencimiento: new Date('2026-11-15T00:00:00.000Z'), importe: new Prisma.Decimal('12345.67'), fecha_pago: null },
+          {
+            numero_cuota: 1,
+            fecha_vencimiento: new Date('2026-10-15T00:00:00.000Z'),
+            importe: new Prisma.Decimal('0.1'),
+            fecha_pago: new Date('2026-10-14T00:00:00.000Z'),
+          },
+        ],
+      })],
+    }))
+    expect(customer?.policies[0]).toMatchObject({
+      currency: 'USD',
+      installments: [
+        { number: 1, dueDate: '2026-10-15', amountCents: 10, paid: true },
+        { number: 2, dueDate: '2026-11-15', amountCents: 1234567, paid: false },
+      ],
+    })
+  })
+
+  it('una moneda fuera del catálogo lanza', () => {
+    expect(() => customerFromRecord(record({ poliza: [policy('POL-00126', { moneda: { codigo: 'EUR' } })] })))
+      .toThrow('fuera de catálogo')
+  })
+
   it('un estado fuera del catálogo lanza', () => {
     expect(() => customerFromRecord(record({ poliza: [policy('POL-00126', { estado_poliza: { nombre: 'vigente' } })] })))
       .toThrow('fuera de catálogo')
@@ -87,8 +119,8 @@ describe('mappers de la cartera', () => {
       apellido: null,
       cliente_telefono: [{ telefono: { numero: '5491155552002' } }],
       poliza: [
-        { numero_poliza: 'POL-00500', ramo: { nombre: 'comercio' }, estado_poliza: { nombre: 'activa' } },
-        { numero_poliza: 'POL-00501', ramo: { nombre: 'hogar' }, estado_poliza: { nombre: 'dada de baja' } },
+        { numero_poliza: 'POL-00500', fecha_vencimiento: new Date('2026-03-01T00:00:00.000Z'), ramo: { nombre: 'comercio' }, estado_poliza: { nombre: 'activa' } },
+        { numero_poliza: 'POL-00501', fecha_vencimiento: new Date('2026-06-15T00:00:00.000Z'), ramo: { nombre: 'hogar' }, estado_poliza: { nombre: 'dada de baja' } },
       ],
     }
 
@@ -101,8 +133,8 @@ describe('mappers de la cartera', () => {
       lastName: null,
       phones: ['5491155552002'],
       policies: [
-        { number: 'POL-00500', ramo: 'comercio', status: 'activa' },
-        { number: 'POL-00501', ramo: 'hogar', status: 'dada de baja' },
+        { number: 'POL-00500', ramo: 'comercio', status: 'activa', expirationDate: '2026-03-01' },
+        { number: 'POL-00501', ramo: 'hogar', status: 'dada de baja', expirationDate: '2026-06-15' },
       ],
     })
   })
@@ -118,9 +150,14 @@ describe('mappers de la cartera', () => {
       cliente_telefono: [{ telefono: { id_telefono: 19, numero: '5491155552002' } }],
       poliza: [
         {
+          id_poliza: 91,
           numero_poliza: 'POL-00500',
           fecha_inicio: new Date('2025-01-15T00:00:00.000Z'),
           fecha_vencimiento: new Date('2026-03-01T00:00:00.000Z'),
+          prima_mensual: new Prisma.Decimal('15500.00'),
+          observaciones: 'Póliza con pago domiciliado',
+          moneda: { codigo: 'ARS' },
+          compania_aseguradora: { id_compania: 3, nombre: 'Seguros Castaño' },
           ramo: { nombre: 'auto' },
           estado_poliza: { nombre: 'activa' },
           bien_asegurado: {
@@ -131,15 +168,30 @@ describe('mappers de la cartera', () => {
             modelo: 'Gol Trend',
             anio: 2018,
           },
+          cobertura: [
+            {
+              id_cobertura: 5,
+              id_plan: 2,
+              descripcion: 'Responsabilidad civil',
+              suma_asegurada: new Prisma.Decimal('1000000.00'),
+              plan: { nombre: 'Básico' },
+            },
+          ],
         },
         {
-          // Las pólizas de vida no aseguran un bien.
+          // Las pólizas de vida no aseguran un bien ni traen coberturas.
+          id_poliza: 92,
           numero_poliza: 'POL-00502',
           fecha_inicio: new Date('2025-06-01T00:00:00.000Z'),
           fecha_vencimiento: new Date('2026-06-01T00:00:00.000Z'),
+          prima_mensual: null,
+          observaciones: null,
+          moneda: { codigo: 'ARS' },
+          compania_aseguradora: { id_compania: 3, nombre: 'Seguros Castaño' },
           ramo: { nombre: 'vida' },
           estado_poliza: { nombre: 'activa' },
           bien_asegurado: null,
+          cobertura: [],
         },
       ],
     }
@@ -154,11 +206,16 @@ describe('mappers de la cartera', () => {
       phones: [{ id: 19, number: '5491155552002' }],
       policies: [
         {
+          id: '91',
           number: 'POL-00500',
           ramo: 'auto',
           status: 'activa',
+          currency: 'ARS',
+          company: { id: '3', name: 'Seguros Castaño' },
           startDate: '2025-01-15',
           expirationDate: '2026-03-01',
+          premiumCents: 1_550_000,
+          observations: 'Póliza con pago domiciliado',
           insuredItem: {
             description: 'Volkswagen Gol',
             plate: 'AB789CD',
@@ -167,14 +224,23 @@ describe('mappers de la cartera', () => {
             model: 'Gol Trend',
             year: 2018,
           },
+          coverages: [
+            { id: 5, planId: 2, planName: 'Básico', description: 'Responsabilidad civil', insuredSumCents: 100_000_000 },
+          ],
         },
         {
+          id: '92',
           number: 'POL-00502',
           ramo: 'vida',
           status: 'activa',
+          currency: 'ARS',
+          company: { id: '3', name: 'Seguros Castaño' },
           startDate: '2025-06-01',
           expirationDate: '2026-06-01',
+          premiumCents: null,
+          observations: null,
           insuredItem: null,
+          coverages: [],
         },
       ],
     })
@@ -190,12 +256,18 @@ describe('mappers de la cartera', () => {
       apellido: 'Benítez',
       cliente_telefono: [],
       poliza: [{
+        id_poliza: 93,
         numero_poliza: 'POL-00501',
         fecha_inicio: new Date('2025-03-01T00:00:00.000Z'),
         fecha_vencimiento: new Date('2026-03-01T00:00:00.000Z'),
+        prima_mensual: null,
+        observaciones: null,
+        moneda: { codigo: 'ARS' },
+        compania_aseguradora: { id_compania: 3, nombre: 'Seguros Castaño' },
         ramo: { nombre: 'pirata' },
         estado_poliza: { nombre: 'activa' },
         bien_asegurado: null,
+        cobertura: [],
       }],
     }
 
@@ -211,7 +283,12 @@ describe('mappers de la cartera', () => {
       nombre: 'Sofía',
       apellido: 'Benítez',
       cliente_telefono: [],
-      poliza: [{ numero_poliza: 'POL-00501', ramo: { nombre: 'pirata' }, estado_poliza: { nombre: 'activa' } }],
+      poliza: [{
+        numero_poliza: 'POL-00501',
+        fecha_vencimiento: new Date('2026-03-01T00:00:00.000Z'),
+        ramo: { nombre: 'pirata' },
+        estado_poliza: { nombre: 'activa' },
+      }],
     }
 
     expect(() => toListItem(record)).toThrow('fuera de catálogo')

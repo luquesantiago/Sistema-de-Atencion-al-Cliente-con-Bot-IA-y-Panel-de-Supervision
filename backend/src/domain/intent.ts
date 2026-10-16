@@ -23,7 +23,7 @@ export const intents = [
 
 export type Intent = (typeof intents)[number]
 
-export type AnswerTemplate = 'expirations' | 'statuses' | 'courtesy' | 'agency'
+export type AnswerTemplate = 'expirations' | 'statuses' | 'balance' | 'courtesy' | 'agency'
 
 export type IntentAction =
   | { kind: 'answer'; template: AnswerTemplate }
@@ -45,6 +45,8 @@ export function actionForIntent(intent: Intent): IntentAction {
       return { kind: 'answer', template: 'expirations' }
     case 'estado de póliza':
       return { kind: 'answer', template: 'statuses' }
+    case 'saldo':
+      return { kind: 'answer', template: 'balance' }
     case 'saludo':
       return { kind: 'answer', template: 'courtesy' }
     case 'información de la agencia':
@@ -59,7 +61,6 @@ export function actionForIntent(intent: Intent): IntentAction {
       return { kind: 'clarify' }
     case 'siniestro':
     case 'cotización':
-    case 'saldo':
     case 'cobertura':
     case 'reclamo':
     case 'otra consulta':

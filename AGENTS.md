@@ -24,7 +24,7 @@ Mensaje sugerido para derivaciones: “Su pregunta será derivada a un miembro d
 
 ### Fuera de alcance
 
-No implementar emisión ni cotización de pólizas, integración con compañías, contabilidad, comisiones, cobranzas, pagos, reembolsos automáticos, otros canales, ni aplicación móvil para clientes. Un pedido de reembolso se registra como aviso al equipo.
+No implementar emisión ni cotización de pólizas, integración con compañías, contabilidad, comisiones, cobranzas, pagos, reembolsos automáticos, otros canales, ni aplicación móvil para clientes. Un pedido de reembolso se registra como aviso al equipo. La alta de pólizas del panel de Base de Clientes es carga de cartera (ABM) sobre un cliente que ya existe, no emisión ni cotización.
 
 ### Entregas
 
@@ -58,20 +58,21 @@ No implementar emisión ni cotización de pólizas, integración con compañías
 
 ## Parcial 1 (08/10/2026): alcance y flujo
 
-Se muestra una conversación por WhatsApp de punta a punta, con los datos históricos migrados. Mientras la cátedra no diga otra cosa, el Parcial 1 no incluye ABM.
+Se muestra una conversación por WhatsApp de punta a punta, con los datos históricos migrados. Mientras la cátedra no diga otra cosa, el Parcial 1 no incluye el ABM de la consigna original (lo que se incorpora es el ABM acordado con el equipo para Base de Clientes, con edición directa, diálogo de confirmación y sin auditoría hasta el MVP 2; ver «Decisiones abiertas»). El Parcial 2 sí incluye reglas de negocio complejas, reportes y métricas, y control de acceso por rol.
 
 1. Si el número de WhatsApp está vinculado a un solo cliente activo, el asistente lo atiende como ese cliente sin pedir el DNI. Si está vinculado a varios, pide el DNI antes de responder cualquier cosa, salvo la información de la agencia. Si no está vinculado, pregunta si ya es cliente o si es nuevo; la IA interpreta la respuesta y, si es un cliente existente, se pide y valida el DNI.
 2. Para un cliente nuevo, el asistente solicita nombre y apellido, DNI y foto del DNI; guarda nombre, DNI y teléfono como prospecto pendiente, no conserva una copia de la foto y deriva el caso.
 3. Para un número no vinculado, el LLM primero clasifica la respuesta a «¿ya es cliente o es nuevo?» como cliente nuevo, cliente existente o ajena/ambigua. Para los números vinculados a varios clientes, y para quienes confirman que ya son clientes, el DNI sigue siendo obligatorio. Una vez identificado, el LLM elige la intención de una lista cerrada: el catálogo `tipo_consulta` (que incluye «cambio de teléfono» e «información de la agencia»), más «no es de seguros», «otra consulta» y «no se entiende». Antes de identificarse, en los mensajes sin DNI, la elige solo para saber si piden la información de la agencia.
 4. Según la intención:
    - Vencimiento o estado de la póliza: responde el asistente. Si el cliente tiene varias pólizas, responde todas juntas, una línea por póliza con el número, el ramo y el dato pedido.
+   - Saldo: responde el asistente con las cuotas sin pagar de cada póliza, una línea por póliza con las vencidas y las por vencer y sus importes; si una póliza no tiene cuotas registradas, deriva.
    - Saludo o agradecimiento: responde con una plantilla de cortesía, sin derivar.
    - Información de la agencia (ramos y planes activos, dirección, teléfono y horario de atención): responde el asistente, también antes de identificarse, y después repite la pregunta pendiente (si ya es cliente o el DNI). No la responde mientras toma los datos de un cliente nuevo ni en silencio.
    - Cambio de teléfono pedido desde un número ya vinculado: le pide que escriba desde el número nuevo.
    - Baja o modificación (incluida el alta de conductor): le avisa que un miembro del equipo va a revisar el pedido, sin darlo por hecho, y deja de responder en esa conversación.
    - Lo que no es de seguros, incluidas las preguntas sobre cómo funciona el asistente: contesta con un texto fijo que no tiene que ver con Seguros Castaño, sin redacción de la IA y sin derivar.
    - Lo que no se entiende, ni con los mensajes anteriores: repregunta con un texto fijo, hasta 2 veces seguidas; si el tercer mensaje seguido tampoco se entiende, deriva.
-   - Cualquier otra cosa (incluidos siniestro, cotización, saldo, cobertura, reclamo, medios de pago y pedidos de grúa o asistencia): deriva a la bandeja de un operador.
+   - Cualquier otra cosa (incluidos siniestro, cotización, cobertura, reclamo, medios de pago y pedidos de grúa o asistencia): deriva a la bandeja de un operador.
 
 Reglas del Parcial 1:
 
@@ -167,13 +168,13 @@ No cerrar por código sin confirmación del cliente. Si una tarea depende de alg
 - No pedir el DNI cuando el número está vinculado a un solo cliente activo (reglas 1 y 2) es una propuesta del equipo (07/10/2026) que la agencia todavía no validó: en la entrevista del 16/09/2026 pidió identificar por DNI en todos los casos (RF-ATE-03). Mientras tanto rige como está escrita.
 - Responder la información de la agencia (RF-ATE-06), también antes de identificarse, es una propuesta del equipo (07/10/2026) que la agencia todavía no validó. Mientras tanto rige como está escrita.
 - Dirección y teléfono de la agencia: los que informa el asistente («Ficticia 123» y 11 7816-8015) son datos de ejemplo, guardados en `parametro_configuracion` y marcados así, hasta que la agencia informe los reales.
-- Si el Parcial 1 tiene que incluir ABM. Mientras tanto, no.
+- ¿Parcial 1 incluye ABM? Sí: el panel de Base de Clientes tiene alta y baja lógica de clientes, edición de identidad (DNI fijo), vínculos de teléfono, y edición y alta de pólizas —la alta pide categoría, estado, moneda, vigencia y, si el bien lo tiene, su bien asegurado y sus coberturas; el número de póliza lo asigna el sistema (POL-<siguiente>) y la compañía es siempre la de la cartera, y todo se crea en la misma transacción en la ficha de un cliente que ya existe—, con diálogo de confirmación campo actual → nuevo (en el alta, el resumen de lo que se crea) y sin motivo ni auditoría (la tabla `auditoria` queda para el MVP 2). Esa edición es directa del operador o del administrador: la solicitud con aprobación (regla 8) solo cubre los pedidos que llegan por WhatsApp desde el asistente, y la regla 10 de trazabilidad queda pendiente hasta que exista la auditoría.
 - Requisitos y documentación de cada acción crítica, y si un alta de conductor aprobada la aplica el sistema o la carga el operador.
 - Qué ficha vale en los clientes duplicados y quién es el titular del VW Gol. Mientras tanto, la migración sigue `docs/migracion.md`: el duplicado exacto quedó en una sola fila y las pólizas POL-00126 y POL-00131 se omiten.
 - Inconsistencias entre las hojas de la planilla (casos vinculados a una póliza de otro ramo, un vencimiento que no coincide y primas sin símbolo de moneda). Mientras tanto, esos casos quedan sin póliza y las primas sin símbolo se toman como pesos.
 - Valores del catálogo de planes (el nombre "riesgos incompletos" está a verificar) y coberturas de vida, hogar y embarcaciones, que no se relevaron. La estructura sí está decidida: los planes son iguales para cualquier bien y se cargan con ABM.
 - Compañía aseguradora: que Seguros Castaño figure como la aseguradora es un supuesto del equipo.
-- Cuotas de las pólizas.
+- Cuotas de las pólizas. Mientras tanto, las cuotas de la base son de ejemplo (`docs/migracion.md`).
 - Si el asistente pide CUIT a los clientes empresa.
 - Tratamiento de datos sensibles.
 - Qué hace el asistente con los audios, las fotos y los archivos sin texto. Mientras tanto, el canal los ignora sin responder y deja una línea en el log del backend; si la foto trae epígrafe, procesa el texto. Las excepciones son la foto del DNI del cliente nuevo y la imagen que llega a una conversación en silencio: se procesan sin guardar la imagen, y queda un mensaje con un texto que dice que el cliente la mandó.

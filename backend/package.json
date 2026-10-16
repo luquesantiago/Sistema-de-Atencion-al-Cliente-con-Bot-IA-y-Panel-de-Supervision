@@ -6,6 +6,7 @@
     "dev": "tsx watch src/index.ts",
     "test": "vitest run --passWithNoTests",
     "migrar-planilla": "tsx scripts/migrar-planilla.ts",
+    "cargar-cuotas-ejemplo": "tsx scripts/cargar-cuotas-ejemplo.ts",
     "postinstall": "prisma generate"
   },
   "keywords": [],

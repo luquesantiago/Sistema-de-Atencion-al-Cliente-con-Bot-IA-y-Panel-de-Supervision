@@ -72,7 +72,7 @@ La identidad fija de prueba debe reemplazarse por autenticación y autorización
 
 ## Cartera de clientes
 
-Endpoints de solo lectura para la pantalla Base de Clientes del panel (RF-CAR-01, RF-CAR-02 y RF-CAR-03). La cartera se identifica por DNI; el teléfono no identifica y un número compartido puede devolver más de un cliente. No hay altas, bajas ni modificaciones por estos endpoints: la cartera se carga con la migración.
+Endpoints de solo lectura y de edición para la pantalla Base de Clientes del panel (RF-CAR-01, RF-CAR-02 y RF-CAR-03). La cartera se identifica por DNI; el teléfono no identifica y un número compartido puede devolver más de un cliente. El panel permite alta y baja lógica de clientes, edición de la identidad, vínculos de teléfono, y edición y alta de pólizas (bien asegurado y coberturas). En un alta, el número de póliza lo asigna el sistema (POL-<última + 1>, con el largo que ya usan las de la cartera) y la compañía es siempre la de la cartera: se piden en el formulario el resto de los datos del contrato. El bien asegurado depende de la categoría elegida y las pólizas de vida no tienen. Son ediciones directas del operador o del administrador, sin solicitud ni aprobación (la regla 8 solo cubre los pedidos que llegan por WhatsApp desde el asistente) y sin motivo ni auditoría: la auditoría de estas ediciones queda para el MVP 2 (tabla `auditoria`). La alta de pólizas es carga de cartera (ABM) sobre un cliente que ya existe, no emisión ni cotización, que siguen fuera de alcance. La cartera histórica se carga con la migración.
 
 ### Listar clientes
 
@@ -90,15 +90,15 @@ Devuelve `{ items, total, limit, offset }`, ordenados por apellido (o razón soc
   "lastName": "Gómez",
   "phones": ["5491155551001"],
   "policies": [
-    { "number": "POL-00123", "ramo": "auto", "status": "activa" }
+    { "number": "POL-00123", "ramo": "auto", "status": "activa", "expirationDate": "2025-01-15" }
   ]
 }
 ```
 
-Las empresas vienen con `cuit` y `razonSocial` y `dni` en `null`. `phones` y `policies` solo incluyen teléfonos y pólizas activos: cada póliza del listado trae tipo (`ramo`) y estado, que es lo que muestra la tabla del panel. Una búsqueda sin coincidencias devuelve `items: []` y `total: 0`, no un `404`.
+Las empresas vienen con `cuit` y `razonSocial` y `dni` en `null`. `phones` y `policies` solo incluyen teléfonos y pólizas activos: cada póliza del listado trae tipo (`ramo`), estado y `expirationDate`, con el que el panel muestra «vencida» aplicando la misma regla del asistente (`isExpired`/`displayStatus` en `src/domain/templates.ts`: solo una póliza `activa` ya vencida se muestra como vencida). Una búsqueda sin coincidencias devuelve `items: []` y `total: 0`, no un `404`.
 
 ### Detalle de un cliente
 
 `GET /api/clientes/:id`
 
-Devuelve el mismo encabezado, con `phones` como lista de `{ id, number }` (el `id` es el que se usa para desvincular teléfonos en los trámites) y `policies` como ficha de cada póliza, ordenadas por vencimiento: `number`, `ramo` (el tipo, que el panel muestra como «Cobertura»), `status`, `startDate` (inicio de la vigencia, `null` en las fixtures de prueba), `expirationDate` y `insuredItem`. `insuredItem` es el bien asegurado (`description`, `plate`, `address`, `brand`, `model`, `year`) o `null` en los ramos que no aseguran un bien, como vida. Un identificador no numérico responde `400` y uno inexistente `404`, con el mismo formato de error de arriba.
+Devuelve el mismo encabezado, con `phones` como lista de `{ id, number }` (el `id` es el que se usa para desvincular teléfonos en los trámites) y `policies` como ficha de cada póliza, ordenadas por vencimiento: `number`, `ramo` (el tipo, que el panel muestra como «Categoría»), `status`, `startDate` (inicio de la vigencia, `null` en las fixtures de prueba), `expirationDate` y `insuredItem`. `insuredItem` es el bien asegurado (`description`, `plate`, `address`, `brand`, `model`, `year`) o `null` en los ramos que no aseguran un bien, como vida. Un identificador no numérico responde `400` y uno inexistente `404`, con el mismo formato de error de arriba.
