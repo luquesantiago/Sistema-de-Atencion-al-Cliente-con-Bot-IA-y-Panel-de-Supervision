@@ -150,9 +150,14 @@ describe('mappers de la cartera', () => {
       cliente_telefono: [{ telefono: { id_telefono: 19, numero: '5491155552002' } }],
       poliza: [
         {
+          id_poliza: 91,
           numero_poliza: 'POL-00500',
           fecha_inicio: new Date('2025-01-15T00:00:00.000Z'),
           fecha_vencimiento: new Date('2026-03-01T00:00:00.000Z'),
+          prima_mensual: new Prisma.Decimal('15500.00'),
+          observaciones: 'Póliza con pago domiciliado',
+          moneda: { codigo: 'ARS' },
+          compania_aseguradora: { id_compania: 3, nombre: 'Seguros Castaño' },
           ramo: { nombre: 'auto' },
           estado_poliza: { nombre: 'activa' },
           bien_asegurado: {
@@ -163,15 +168,30 @@ describe('mappers de la cartera', () => {
             modelo: 'Gol Trend',
             anio: 2018,
           },
+          cobertura: [
+            {
+              id_cobertura: 5,
+              id_plan: 2,
+              descripcion: 'Responsabilidad civil',
+              suma_asegurada: new Prisma.Decimal('1000000.00'),
+              plan: { nombre: 'Básico' },
+            },
+          ],
         },
         {
-          // Las pólizas de vida no aseguran un bien.
+          // Las pólizas de vida no aseguran un bien ni traen coberturas.
+          id_poliza: 92,
           numero_poliza: 'POL-00502',
           fecha_inicio: new Date('2025-06-01T00:00:00.000Z'),
           fecha_vencimiento: new Date('2026-06-01T00:00:00.000Z'),
+          prima_mensual: null,
+          observaciones: null,
+          moneda: { codigo: 'ARS' },
+          compania_aseguradora: { id_compania: 3, nombre: 'Seguros Castaño' },
           ramo: { nombre: 'vida' },
           estado_poliza: { nombre: 'activa' },
           bien_asegurado: null,
+          cobertura: [],
         },
       ],
     }
@@ -186,11 +206,16 @@ describe('mappers de la cartera', () => {
       phones: [{ id: 19, number: '5491155552002' }],
       policies: [
         {
+          id: '91',
           number: 'POL-00500',
           ramo: 'auto',
           status: 'activa',
+          currency: 'ARS',
+          company: { id: '3', name: 'Seguros Castaño' },
           startDate: '2025-01-15',
           expirationDate: '2026-03-01',
+          premiumCents: 1_550_000,
+          observations: 'Póliza con pago domiciliado',
           insuredItem: {
             description: 'Volkswagen Gol',
             plate: 'AB789CD',
@@ -199,14 +224,23 @@ describe('mappers de la cartera', () => {
             model: 'Gol Trend',
             year: 2018,
           },
+          coverages: [
+            { id: 5, planId: 2, planName: 'Básico', description: 'Responsabilidad civil', insuredSumCents: 100_000_000 },
+          ],
         },
         {
+          id: '92',
           number: 'POL-00502',
           ramo: 'vida',
           status: 'activa',
+          currency: 'ARS',
+          company: { id: '3', name: 'Seguros Castaño' },
           startDate: '2025-06-01',
           expirationDate: '2026-06-01',
+          premiumCents: null,
+          observations: null,
           insuredItem: null,
+          coverages: [],
         },
       ],
     })
@@ -222,12 +256,18 @@ describe('mappers de la cartera', () => {
       apellido: 'Benítez',
       cliente_telefono: [],
       poliza: [{
+        id_poliza: 93,
         numero_poliza: 'POL-00501',
         fecha_inicio: new Date('2025-03-01T00:00:00.000Z'),
         fecha_vencimiento: new Date('2026-03-01T00:00:00.000Z'),
+        prima_mensual: null,
+        observaciones: null,
+        moneda: { codigo: 'ARS' },
+        compania_aseguradora: { id_compania: 3, nombre: 'Seguros Castaño' },
         ramo: { nombre: 'pirata' },
         estado_poliza: { nombre: 'activa' },
         bien_asegurado: null,
+        cobertura: [],
       }],
     }
 

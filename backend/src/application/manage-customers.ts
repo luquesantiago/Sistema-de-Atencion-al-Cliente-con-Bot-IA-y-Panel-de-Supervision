@@ -10,7 +10,8 @@ export type ListCustomersInput = PageRequest & {
 }
 
 // Casos de uso de la cartera para el panel de supervisión (RF-CAR-01,
-// RF-CAR-02 y RF-CAR-03). Solo lectura: no alta, ni baja, ni modificación.
+// RF-CAR-02 y RF-CAR-03). Solo lectura: las altas, bajas y modificaciones
+// están en ManageCustomerEdits.
 export class ManageCustomers {
   public constructor(private readonly repository: CustomerRepository) {}
 

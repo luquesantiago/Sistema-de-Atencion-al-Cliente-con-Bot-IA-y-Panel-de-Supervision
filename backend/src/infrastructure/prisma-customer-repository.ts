@@ -98,7 +98,18 @@ export class PrismaCustomerRepository implements CustomerRepository {
         poliza: {
           where: { activo: true },
           orderBy: [{ fecha_vencimiento: 'asc' }, { numero_poliza: 'asc' }],
-          include: { ramo: true, estado_poliza: true, bien_asegurado: true },
+          include: {
+            ramo: true,
+            estado_poliza: true,
+            moneda: true,
+            compania_aseguradora: true,
+            bien_asegurado: true,
+            cobertura: {
+              where: { activo: true },
+              orderBy: { id_cobertura: 'asc' },
+              include: { plan: true },
+            },
+          },
         },
       },
     })
@@ -172,9 +183,17 @@ type PolicySummaryRecord = {
   estado_poliza: { nombre: string }
 }
 
-// La ficha agrega la vigencia y el bien asegurado, que puede no existir (vida).
+// La ficha agrega la vigencia, la compañía, la moneda, la prima, el bien
+// asegurado y las coberturas activas, que pueden no existir (vida sin bien,
+// póliza sin coberturas cargadas).
 type PolicyDetailRecord = PolicyRecord & {
+  id_poliza: number
   fecha_inicio: Date
+  // DECIMAL(12,2): Prisma lo entrega como Decimal.
+  prima_mensual: { toFixed(decimals: number): string } | null
+  observaciones: string | null
+  moneda: { codigo: string }
+  compania_aseguradora: { id_compania: number; nombre: string }
   bien_asegurado: {
     descripcion: string
     patente_matricula: string | null
@@ -183,6 +202,14 @@ type PolicyDetailRecord = PolicyRecord & {
     modelo: string | null
     anio: number | null
   } | null
+  cobertura: Array<{
+    id_cobertura: number
+    id_plan: number
+    descripcion: string | null
+    // DECIMAL(14,2): Prisma lo entrega como Decimal.
+    suma_asegurada: { toFixed(decimals: number): string } | null
+    plan: { nombre: string }
+  }>
 }
 
 export type CustomerListRecord = {
@@ -253,9 +280,17 @@ function toPolicySummary(policy: PolicySummaryRecord): CustomerPolicySummary {
 
 function toPolicyDetail(policy: PolicyDetailRecord): PolicyDetail {
   const base = toPolicy(policy)
+  if (!isCurrency(policy.moneda.codigo)) {
+    throw new Error(`La póliza ${policy.numero_poliza} contiene valores fuera de catálogo`)
+  }
   return {
     ...base,
+    id: String(policy.id_poliza),
+    currency: policy.moneda.codigo,
+    company: { id: String(policy.compania_aseguradora.id_compania), name: policy.compania_aseguradora.nombre },
     startDate: policy.fecha_inicio.toISOString().slice(0, 10),
+    premiumCents: policy.prima_mensual === null ? null : centsOf(policy.prima_mensual),
+    observations: policy.observaciones,
     insuredItem: policy.bien_asegurado
       ? {
           description: policy.bien_asegurado.descripcion,
@@ -266,6 +301,13 @@ function toPolicyDetail(policy: PolicyDetailRecord): PolicyDetail {
           year: policy.bien_asegurado.anio,
         }
       : null,
+    coverages: policy.cobertura.map((coverage) => ({
+      id: coverage.id_cobertura,
+      planId: coverage.id_plan,
+      planName: coverage.plan.nombre,
+      description: coverage.descripcion,
+      insuredSumCents: coverage.suma_asegurada === null ? null : centsOf(coverage.suma_asegurada),
+    })),
   }
 }
 

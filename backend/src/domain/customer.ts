@@ -61,15 +61,35 @@ export type InsuredItemDetail = {
   year: number | null
 }
 
-// Póliza como la muestra la ficha del panel: vigencia y bien incluidos.
+// Cobertura activa de la póliza, como la muestra la ficha del panel para
+// poder editarla. El importe va en centavos enteros.
+export type CoverageDetail = {
+  id: number
+  planId: number
+  planName: string
+  description: string | null
+  insuredSumCents: number | null
+}
+
+// Póliza como la muestra la ficha del panel y como la edita el formulario:
+// vigencia, compañía, moneda, prima, bien y coberturas incluidos. El id es
+// el que usan las ediciones del panel.
 export type PolicyDetail = {
+  id: string
   number: string
   ramo: Ramo
   status: PolicyStatus
+  currency: Currency
+  /** Compañía dueña del registro de la póliza. */
+  company: { id: string; name: string } | null
   // Fecha de inicio aaaa-mm-dd. Las fixtures de prueba no la tienen y queda null.
   startDate: string | null
   expirationDate: string
+  // Prima mensual en centavos; null si no está cargada.
+  premiumCents: number | null
+  observations: string | null
   insuredItem: InsuredItemDetail | null
+  coverages: CoverageDetail[]
 }
 
 export type Customer = {
