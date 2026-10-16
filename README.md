@@ -126,7 +126,7 @@ En [`docs/`](docs/):
 - [`caso8_der.md`](docs/caso8_der.md): DER, convenciones de la base y decisiones de modelado. Diagrama en [`caso8_der.svg`](docs/caso8_der.svg).
 - [`01_esquema.sql`](docs/01_esquema.sql) y [`02_catalogos.sql`](docs/02_catalogos.sql): esquema en MySQL como quedó en el Hito 0. El vigente está en `backend/prisma/migrations`.
 - [`caso8_tabla_de_eventos.md`](docs/caso8_tabla_de_eventos.md) y [`caso8_diagrama_contexto.puml`](docs/caso8_diagrama_contexto.puml): eventos de negocio y diagrama de contexto.
-- [`migracion.md`](docs/migracion.md): reglas de la migración de la planilla histórica y de los usuarios. El Excel limpio no está en el repo.
+- [`migracion.md`](docs/migracion.md): reglas de la migración de la planilla histórica y de los usuarios. El Excel limpio está en `backend/planilla/`.
 
 Las reglas de negocio, las decisiones abiertas y las convenciones de código están resumidas en [`AGENTS.md`](AGENTS.md).
 

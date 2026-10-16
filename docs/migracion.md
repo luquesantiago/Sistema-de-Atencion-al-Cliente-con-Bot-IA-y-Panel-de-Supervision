@@ -4,18 +4,17 @@ Reglas para importar a la base los datos históricos de la agencia (Parcial 1). 
 
 ## Dónde está el Excel
 
-- No se sube al repo. Está en la carpeta del proyecto en Drive.
-- Para cargarlo, se copia a `backend/planilla/`, una carpeta que Git ignora. Tiene que estar ahí porque el contenedor del backend solo ve `./backend`: un archivo en otra carpeta (por ejemplo, el Escritorio de Windows) no lo encuentra. Después de cargar se puede borrar de ahí: los datos quedan en la base.
+- Está en el repo, en `backend/planilla/Caso8_seguros_bot_datos_limpios.xlsx`, así lo tiene cualquiera que clone el proyecto.
+- El script lo lee desde `backend/planilla/`, dentro de `backend/`, porque el contenedor solo monta `./backend`: un archivo en otra carpeta (por ejemplo, el Escritorio de Windows) no lo encuentra.
 - El script está en `backend/scripts/migrar-planilla.ts` y se corre sobre una base vacía, recién migrada:
 
   ```bash
-  cp <carpeta de Drive>/Caso8_seguros_bot_datos_limpios.xlsx backend/planilla/
   docker compose exec backend npm run migrar-planilla
   ```
 
   Para leer otro archivo: `npm run migrar-planilla -- <ruta dentro de backend/>`. Valida toda la planilla antes de escribir y carga todo en una transacción: si algo falla, la base queda como estaba. Si la base ya tiene clientes o los usuarios `roberto` o `graciela`, no escribe nada. Al terminar informa cuántos registros cargó por tabla y qué filas salteó.
 - Los datos quedan en el volumen de Docker de la base: `docker compose stop`, `restart` y `down` (sin `-v`) no los borran. `docker compose down -v` sí: después hay que volver a correr el script.
-- Quien no tenga el Excel no tiene los datos migrados y el asistente no reconoce ningún DNI. La demo corre en una máquina que lo tenga.
+- El Excel viene con el repo, pero los datos migrados no: hay que correr el script. Sin correrlo, el asistente no reconoce ningún DNI.
 
 ## Qué lee el script
 

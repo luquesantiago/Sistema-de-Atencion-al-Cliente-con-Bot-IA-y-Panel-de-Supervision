@@ -3,7 +3,7 @@
 //
 // Uso: docker compose exec backend npm run migrar-planilla [-- <ruta del Excel>]
 //
-// El Excel no está en el repo: se copia a backend/planilla/ (ignorada por Git).
+// El Excel está en el repo, en backend/planilla/.
 // Se corre sobre una base vacía: valida toda la planilla antes de escribir y
 // carga todo en una transacción, así que si algo falla la base queda como estaba.
 // No imprime DNI, teléfonos ni textos de los mensajes: solo ids de la planilla y conteos.
@@ -99,7 +99,7 @@ class SpreadsheetErrors {
 async function main(): Promise<void> {
   const path = process.argv[2] ?? defaultPath
   if (!existsSync(path)) {
-    throw new Error(`No se encontró el Excel en ${path}. Copialo a backend/planilla/ (ver docs/migracion.md).`)
+    throw new Error(`No se encontró el Excel en ${path}. Está en backend/planilla/ (ver docs/migracion.md).`)
   }
 
   const errors = new SpreadsheetErrors()
