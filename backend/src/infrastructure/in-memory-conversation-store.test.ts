@@ -19,7 +19,7 @@ function firstMessage(): ConversationChanges {
     ],
     customerId: 7,
     prospect: { case: { created: 0 }, name: 'Laura Inventada', dni: '99000010' },
-    phoneChangeRequest: { case: { created: 1 }, customerId: 7 },
+    phoneChangeRequest: { case: { created: 1 }, customerId: 7, riskLevel: 'bajo' },
   }
 }
 
@@ -57,7 +57,7 @@ describe('almacén de conversaciones en memoria', () => {
       caseTypes: [],
       incoming: { case: { created: 0 }, text: 'otra vez' },
       replies: [],
-      phoneChangeRequest: { case: { created: 0 }, customerId: 7 },
+      phoneChangeRequest: { case: { created: 0 }, customerId: 7, riskLevel: 'bajo' },
     }, async () => {})
     expect(store.snapshot().phoneChanges).toHaveLength(1)
   })
@@ -71,7 +71,7 @@ describe('almacén de conversaciones en memoria', () => {
 
   it('si la marca de silencio cambió desde que se leyó, save lanza', async () => {
     const store = new InMemoryConversationStore()
-    const saved = await store.save({ ...firstMessage(), handoff: { case: { created: 0 }, reason: 'cliente nuevo' } }, async () => {})
+    const saved = await store.save({ ...firstMessage(), handoff: { case: { created: 0 }, reason: 'cliente nuevo', riskLevel: 'medio' } }, async () => {})
     const changes: ConversationChanges = {
       phone,
       at,

@@ -25,7 +25,7 @@ describe('classifyIntent', () => {
     const requests: RecordedRequest[] = []
     const client = clientWith(fakeFetch(200, completion({ intencion: 'vencimiento' }), requests))
 
-    await expect(client.classifyIntent('¿cuándo vence?', [])).resolves.toBe('vencimiento')
+    await expect(client.classifyIntent('¿cuándo vence?', [])).resolves.toEqual({ intent: 'vencimiento', urgency: null })
 
     expect(requests[0]?.url).toBe('https://api.groq.com/openai/v1/chat/completions')
     expect(requests[0]?.body).toMatchObject({
@@ -37,13 +37,31 @@ describe('classifyIntent', () => {
           strict: true,
           schema: {
             type: 'object',
-            properties: { intencion: { type: 'string', enum: [...intents] } },
-            required: ['intencion'],
+            properties: {
+              intencion: { type: 'string', enum: [...intents] },
+              urgencia: { type: 'string', enum: ['grave', 'normal'] },
+            },
+            required: ['intencion', 'urgencia'],
             additionalProperties: false,
           },
         },
       },
     })
+  })
+
+  it('devuelve la urgencia de un siniestro grave', async () => {
+    const client = clientWith(fakeFetch(200, completion({ intencion: 'siniestro', urgencia: 'grave' })))
+    await expect(client.classifyIntent('choqué y hay un herido', [])).resolves.toEqual({ intent: 'siniestro', urgency: 'grave' })
+  })
+
+  it.each([{ urgencia: 'urgentísimo' }, {}, { urgencia: 3 }])('una urgencia inválida o ausente (%o) queda null sin lanzar', async (extra) => {
+    const client = clientWith(fakeFetch(200, completion({ intencion: 'siniestro', ...extra })))
+    await expect(client.classifyIntent('choqué', [])).resolves.toEqual({ intent: 'siniestro', urgency: null })
+  })
+
+  it('explica qué es un siniestro grave', () => {
+    expect(intentInstructions).toContain('personas heridas, riesgo de vida o una emergencia en curso')
+    expect(intentInstructions).toContain('Para cualquier otra intención, normal.')
   })
 
   it('la lista tiene «otra consulta» y «no se entiende», y no «no sé»', async () => {

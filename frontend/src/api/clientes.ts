@@ -8,9 +8,13 @@
  * campos ausentes llegan como `null` y no se inventan valores en su lugar.
  */
 
+
 // La lista muestra número y estado; la API también trae `ramo` (el tipo de
 // póliza, que la ficha presenta como «Categoría») y `expirationDate`, con el
 // que se calcula si la póliza está vencida.
+
+import { leer } from './respuesta'
+
 export type DatoPolizaResumen = {
   number: string
   ramo: string
@@ -117,7 +121,6 @@ export async function obtenerCliente(id: string): Promise<ClienteDetalle> {
   const respuesta = await fetch(`/api/clientes/${encodeURIComponent(id)}`)
   return (await leer<ClienteDetalle>(respuesta)) as ClienteDetalle
 }
-
 // Entradas de las ediciones del panel: el backend las valida y normaliza.
 // El DNI no se puede modificar nunca: es el identificador del cliente.
 
@@ -224,16 +227,3 @@ async function enviar<T>(path: string, init: RequestInit): Promise<T> {
   return (await leer<T>(respuesta)) as T
 }
 
-async function leer<T>(respuesta: Response): Promise<T> {
-  if (!respuesta.ok) {
-    let mensaje = `El servidor respondió ${respuesta.status}.`
-    try {
-      const cuerpo = (await respuesta.json()) as { error?: { message?: string } }
-      if (cuerpo.error?.message) mensaje = cuerpo.error.message
-    } catch {
-      // Sin cuerpo JSON: se usa el mensaje genérico.
-    }
-    throw new Error(mensaje)
-  }
-  return (await respuesta.json()) as T
-}

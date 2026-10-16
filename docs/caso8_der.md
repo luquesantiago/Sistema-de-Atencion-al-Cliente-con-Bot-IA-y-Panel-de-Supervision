@@ -1,7 +1,7 @@
 # DER — Caso 8: Sistema de Atención al Cliente con Bot IA y Panel de Supervisión
 
 Seguros Castaño — PPP 1, UNLa, Grupo 11. Entregable del Hito 0.
-Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 29/09/2026 (suma `caso.id_poliza`). Los cambios del 28/09/2026 están en la sección del final.
+Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 29/09/2026 (suma `caso.id_poliza`). El `.puml` suma `mensaje.id_imagen_whatsapp` el 15/10/2026; el `.png` y el `.svg` todavía no se regeneraron con ese cambio. Los cambios del 28/09/2026 y del 15/10/2026 están en las secciones del final.
 
 ## Convenciones aplicadas
 
@@ -53,7 +53,7 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 29/09/2026 (suma `caso
 |---|---|
 | `conversacion` | **Sesión** de WhatsApp con un número (FK a `telefono`). Termina (`fecha_fin`) tras el tiempo de inactividad configurado; el próximo mensaje abre una conversación nueva y el asistente vuelve a pedir el DNI. Si tiene un caso derivado sin cerrar, la inactividad no la cierra: sigue abierta hasta que se cierre el caso, el asistente sigue sin responder y lo que escribe el cliente queda en ese caso. Guarda si el asistente está suspendido. El cliente es nulo hasta que la persona se identifica. |
 | `caso` | **Uno por consulta**, con varios mensajes hasta resolverse. Lleva el tipo de consulta (nulo mientras no se conoce), responsable asignado, nivel de riesgo, la póliza del caso cuando se sabe (`id_poliza`, opcional, 28/09/2026) y las fechas de apertura, derivación, toma y cierre; el estado se deduce de esas fechas. |
-| `mensaje` | Cada mensaje del caso, con su origen. La fecha guarda milisegundos para ordenar la conversación. |
+| `mensaje` | Cada mensaje del caso, con su origen. La fecha guarda milisegundos para ordenar la conversación. En los mensajes de imagen del cliente, `id_imagen_whatsapp` guarda el id del mensaje de WhatsApp en WAHA, no la imagen (15/10/2026). |
 | `origen_mensaje` | Catálogo: cliente, asistente, operador. |
 | `tipo_consulta` | Catálogo de tipos de consulta que detecta el asistente (flujo F12 del diagrama de contexto). Normaliza la columna `tipo_consulta_detectado` de la planilla. |
 | `prospecto` | Datos que el asistente junta de un cliente nuevo, con su estado. Puede registrar un teléfono de contacto distinto del de la conversación. Al confirmarse, se vincula al cliente creado. |
@@ -155,6 +155,12 @@ Están en este documento, en el `.puml` y en la migración `20260929204929_caso_
 2. **Cambio de teléfono (RF-CAR-05)**: se registra en `solicitud_accion` con el tipo «cambio de teléfono», sin columnas nuevas. El número nuevo sale de la conversación del caso, y lo que se vinculó y desvinculó queda en `detalle` al aplicar el cambio. Es un dato de cartera, no una acción crítica: no genera la alerta «Pedido de acción crítica».
 3. **Catálogos**: «cambio de teléfono» se suma a `tipo_accion` y a `tipo_consulta`.
 4. **Usuarios de prueba e históricos**: sin cambios en el modelo; cómo se cargan está en `migracion.md`.
+
+## Decisión tomada el 15/10/2026
+
+Está en este documento, en el `.puml` y en la migración `20261015185550_mensaje_id_imagen_whatsapp` de `backend/prisma/migrations` (change `bandeja-atender-casos`).
+
+1. **Imagen del cliente sin copia**: `mensaje.id_imagen_whatsapp`, opcional, guarda el id serializado del mensaje de WhatsApp en WAHA, solo en los mensajes de imagen (la foto del DNI del cliente nuevo y la imagen que llega a una conversación en silencio). El panel pide la imagen a WAHA en el momento de mostrarla y no la guarda (RF-ATE-05). Decisión de Santiago.
 
 ## Decisiones del equipo que conviene confirmar
 

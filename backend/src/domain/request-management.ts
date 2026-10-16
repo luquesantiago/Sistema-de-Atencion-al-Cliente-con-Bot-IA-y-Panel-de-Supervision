@@ -47,6 +47,9 @@ export type DecisionResult = {
   clienteId?: number
 }
 
+// casoId: el caso del alta, para abrirlo en la bandeja después de rechazarla.
+export type ProspectDecisionResult = DecisionResult & { casoId: number }
+
 export type PhoneChangeDecisionResult = DecisionResult & {
   phone: string
 }
@@ -60,7 +63,7 @@ export type PhoneChangeNotification = {
 export interface RequestManagementRepository {
   listPendingProspects(page: PageRequest): Promise<PendingProspect[]>
   listPendingPhoneChanges(page: PageRequest): Promise<PendingPhoneChange[]>
-  decideProspect(input: ProspectDecisionInput): Promise<DecisionResult>
+  decideProspect(input: ProspectDecisionInput): Promise<ProspectDecisionResult>
   decidePhoneChange(input: PhoneChangeDecisionInput): Promise<PhoneChangeDecisionResult>
   getPhoneChangeNotification(id: number): Promise<PhoneChangeNotification>
   recordPhoneChangeNotification(id: number, text: string, sentAt: Date): Promise<void>
@@ -68,8 +71,9 @@ export interface RequestManagementRepository {
 
 export class RequestManagementError extends Error {
   public constructor(
-    public readonly statusCode: 400 | 404 | 409,
-    public readonly code: 'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT',
+    public readonly statusCode: 400 | 404 | 409 | 502,
+    // WHATSAPP_ERROR e IMAGE_UNAVAILABLE: la Bandeja de Atención (change bandeja-atender-casos).
+    public readonly code: 'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'WHATSAPP_ERROR' | 'IMAGE_UNAVAILABLE',
     message: string,
   ) {
     super(message)

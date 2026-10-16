@@ -163,6 +163,26 @@ export function IconoBaja({ className }: IconoProps) {
     </PanelIcono>
   )
 }
+/** Riesgo alto o crítico: acompaña siempre al texto de la gravedad. */
+export function IconoAlerta({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <path d="M10.3 4.2 2.9 17.3A2 2 0 0 0 4.6 20h14.8a2 2 0 0 0 1.7-2.7L13.7 4.2a2 2 0 0 0-3.4 0z" />
+      <path d="M12 9.5v4.5" />
+      <path d="M12 17h.01" />
+    </PanelIcono>
+  )
+}
+
+/** Riesgo medio o pendiente: acompaña siempre a un texto. */
+export function IconoReloj({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
+    </PanelIcono>
+  )
+}
 
 const ICONOS: Record<ModuloPanel, (props: IconoProps) => ReactNode> = {
   dashboard: IconoDashboard,
