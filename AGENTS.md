@@ -104,7 +104,7 @@ Reglas del Parcial 1:
 
 ## Guía visual y de contenido
 
-- **Sistema de diseño obligatorio:** Todo el frontend debe ceñirse estrictamente a las reglas, paleta de colores, tipografía, bordes y componentes especificados en el archivo `docs/design.md` ubicado en la raíz del proyecto.
+- **Sistema de diseño obligatorio:** Todo el frontend debe ceñirse estrictamente a las reglas, paleta de colores, tipografía, bordes y componentes especificados en el archivo `docs/design.md`.
 - Interfaz de supervisión en español, con tono claro, profesional y natural para Argentina.
 - Preservar la dirección visual acordada: paleta castaño y crema, sidebar en tono castaño oscuro, superficies limpias, y uso moderado de efectos *Liquid Glass* sin comprometer la legibilidad.
 - Priorizar densidad operativa, lectura rápida, estados visibles y acciones inequívocas sobre decoración.
