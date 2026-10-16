@@ -112,12 +112,14 @@ Reglas del Parcial 1:
 - Mantener TypeScript estricto y no silenciar errores con `any`, `@ts-ignore` o aserciones innecesarias.
 - Preferir cambios pequeños, nombres explícitos y APIs existentes del proyecto antes que nuevas abstracciones.
 
+
 ## Guía visual y de contenido
 
+- **Sistema de diseño obligatorio:** Todo el frontend debe ceñirse estrictamente a las reglas, paleta de colores, tipografía, bordes y componentes especificados en el archivo `docs/design.md`.
 - Interfaz de supervisión en español, con tono claro, profesional y natural para Argentina.
-- Preservar la dirección de los mockups: sidebar azul marino, fondo gris muy claro, superficies blancas, azul para acción primaria, verde para éxito, ámbar para advertencia y rojo para riesgo o rechazo.
+- Preservar la dirección visual acordada: paleta castaño y crema, sidebar en tono castaño oscuro, superficies limpias, y uso moderado de efectos *Liquid Glass* sin comprometer la legibilidad.
 - Priorizar densidad operativa, lectura rápida, estados visibles y acciones inequívocas sobre decoración.
-- Las alertas deben comunicar gravedad y motivo; no usar color como única señal.
+- Las alertas deben comunicar gravedad y motivo; no usar color como única señal (emplear textos explícitos e iconos).
 - Mantener los módulos del panel: Dashboard, Bandeja de Atención, Trámites por Aprobar y Base de Clientes.
 - No presentar datos ficticios como datos reales. Los fixtures deben estar marcados o documentados.
 
@@ -135,6 +137,14 @@ Reglas del Parcial 1:
 1. Leer la skill aplicable antes de cambiar una superficie del proyecto.
 2. Localizar la regla de negocio y su prueba o punto de integración más cercano.
 3. Implementar el cambio mínimo, preservando APIs y estilo existentes.
+4. Verificar primero el slice afectado y después ejecutar las comprobaciones globales disponibles.
+5. Actualizar documentación o decisiones abiertas cuando el cambio modifique el comportamiento acordado.
+
+## Flujo de trabajo esperado
+
+1. Leer la skill aplicable y el archivo `docs/design.md` antes de cambiar cualquier superficie visual o componente de interfaz del proyecto.
+2. Localizar la regla de negocio y su prueba o punto de integración más cercano.
+3. Implementar el cambio mínimo, preservando APIs, estilos y tokens existentes en `docs/design.md`.
 4. Verificar primero el slice afectado y después ejecutar las comprobaciones globales disponibles.
 5. Actualizar documentación o decisiones abiertas cuando el cambio modifique el comportamiento acordado.
 
@@ -208,7 +218,7 @@ Están en `.claude/skills/` con el formato estándar (`SKILL.md` con `name` y `d
 
 - `dominio-seguros`: reglas, flujos y estados del negocio.
 - `backend-datos`: API, Prisma, MySQL y consistencia.
-- `frontend-panel`: panel, UX visual y accesibilidad.
+- `frontend-panel`: panel, UX visual, accesibilidad y cumplimiento estricto de las reglas definidas en `docs/design.md`.
 - `verificacion-seguridad`: IA, privacidad, autorización y auditoría.
 
 Claude Code lee este archivo solo mientras no haya un `CLAUDE.md` en el repo: no crear uno (tampoco con `/init`). Si alguna vez hace falta, que empiece con `@AGENTS.md`.
