@@ -26,29 +26,44 @@ function App() {
     setActivo(nuevoUsuario.rol === 'administrador' ? 'dashboard' : 'bandeja')
   }
 
+  const capaAmbiental = (
+    <div className="ambient-layer" aria-hidden="true">
+      <div className="ambient-orb ambient-orb--uno" />
+      <div className="ambient-orb ambient-orb--dos" />
+    </div>
+  )
+
   if (usuario === null) {
-    return <Login onIngresar={manejarIngreso} />
+    return (
+      <>
+        {capaAmbiental}
+        <Login onIngresar={manejarIngreso} />
+      </>
+    )
   }
 
   return (
-    <div className="panel">
-      <a className="enlace-salto" href="#contenido">
-        Ir al contenido
-      </a>
+    <>
+      {capaAmbiental}
+      <div className="panel">
+        <a className="enlace-salto" href="#contenido">
+          Ir al contenido
+        </a>
 
-      <Sidebar
-        activo={activo}
-        usuario={usuario}
-        onNavegar={setActivo}
-        onCerrarSesion={() => setUsuario(null)}
-      />
+        <Sidebar
+          activo={activo}
+          usuario={usuario}
+          onNavegar={setActivo}
+          onCerrarSesion={() => setUsuario(null)}
+        />
 
-      <main className="panel__principal" id="contenido">
-        {Pagina === undefined
-          ? <Dashboard modulo={modulo} rol={usuario.rol} onNavegar={setActivo} />
-          : <Pagina modulo={modulo} />}
-      </main>
-    </div>
+        <main className="panel__principal" id="contenido">
+          {Pagina === undefined
+            ? <Dashboard modulo={modulo} rol={usuario.rol} onNavegar={setActivo} />
+            : <Pagina modulo={modulo} />}
+        </main>
+      </div>
+    </>
   )
 }
 

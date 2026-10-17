@@ -11,7 +11,7 @@ export default function TramitesAprobar({ modulo }: { modulo: Modulo }) {
         titulo="No hay trámites pendientes de aprobación"
         descripcion="Cada pedido se muestra con el motivo, el estado actual y la autoridad requerida. El cambio de teléfono es un dato de cartera y no una acción crítica, así que no genera la alerta de pedido de acción crítica. Al decidir se registra quién, cuándo y con qué fundamento."
         acciones={
-          <span className="chip chip--neutro">
+          <span className="badge badge--neutro">
             Autorizan: Administrador y Operadores habilitados
           </span>
         }
