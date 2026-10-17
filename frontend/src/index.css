@@ -1,55 +1,57 @@
 :root {
   color-scheme: light;
 
-  /* Navegación */
-  --nav-fondo: #0f2540;
-  --nav-fondo-alto: #16304f;
-  --nav-borde: #1d3a5c;
-  --nav-texto: #c4d2e4;
-  --nav-texto-activo: #ffffff;
-  --ancho-nav: 252px;
+  /* Superficies (design.md §1) */
+  --color-bg: #f7f4ef;
+  --color-surface: #ffffff;
+  --color-sidebar: rgba(74, 53, 37, 0.92);
+  --color-sidebar-text: #f7f4ef;
 
-  /* Superficies */
-  --fondo: #f5f6f8;
-  --superficie: #ffffff;
-  --superficie-alterna: #fafbfc;
-  --borde: #e1e5ea;
-  --borde-fuerte: #cdd4dc;
+  /* Acción y acento (design.md §1) */
+  --color-primary: #7f5539;
+  --color-primary-hover: #65422b;
+  --color-secondary: #b08968;
+  --color-accent-light: #ede0d4;
+  --color-text: #2b1e16;
+  --color-text-muted: #7d6b5d;
 
-  /* Texto */
-  --texto: #1b2027;
-  --texto-suave: #5b6672;
-  --texto-tenue: #7b8794;
+  /* Estados semánticos (design.md §1) */
+  --color-success-bg: #e6f4ea;
+  --color-success-text: #00704a;
+  --color-warning-bg: #fef3c7;
+  --color-warning-text: #92400e;
+  --color-danger-bg: #fee2e2;
+  --color-danger-text: #b91c1c;
 
-  /* Estados: nunca comunican solo por color, siempre con texto o icono */
-  --primario: #1a63d8;
-  --primario-fuerte: #144fb0;
-  --primario-suave: #e8f0fd;
-  --exito: #16794a;
-  --exito-suave: #e4f4ec;
-  --alerta: #8f5600;
-  --alerta-suave: #fdf1de;
-  --riesgo: #b3261e;
-  --riesgo-suave: #fbe9e7;
+  /* Derivados de la paleta para superficies que la guía no nombra */
+  --color-danger-hover: #8f1d17;
+  --color-text-faint: #9a8877;
+  --color-surface-alt: #fcfaf7;
+  --color-accent-hover: #e3d3c1;
+  --color-success-border: #a9d8bd;
+  --color-warning-border: #f3d89a;
+  --color-danger-border: #f5c2c2;
+  --nav-overlay: rgba(247, 244, 239, 0.15);
+  --nav-hover: rgba(247, 244, 239, 0.22);
+  --nav-borde: rgba(247, 244, 239, 0.14);
+  --nav-texto: rgba(247, 244, 239, 0.78);
+  --velo-modal: rgba(43, 30, 22, 0.45);
+  --sombra-modal: 0 12px 32px rgba(43, 30, 22, 0.22);
 
-  --radio: 8px;
-  --radio-chico: 6px;
-  --sombra-tarjeta: 0 1px 2px rgba(16, 24, 40, 0.06);
-  --foco: 0 0 0 2px #ffffff, 0 0 0 4px var(--primario);
+  /* Liquid Glass — design.md §2 */
+  --glass-fondo: linear-gradient(135deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.55) 100%);
+  --glass-borde: rgba(255, 255, 255, 0.75);
+  --glass-desenfoque: blur(16px) saturate(150%);
+  --glass-sidebar: linear-gradient(180deg, rgba(92, 66, 46, 0.9) 0%, rgba(74, 53, 37, 0.93) 48%, rgba(56, 38, 26, 0.96) 100%);
 
-  --fuente: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
-    sans-serif;
-  --mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  /* Tipografía (design.md §4): sin fuentes nuevas, solo el fallback acordado */
+  --font-sans: 'SoDo Sans', Inter, Manrope, 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
-  font-family: var(--fuente);
-  font-size: 15px;
-  line-height: 1.5;
-  color: var(--texto);
-  background: var(--fondo);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  /* Radios, sombras y layout (design.md §1) */
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow-soft: 0 2px 8px rgba(43, 30, 22, 0.08);
+  --sidebar-width: 18rem;
 }
 
 *,
@@ -58,9 +60,21 @@
   box-sizing: border-box;
 }
 
+/* Tipografía base (design.md §4) */
 body {
   margin: 0;
   min-height: 100svh;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--color-text);
+  background: var(--color-bg);
+  letter-spacing: -0.01em;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1,
@@ -85,14 +99,28 @@ button {
 }
 
 a {
-  color: var(--primario);
+  color: var(--color-primary);
 }
 
-/* Foco visible en toda la app, navegación por teclado incluida */
+/* Jerarquía tipográfica (design.md §4) */
+
+h1 {
+  font-size: clamp(1.5rem, 1.2rem + 1.2vw, 1.875rem);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+h2 {
+  font-size: clamp(1.125rem, 1rem + 0.5vw, 1.5rem);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+/* Foco visible en toda la app, navegación por teclado incluida (design.md §7) */
+
 :focus-visible {
-  outline: none;
-  box-shadow: var(--foco);
-  border-radius: var(--radio-chico);
+  outline: 3px solid var(--color-secondary);
+  outline-offset: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -100,6 +128,8 @@ a {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
