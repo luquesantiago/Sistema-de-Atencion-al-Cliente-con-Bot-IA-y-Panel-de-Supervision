@@ -104,7 +104,7 @@ Reglas del Parcial 1:
 
 ## Guía visual y de contenido
 
-- **Sistema de diseño obligatorio:** Todo el frontend debe ceñirse estrictamente a las reglas, paleta de colores, tipografía, bordes y componentes especificados en el archivo `docs/design.md`.
+- **Sistema de diseño obligatorio:** Todo el frontend debe ceñirse a las reglas, paleta de colores, tipografía, bordes y componentes especificados en el archivo `docs/design.md`. La **paleta de colores es fija e inamovible** (tokens de `docs/design.md`); la tipografía, los bordes y los componentes pueden evolucionar conforme a la skill `frontend-design`, y toda desviación adoptada se documenta en `docs/design.md` para mantenerlo como fuente de verdad.
 - Interfaz de supervisión en español, con tono claro, profesional y natural para Argentina.
 - Preservar la dirección visual acordada: paleta castaño y crema, sidebar en tono castaño oscuro, superficies limpias, y uso moderado de efectos *Liquid Glass* sin comprometer la legibilidad.
 - Priorizar densidad operativa, lectura rápida, estados visibles y acciones inequívocas sobre decoración.
@@ -208,6 +208,7 @@ Están en `.claude/skills/` con el formato estándar (`SKILL.md` con `name` y `d
 - `dominio-seguros`: reglas, flujos y estados del negocio.
 - `backend-datos`: API, Prisma, MySQL y consistencia.
 - `frontend-panel`: panel, UX visual, accesibilidad y cumplimiento estricto de las reglas definidas en `docs/design.md`.
+- `frontend-design` (de Anthropic, Apache 2.0, con sección de adaptación propia): proceso de diseño visual para UI nueva (paleta, tipografía, layout, copy) orientado a evitar la estética genérica de IA. La paleta de colores se rige por `docs/design.md` y no se toca; el resto de ejes (tipografía, layout, motion, copy) puede evolucionar con ella, manteniendo `docs/design.md` sincronizado. Complementaria de `frontend-panel`.
 - `verificacion-seguridad`: IA, privacidad, autorización y auditoría.
 
 Claude Code lee este archivo solo mientras no haya un `CLAUDE.md` en el repo: no crear uno (tampoco con `/init`). Si alguna vez hace falta, que empiece con `@AGENTS.md`.
