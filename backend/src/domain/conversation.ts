@@ -1,6 +1,7 @@
 import type { ContextMessage } from './ai-client.js'
 import { maskDni } from './dni.js'
 import type { Intent } from './intent.js'
+import type { RiskLevel } from './risk-level.js'
 
 // Conversación por WhatsApp guardada en la base (design.md, decisiones 3, 6 y 7). Son
 // tipos y funciones puras: la base y el envío quedan en el ConversationStore.
@@ -77,15 +78,18 @@ export type ConversationChanges = {
   customerId?: number
   newCases: Array<{ type: QueryType | null }>
   caseTypes: Array<{ case: CaseRef; type: QueryType }>
-  incoming: { case: CaseRef; text: string }
+  // imageRef: el id del mensaje de WhatsApp de una imagen que el flujo procesa, para verla
+  // desde el panel sin guardarla (change bandeja-atender-casos, decisión 7).
+  incoming: { case: CaseRef; text: string; imageRef?: string }
   // Redacción que rechazó el control: queda como respuesta no enviada.
   rejectedDraft?: { text: string; answers: QueryRef }
   // Se envían en este orden.
   replies: AssistantMessage[]
-  handoff?: { case: CaseRef; reason: string }
+  // riskLevel: el nivel que queda en el caso (change bandeja-atencion-lectura, decisión 2).
+  handoff?: { case: CaseRef; reason: string; riskLevel: RiskLevel }
   prospect?: { case: CaseRef; name: string; dni: string }
   // Se crea solo si el cliente no tiene ya una solicitud pendiente para ese número.
-  phoneChangeRequest?: { case: CaseRef; customerId: number }
+  phoneChangeRequest?: { case: CaseRef; customerId: number; riskLevel: RiskLevel }
 }
 
 export type SavedConversation = {

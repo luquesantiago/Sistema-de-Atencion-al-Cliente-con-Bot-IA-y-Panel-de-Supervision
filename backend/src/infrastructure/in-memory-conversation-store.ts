@@ -9,6 +9,7 @@ import type {
   SavedConversation,
   Settings,
 } from '../domain/conversation.js'
+import type { RiskLevel } from '../domain/risk-level.js'
 
 // Doble de prueba del almacén de conversaciones (design.md, decisión 3). Aplica los cambios
 // sobre una copia y la conserva solo si send no lanza, como la transacción de la base.
@@ -29,11 +30,12 @@ export type StoredCase = {
   openedAt: Date
   handedOffAt: Date | null
   handoffReason: string | null
+  riskLevel: RiskLevel | null
   closedAt: Date | null
   unattendedAlert: boolean
 }
 
-export type StoredMessage = { id: number; caseId: number; origin: MessageOrigin; text: string; sentAt: Date }
+export type StoredMessage = { id: number; caseId: number; origin: MessageOrigin; text: string; sentAt: Date; imageRef?: string }
 export type StoredReply = { id: number; queryMessageId: number; sentMessageId: number | null; text: string; at: Date }
 export type StoredProspect = { id: number; caseId: number; name: string; dni: string; status: 'pendiente' | 'confirmado' | 'descartado' }
 export type StoredPhoneChange = {
@@ -188,6 +190,7 @@ function apply(state: ConversationState, changes: ConversationChanges): SavedCon
       openedAt: at,
       handedOffAt: null,
       handoffReason: null,
+      riskLevel: null,
       closedAt: null,
       unattendedAlert: false,
     }
@@ -207,7 +210,14 @@ function apply(state: ConversationState, changes: ConversationChanges): SavedCon
     if (target.type === null) target.type = type
   }
 
-  const incoming: StoredMessage = { id: newId(), caseId: caseOf(changes.incoming.case).id, origin: 'cliente', text: changes.incoming.text, sentAt: at }
+  const incoming: StoredMessage = {
+    id: newId(),
+    caseId: caseOf(changes.incoming.case).id,
+    origin: 'cliente',
+    text: changes.incoming.text,
+    sentAt: at,
+    ...(changes.incoming.imageRef ? { imageRef: changes.incoming.imageRef } : {}),
+  }
   state.messages.push(incoming)
   const queryId = (ref: QueryRef) => (ref === 'incoming' ? incoming.id : ref.existing)
 
@@ -224,6 +234,7 @@ function apply(state: ConversationState, changes: ConversationChanges): SavedCon
     const target = caseOf(changes.handoff.case)
     target.handedOffAt = at
     target.handoffReason = changes.handoff.reason.slice(0, 255)
+    target.riskLevel = changes.handoff.riskLevel
     conversation.suspended = true
   }
   if (changes.prospect) {
@@ -231,11 +242,13 @@ function apply(state: ConversationState, changes: ConversationChanges): SavedCon
     state.prospects.push({ id: newId(), caseId: caseOf(ref).id, name: name.slice(0, 200), dni, status: 'pendiente' })
   }
   if (changes.phoneChangeRequest) {
-    const { case: ref, customerId } = changes.phoneChangeRequest
+    const { case: ref, customerId, riskLevel } = changes.phoneChangeRequest
     const pending = state.phoneChanges.some((request) =>
       request.customerId === customerId && request.phone === changes.phone && request.status === 'pendiente')
     if (!pending) {
-      state.phoneChanges.push({ id: newId(), caseId: caseOf(ref).id, customerId, phone: changes.phone, status: 'pendiente' })
+      const target = caseOf(ref)
+      target.riskLevel = riskLevel
+      state.phoneChanges.push({ id: newId(), caseId: target.id, customerId, phone: changes.phone, status: 'pendiente' })
     }
   }
 
