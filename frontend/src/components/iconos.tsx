@@ -106,6 +106,36 @@ export function IconoSalir({ className }: IconoProps) {
   )
 }
 
+// Marca: escudo de la insignia de la sección «Marca» (design.md §5).
+export function IconoEscudo({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </PanelIcono>
+  )
+}
+
+// Menú móvil: abrir y cerrar el panel de navegación (design.md §5).
+export function IconoMenu({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <path d="M4 6.5h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17.5h16" />
+    </PanelIcono>
+  )
+}
+
+export function IconoCerrar({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <path d="m6.5 6.5 11 11" />
+      <path d="m17.5 6.5-11 11" />
+    </PanelIcono>
+  )
+}
+
 export function IconoInfo({ className }: IconoProps) {
   return (
     <PanelIcono className={className}>

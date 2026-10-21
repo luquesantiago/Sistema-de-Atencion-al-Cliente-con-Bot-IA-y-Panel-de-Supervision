@@ -226,4 +226,3 @@ async function enviar<T>(path: string, init: RequestInit): Promise<T> {
   })
   return (await leer<T>(respuesta)) as T
 }
-

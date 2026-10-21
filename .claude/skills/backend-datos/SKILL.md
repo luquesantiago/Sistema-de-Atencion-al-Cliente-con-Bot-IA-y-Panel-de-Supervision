@@ -80,5 +80,5 @@ docker compose exec backend npx prisma generate
 - Las migraciones pendientes se aplican solas al levantar el backend (`docker compose restart backend` después de traer migraciones nuevas).
 - Los CHECK de la base no aparecen en `schema.prisma` (Prisma no los representa): los sigue controlando MySQL.
 - Toda migración debe ser revisable y compatible con datos existentes o acompañarse de una estrategia de importación.
-- La importación histórica sigue `docs/migracion.md` y no modifica la planilla original. El Excel limpio no está en el repo: el script lo lee desde una carpeta ignorada dentro de `backend/`, porque el contenedor solo monta `./backend`. Los registros irresolubles (columna «migrar» = No, como las pólizas POL-00126 y POL-00131 del VW Gol) se omiten y quedan en la hoja Pendientes para carga manual.
+- La importación histórica sigue `docs/migracion.md` y no modifica la planilla original. El Excel limpio está en `backend/planilla/`; el script lo lee desde ahí, dentro de `backend/`, porque el contenedor solo monta `./backend`. Los registros irresolubles (columna «migrar» = No, como las pólizas POL-00126 y POL-00131 del VW Gol) se omiten y quedan en la hoja Pendientes para carga manual.
 - No almacenar secretos ni datos reales de clientes en fixtures, logs de desarrollo o migraciones.

@@ -83,19 +83,19 @@ const ESTADOS_POLIZA: Record<string, {
   texto: string
   icono: (props: { className?: string }) => ReactNode
 }> = {
-  activa: { clase: 'chip chip--exito', texto: 'activa', icono: IconoActiva },
-  vencida: { clase: 'chip chip--alerta', texto: 'vencida', icono: IconoVencida },
-  'suspendida por mora': { clase: 'chip chip--riesgo', texto: 'suspendida por mora', icono: IconoSuspendida },
-  'dada de baja': { clase: 'chip chip--neutro', texto: 'dada de baja', icono: IconoBaja },
+  activa: { clase: 'badge badge--success', texto: 'activa', icono: IconoActiva },
+  vencida: { clase: 'badge badge--warning', texto: 'vencida', icono: IconoVencida },
+  'suspendida por mora': { clase: 'badge badge--danger', texto: 'suspendida por mora', icono: IconoSuspendida },
+  'dada de baja': { clase: 'badge badge--neutro', texto: 'dada de baja', icono: IconoBaja },
 }
 
-function chipDePoliza(poliza: { status: string; expirationDate: string }): ReactNode {
+function badgeDePoliza(poliza: { status: string; expirationDate: string }): ReactNode {
   const estado = estadoMostrado(poliza)
   const { clase, texto, icono: Icono } = ESTADOS_POLIZA[estado] ??
-    { clase: 'chip chip--neutro', texto: estado, icono: IconoInfo }
+    { clase: 'badge badge--neutro', texto: estado, icono: IconoInfo }
   return (
     <span className={clase}>
-      <Icono className="chip__icono" />
+      <Icono className="badge__icono" />
       {texto}
     </span>
   )
@@ -116,7 +116,7 @@ function resumenDePolizas(polizas: DatoPolizaResumen[]): ReactNode {
       {polizas.map((poliza) => (
         <li key={poliza.number} className="tabla__poliza">
           <span className="tabla__poliza-numero">{poliza.number}</span>
-          {chipDePoliza(poliza)}
+          {badgeDePoliza(poliza)}
         </li>
       ))}
     </ul>
@@ -639,7 +639,8 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
               return (
                 <tr
                   key={cliente.id}
-                  className={`tabla__fila${activo ? ' tabla__fila--activa' : ''}`}
+                  className="tabla__fila"
+                  aria-current={activo ? 'true' : undefined}
                   onClick={() => void abrirDetalle(cliente)}
                 >
                   <td className="tabla__identificacion">{identificacion(cliente)}</td>
@@ -758,7 +759,7 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
                   </button>
                   <button
                     type="button"
-                    className="boton boton--peligro-claro"
+                    className="boton boton--peligro"
                     onClick={() => confirmarBajaCliente(detalle)}
                   >
                     Dar de baja
@@ -831,7 +832,7 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
                         <article key={poliza.id} className="detalle-panel__poliza">
                           <header className="detalle-panel__poliza-encabezado">
                             <h4 className="detalle-panel__poliza-numero">{poliza.number}</h4>
-                            {chipDePoliza(poliza)}
+                            {badgeDePoliza(poliza)}
                           </header>
 
                           <dl className="detalle-panel__datos">
