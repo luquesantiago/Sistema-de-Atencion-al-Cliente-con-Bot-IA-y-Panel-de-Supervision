@@ -12,7 +12,6 @@ import {
   type AlertaBandeja,
   type CasoBandeja,
   type DetalleCasoBandeja,
-  type EtiquetaBandeja,
   type Gravedad,
   type MensajeBandeja,
   type OrigenMensaje,
@@ -37,11 +36,18 @@ const GRAVEDADES: Record<Gravedad | 'sin-nivel', { texto: string; clase: string;
   'sin-nivel': { texto: 'Sin nivel', clase: 'chip chip--neutro chip--sin-nivel', Icono: null },
 }
 
-const ETIQUETAS: Record<EtiquetaBandeja, string> = {
-  'alta-pendiente': 'Alta pendiente · se decide en Trámites',
-  'alta-rechazada': 'Alta rechazada · avisar al cliente',
-  'pedido-pendiente': 'Pedido pendiente de aprobación',
-  'cambio-telefono-pendiente': 'Cambio de teléfono pendiente · se decide en Trámites',
+type Prioridad = 'critico' | 'medio' | 'bajo'
+
+const BADGES_PRIORIDAD: Record<Prioridad, { clase: string; Icono: typeof IconoAlerta }> = {
+  critico: { clase: 'badge-prioridad badge-prioridad--critico', Icono: IconoAlerta },
+  medio: { clase: 'badge-prioridad badge-prioridad--medio', Icono: IconoReloj },
+  bajo: { clase: 'badge-prioridad badge-prioridad--bajo', Icono: IconoInfo },
+}
+
+const BANNERS_ALERTA: Record<Prioridad, string> = {
+  critico: 'alerta-banner alerta-banner--critico',
+  medio: 'alerta-banner alerta-banner--revision',
+  bajo: 'alerta-banner alerta-banner--resuelto',
 }
 
 const ORIGENES: Record<OrigenMensaje, string> = {
@@ -60,26 +66,8 @@ const formatoFecha = new Intl.DateTimeFormat('es-AR', {
   minute: '2-digit',
 })
 
-const formatoHora = new Intl.DateTimeFormat('es-AR', {
-  timeZone: 'America/Argentina/Buenos_Aires',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-})
-
 function fechaHora(iso: string): string {
   return formatoFecha.format(new Date(iso))
-}
-
-// «1 h 20 min», contra la hora de la última actualización.
-function espera(desde: string | null, ahora: Date): string {
-  if (desde === null) return 'Sin dato'
-  const minutos = Math.max(0, Math.floor((ahora.getTime() - new Date(desde).getTime()) / 60_000))
-  if (minutos < 1) return 'Menos de 1 min'
-  if (minutos < 60) return `${minutos} min`
-  const horas = Math.floor(minutos / 60)
-  if (horas < 24) return `${horas} h ${minutos % 60} min`
-  return `${Math.floor(horas / 24)} d ${horas % 24} h`
 }
 
 function nombreDelCaso(caso: CasoBandeja): string {
@@ -137,14 +125,78 @@ function ChipGravedad({ gravedad }: { gravedad: Gravedad | null }) {
   )
 }
 
-function ChipEtiqueta({ etiqueta }: { etiqueta: EtiquetaBandeja | null }) {
-  if (etiqueta === null) return null
+// Prioridad visible de la tarjeta. Respeta los cuatro niveles del DER: el color
+// agrupa, pero el texto sigue distinguiendo «Crítico» de «Alto».
+function prioridadDelCaso(caso: CasoBandeja): { prioridad: Prioridad; texto: string } {
+  if (caso.severity === 'crítico') return { prioridad: 'critico', texto: 'Crítico' }
+  if (caso.severity === 'alto') return { prioridad: 'critico', texto: 'Alto' }
+  if (caso.label === 'alta-rechazada') return { prioridad: 'medio', texto: 'Revisión' }
+  if (caso.label !== null) return { prioridad: 'medio', texto: 'Pendiente' }
+  const prioridad: Prioridad = caso.severity === 'medio' ? 'medio' : 'bajo'
+  if (caso.queryType === 'baja') return { prioridad, texto: 'Baja' }
+  if (caso.queryType === 'vencimiento') return { prioridad, texto: 'Vencimientos' }
+  if (caso.severity === 'medio') return { prioridad, texto: 'Medio' }
+  if (caso.severity === 'bajo') return { prioridad, texto: 'Bajo' }
+  return { prioridad, texto: 'Sin nivel' }
+}
+
+function BadgePrioridad({ caso }: { caso: CasoBandeja }) {
+  const { prioridad, texto } = prioridadDelCaso(caso)
+  const { clase, Icono } = BADGES_PRIORIDAD[prioridad]
   return (
-    <span className="chip chip--alerta">
-      <IconoReloj className="chip__icono" />
-      {ETIQUETAS[etiqueta]}
+    <span className={clase}>
+      <Icono className="badge-prioridad__icono" />
+      {texto}
     </span>
   )
+}
+
+function detalleAlerta(caso: CasoBandeja): string {
+  switch (caso.label) {
+    case 'alta-pendiente':
+      return 'Alta pendiente de aprobación'
+    case 'alta-rechazada':
+      return 'Alta rechazada: avisar al cliente'
+    case 'pedido-pendiente':
+      return 'Pedido pendiente de aprobación'
+    case 'cambio-telefono-pendiente':
+      return 'Cambio de teléfono pendiente de aprobación'
+  }
+  switch (caso.queryType) {
+    case 'siniestro':
+      return 'Siniestro pendiente de revisión'
+    case 'reclamo':
+      return 'Reclamo pendiente de revisión'
+    case 'baja':
+      return 'Baja pendiente de aprobación'
+    case 'modificación':
+      return 'Modificación pendiente de aprobación'
+    case 'cotización':
+      return 'Cotización pendiente de revisión'
+    case 'cobertura':
+      return 'Consulta de cobertura pendiente de revisión'
+    case 'vencimiento':
+      return 'Vencimiento pendiente de seguimiento'
+    default:
+      return caso.severity === 'crítico'
+        ? 'Caso crítico'
+        : caso.severity === 'alto'
+          ? 'Caso de prioridad alta'
+          : caso.severity === 'medio'
+            ? 'Caso de prioridad media'
+            : 'Caso en seguimiento'
+  }
+}
+
+// El banner muestra solo el mensaje dinámico; el color sale de la prioridad.
+function mensajeAlerta(caso: CasoBandeja, alertas: AlertaBandeja[]): { clase: string; texto: string } {
+  const { prioridad } = prioridadDelCaso(caso)
+  const prefijo = prioridad === 'critico' ? 'Atención' : prioridad === 'medio' ? 'Revisión' : 'Seguimiento'
+  const pendientes =
+    alertas.length > 0
+      ? ` · ${alertas.length} ${alertas.length === 1 ? 'alerta sin atender' : 'alertas sin atender'}`
+      : ''
+  return { clase: BANNERS_ALERTA[prioridad], texto: `${prefijo}: ${detalleAlerta(caso)}${pendientes}` }
 }
 
 const formatoDia = new Intl.DateTimeFormat('es-AR', {
@@ -686,19 +738,7 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
                     : 'Sin mensajes'}
                 </span>
                 <span className="tarjeta-caso__chips">
-                  <ChipGravedad gravedad={caso.severity} />
-                  <ChipEtiqueta etiqueta={caso.label} />
-                </span>
-                <span className="tarjeta-caso__pie">
-                  <span>
-                    {caso.queryType ?? 'Sin tipo'} ·{' '}
-                    {caso.assignee ? (
-                      caso.assignedToMe ? `${caso.assignee.name} (vos)` : caso.assignee.name
-                    ) : (
-                      <span className="bandeja__sin-tomar">Sin tomar</span>
-                    )}
-                  </span>
-                  <span>Espera {espera(caso.waitingSince, ahora)}</span>
+                  <BadgePrioridad caso={caso} />
                 </span>
               </span>
             </button>
@@ -755,8 +795,8 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
     }
 
     const caso = casoDelDetalle
-    const franjaDeRiesgo = caso?.severity === 'crítico' || caso?.severity === 'alto'
     const alertas = detalleActual?.alerts ?? []
+    const alerta = caso ? mensajeAlerta(caso, alertas) : null
     return (
       <>
         <header className="chat-header">
@@ -780,37 +820,10 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
             </button>
           </div>
 
-          {caso ? (
-            <div className={`chat-header__estado${franjaDeRiesgo ? ' chat-header__estado--riesgo' : ''}`}>
-              <ChipGravedad gravedad={caso.severity} />
-              <ChipEtiqueta etiqueta={caso.label} />
-              {alertas.length > 0 ? (
-                <span className="chip chip--riesgo">
-                  <IconoAlerta className="chip__icono" />
-                  {alertas.length === 1 ? '1 alerta sin atender' : `${alertas.length} alertas sin atender`}
-                </span>
-              ) : null}
-              <span className="conversacion__dato">
-                Consulta: <strong>{caso.queryType ?? 'Sin tipo'}</strong>
-              </span>
-              {caso.handoffReason ? (
-                <span className="conversacion__dato">
-                  Motivo: <strong>{caso.handoffReason}</strong>
-                </span>
-              ) : null}
-              <span className="conversacion__dato">
-                Responsable:{' '}
-                {caso.assignee ? (
-                  <strong>{caso.assignedToMe ? `${caso.assignee.name} (vos)` : caso.assignee.name}</strong>
-                ) : (
-                  <span className="bandeja__sin-tomar">Sin tomar</span>
-                )}
-              </span>
-              <span className="conversacion__dato">
-                Espera: <strong>{espera(caso.waitingSince, ahora)}</strong>
-                {caso.waitingSince ? ` (desde ${fechaHora(caso.waitingSince)})` : ''}
-              </span>
-            </div>
+          {alerta ? (
+            <p className={alerta.clase} role="status">
+              {alerta.texto}
+            </p>
           ) : null}
         </header>
 
@@ -869,7 +882,6 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
     )
   }
 
-  const desde = offset + 1
   const hasta = offset + (casos?.length ?? 0)
   return (
     <div className={`bandeja-container${seleccionado !== null ? ' bandeja-container--con-caso' : ''}`}>
@@ -878,14 +890,6 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
           <h1 className="bandeja__titulo" id="bandeja-titulo">
             {modulo.nombre}
           </h1>
-          <p className="bandeja__resumen">
-            {casos === null || casos.length === 0
-              ? 'Sin casos'
-              : consulta !== ''
-                ? `${casosFiltrados?.length ?? 0} de ${casos.length} casos`
-                : `${desde}–${hasta} de ${total} casos`}
-            {actualizado ? ` · actualizada a las ${formatoHora.format(actualizado)}` : ''}
-          </p>
           <div className="bandeja__busqueda">
             <input
               className="bandeja__busqueda-campo"

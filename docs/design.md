@@ -180,6 +180,27 @@ La estética debe ser cálida, sobria y profesional. Liquid Glass es un recurso 
 - Los estados deben incluir texto explícito y, cuando ayude, un icono. **Nunca comunicar información únicamente mediante el color.**
 - Verificar el contraste de texto y controles sobre cada superficie; ajustar tonos si no cumplen los requisitos de accesibilidad.
 
+### Prioridad de casos y banner de alerta
+
+La Bandeja de Atención usa un badge de prioridad ajustado al texto en cada tarjeta y un banner en la cabecera del chat. Ambos reutilizan los pares semánticos de arriba y siempre incluyen texto:
+
+```css
+.badge-prioridad { display: inline-flex; align-items: center; align-self: flex-start;
+  gap: 0.35rem; width: fit-content; max-width: 100%; padding: 0.2rem 0.6rem;
+  border: 1px solid transparent; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600; }
+.badge-prioridad--critico { background: var(--color-danger-bg);  color: var(--color-danger-text);  border-color: var(--color-danger-border); }
+.badge-prioridad--medio   { background: var(--color-warning-bg); color: var(--color-warning-text); border-color: var(--color-warning-border); }
+.badge-prioridad--bajo    { background: var(--color-success-bg); color: var(--color-success-text); border-color: var(--color-success-border); }
+
+.alerta-banner { width: 100%; padding: 9px 20px; font-size: 0.83rem; font-weight: 600; }
+.alerta-banner--critico  { background: var(--color-danger-bg);  color: var(--color-danger-text); }
+.alerta-banner--revision { background: var(--color-warning-bg); color: var(--color-warning-text); }
+.alerta-banner--resuelto { background: var(--color-success-bg); color: var(--color-success-text); }
+```
+
+El color agrupa la prioridad para lectura rápida, pero el texto conserva los cuatro niveles del DER: «Crítico» y «Alto» comparten rojo y se distinguen por la etiqueta. El banner muestra solo el mensaje de alerta, sin metadatos adicionales.
+
 ## 4. Tipografía — inspirada en la web de Starbucks
 
 Starbucks utiliza las familias corporativas SoDo Sans, Lander y Pike. SoDo Sans es una tipografía propietaria y no debe suponerse disponible en el proyecto. Utilizarla únicamente si los archivos y la licencia necesarios están disponibles. No descargar ni copiar archivos de fuentes propietarias sin autorización.
