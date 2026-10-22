@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decideClose, decideReply, decideTake, maxReplyLength, type CaseActionState } from './case-actions.js'
+import { decideClose, decideRelease, decideReply, decideTake, maxReplyLength, type CaseActionState } from './case-actions.js'
 
 const me = { userId: 10 }
 const graciela = 20
@@ -29,6 +29,25 @@ describe('tomar un caso (RF-DER-02)', () => {
 
   it('un caso que no está en la bandeja no se toma', () => {
     expect(decideTake(caseState({ inInbox: false }))).toEqual({ ok: false, error: 'not-in-inbox' })
+  })
+})
+
+describe('devolver un caso al bot', () => {
+  it('el responsable libera el caso y el asistente retoma la conversación', () => {
+    expect(decideRelease(caseState(), me)).toEqual({ ok: true, resumeAssistant: true })
+  })
+
+  it('un caso sin derivar se libera solo del responsable', () => {
+    expect(decideRelease(caseState({ handedOff: false }), me)).toEqual({ ok: true, resumeAssistant: false })
+  })
+
+  it('un caso sin responsable o de otro no se libera', () => {
+    expect(decideRelease(caseState({ assigneeId: null }), me)).toEqual({ ok: false, error: 'not-assignee' })
+    expect(decideRelease(caseState({ assigneeId: graciela }), me)).toEqual({ ok: false, error: 'not-assignee' })
+  })
+
+  it('un caso fuera de la bandeja no se libera', () => {
+    expect(decideRelease(caseState({ inInbox: false }), me)).toEqual({ ok: false, error: 'not-in-inbox' })
   })
 })
 

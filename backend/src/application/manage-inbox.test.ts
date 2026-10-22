@@ -58,8 +58,10 @@ class InMemoryInbox implements InboxRepository {
   public readonly replies: Array<{ caseId: number; text: string; take: boolean }> = []
   public readonly closed: Array<{ caseId: number; input: CloseInput }> = []
   public readonly takes: Array<{ caseId: number; expected: number | null }> = []
+  public readonly releases: Array<{ caseId: number; expected: number; resumeAssistant: boolean }> = []
   public failReplySave = false
   public takeConflict = false
+  public releaseConflict = false
   public image: InboxImageRef | null = null
 
   public constructor(
@@ -87,6 +89,13 @@ class InMemoryInbox implements InboxRepository {
     this.takes.push({ caseId, expected })
     if (this.takeConflict || !this.state) return false
     this.state = { ...this.state, assigneeId: actor.userId }
+    return true
+  }
+
+  public async release(caseId: number, expected: number, resumeAssistant: boolean): Promise<boolean> {
+    this.releases.push({ caseId, expected, resumeAssistant })
+    if (this.releaseConflict || !this.state) return false
+    this.state = { ...this.state, assigneeId: null }
     return true
   }
 
@@ -216,6 +225,38 @@ describe('ManageInbox.take (RF-DER-02)', () => {
     const repository = new InMemoryInbox([], conversation, actionState({ inInbox: false }))
     await expect(inbox(repository).take('12', me)).rejects.toMatchObject({ statusCode: 404 })
     expect(repository.takes).toEqual([])
+  })
+})
+
+describe('ManageInbox.release', () => {
+  it('el responsable devuelve el caso y el asistente retoma la conversación', async () => {
+    const repository = new InMemoryInbox([], null, actionState({ assigneeId: me.userId }))
+    await expect(inbox(repository).release('12', me)).resolves.toEqual({ caseId: 12, releasedAt: now, assistantResumed: true })
+    expect(repository.releases).toEqual([{ caseId: 12, expected: me.userId, resumeAssistant: true }])
+  })
+
+  it('un caso sin derivar se libera sin tocar al asistente', async () => {
+    const repository = new InMemoryInbox([], null, actionState({ assigneeId: me.userId, handedOff: false }))
+    await expect(inbox(repository).release('12', me)).resolves.toMatchObject({ assistantResumed: false })
+    expect(repository.releases).toEqual([{ caseId: 12, expected: me.userId, resumeAssistant: false }])
+  })
+
+  it('un caso sin responsable o de otro responsable da CONFLICT', async () => {
+    await expect(inbox(new InMemoryInbox([], null, actionState())).release('12', me))
+      .rejects.toMatchObject({ statusCode: 409, code: 'CONFLICT' })
+    await expect(inbox(new InMemoryInbox([], null, actionState({ assigneeId: 20 }))).release('12', me))
+      .rejects.toMatchObject({ statusCode: 409, code: 'CONFLICT' })
+  })
+
+  it('un caso fuera de la bandeja da NOT_FOUND', async () => {
+    await expect(inbox(new InMemoryInbox([], null, actionState({ assigneeId: me.userId, inInbox: false }))).release('12', me))
+      .rejects.toMatchObject({ statusCode: 404, code: 'NOT_FOUND' })
+  })
+
+  it('si otro lo cambió mientras tanto, CONFLICT', async () => {
+    const repository = new InMemoryInbox([], null, actionState({ assigneeId: me.userId }))
+    repository.releaseConflict = true
+    await expect(inbox(repository).release('12', me)).rejects.toMatchObject({ statusCode: 409, code: 'CONFLICT' })
   })
 })
 

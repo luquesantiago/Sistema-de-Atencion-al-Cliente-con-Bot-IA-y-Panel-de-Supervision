@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import type { Modulo } from '../navigation'
 import EstadoPanel from '../components/EstadoPanel'
-import { IconoAlerta, IconoInfo, IconoReloj } from '../components/iconos'
+import { IconoAlerta, IconoInfo, IconoPausa, IconoReanudar, IconoReloj } from '../components/iconos'
 import {
   cerrarCaso,
   contestarCaso,
+  liberarCaso,
   listarBandeja,
   obtenerCasoBandeja,
   obtenerImagenMensaje,
@@ -12,8 +13,6 @@ import {
   type AlertaBandeja,
   type CasoBandeja,
   type DetalleCasoBandeja,
-  type EtiquetaBandeja,
-  type Gravedad,
   type MensajeBandeja,
   type OrigenMensaje,
 } from '../api/bandeja'
@@ -27,21 +26,18 @@ const LARGO_MAXIMO_RESPUESTA = 4096
 const LARGO_MINIMO_MOTIVO = 3
 const LARGO_MAXIMO_MOTIVO = 2000
 
-// Los cuatro niveles del DER más «Sin nivel». Se distinguen por texto e ícono, no solo por
-// color: crítico es el único chip relleno.
-const GRAVEDADES: Record<Gravedad | 'sin-nivel', { texto: string; clase: string; Icono: typeof IconoAlerta | null }> = {
-  crítico: { texto: 'Crítico', clase: 'chip chip--riesgo-fuerte', Icono: IconoAlerta },
-  alto: { texto: 'Alto', clase: 'chip chip--riesgo', Icono: IconoAlerta },
-  medio: { texto: 'Medio', clase: 'chip chip--alerta', Icono: IconoReloj },
-  bajo: { texto: 'Bajo', clase: 'chip chip--neutro', Icono: IconoInfo },
-  'sin-nivel': { texto: 'Sin nivel', clase: 'chip chip--neutro chip--sin-nivel', Icono: null },
+type Prioridad = 'critico' | 'medio' | 'bajo'
+
+const BADGES_PRIORIDAD: Record<Prioridad, { clase: string; Icono: typeof IconoAlerta }> = {
+  critico: { clase: 'badge-prioridad badge-prioridad--critico', Icono: IconoAlerta },
+  medio: { clase: 'badge-prioridad badge-prioridad--medio', Icono: IconoReloj },
+  bajo: { clase: 'badge-prioridad badge-prioridad--bajo', Icono: IconoInfo },
 }
 
-const ETIQUETAS: Record<EtiquetaBandeja, string> = {
-  'alta-pendiente': 'Alta pendiente · se decide en Trámites',
-  'alta-rechazada': 'Alta rechazada · avisar al cliente',
-  'pedido-pendiente': 'Pedido pendiente de aprobación',
-  'cambio-telefono-pendiente': 'Cambio de teléfono pendiente · se decide en Trámites',
+const BANNERS_ALERTA: Record<Prioridad, string> = {
+  critico: 'alerta-banner alerta-banner--critico',
+  medio: 'alerta-banner alerta-banner--revision',
+  bajo: 'alerta-banner alerta-banner--resuelto',
 }
 
 const ORIGENES: Record<OrigenMensaje, string> = {
@@ -60,26 +56,8 @@ const formatoFecha = new Intl.DateTimeFormat('es-AR', {
   minute: '2-digit',
 })
 
-const formatoHora = new Intl.DateTimeFormat('es-AR', {
-  timeZone: 'America/Argentina/Buenos_Aires',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-})
-
 function fechaHora(iso: string): string {
   return formatoFecha.format(new Date(iso))
-}
-
-// «1 h 20 min», contra la hora de la última actualización.
-function espera(desde: string | null, ahora: Date): string {
-  if (desde === null) return 'Sin dato'
-  const minutos = Math.max(0, Math.floor((ahora.getTime() - new Date(desde).getTime()) / 60_000))
-  if (minutos < 1) return 'Menos de 1 min'
-  if (minutos < 60) return `${minutos} min`
-  const horas = Math.floor(minutos / 60)
-  if (horas < 24) return `${horas} h ${minutos % 60} min`
-  return `${Math.floor(horas / 24)} d ${horas % 24} h`
 }
 
 function nombreDelCaso(caso: CasoBandeja): string {
@@ -91,24 +69,114 @@ function mensajeDeError(error: unknown, textoPorDefecto: string): string {
   return error instanceof Error ? error.message : textoPorDefecto
 }
 
-function ChipGravedad({ gravedad }: { gravedad: Gravedad | null }) {
-  const { texto, clase, Icono } = GRAVEDADES[gravedad ?? 'sin-nivel']
+// Búsqueda simple: sin distinguir mayúsculas ni tildes.
+function normalizarTexto(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim()
+}
+
+// El caso todavía no expone la patente de forma directa. Si el dato llega como
+// `plate`/`domain` (o dentro de `vehicle`), se usa; si no, queda null.
+function patenteEstructurada(caso: CasoBandeja): string | null {
+  const patentes: unknown[] = []
+  if ('plate' in caso) patentes.push(caso.plate)
+  if ('domain' in caso) patentes.push(caso.domain)
+  if ('vehicle' in caso && typeof caso.vehicle === 'object' && caso.vehicle !== null) {
+    if ('plate' in caso.vehicle) patentes.push(caso.vehicle.plate)
+    if ('domain' in caso.vehicle) patentes.push(caso.vehicle.domain)
+  }
+  const patente = patentes.find((valor): valor is string => typeof valor === 'string' && valor.trim() !== '')
+  return patente?.trim() ?? null
+}
+
+// Búsqueda por patente: el dato estructurado si existe, y también el texto del
+// caso, donde puede aparecer junto con la consulta.
+function patenteDelCaso(caso: CasoBandeja): string {
+  return [patenteEstructurada(caso), caso.lastMessage?.text, caso.handoffReason]
+    .filter((valor): valor is string => typeof valor === 'string')
+    .join(' ')
+}
+
+// Lo que se puede buscar de un caso: teléfono, nombre del cliente y patente.
+function textoDelCaso(caso: CasoBandeja): string {
+  return normalizarTexto([caso.phone, caso.customer?.name ?? '', patenteDelCaso(caso)].join(' '))
+}
+
+// Prioridad visible de la tarjeta. Respeta los cuatro niveles del DER: el color
+// agrupa, pero el texto sigue distinguiendo «Crítico» de «Alto».
+function prioridadDelCaso(caso: CasoBandeja): { prioridad: Prioridad; texto: string } {
+  if (caso.severity === 'crítico') return { prioridad: 'critico', texto: 'Crítico' }
+  if (caso.severity === 'alto') return { prioridad: 'critico', texto: 'Alto' }
+  if (caso.label === 'alta-rechazada') return { prioridad: 'medio', texto: 'Revisión' }
+  if (caso.label !== null) return { prioridad: 'medio', texto: 'Pendiente' }
+  const prioridad: Prioridad = caso.severity === 'medio' ? 'medio' : 'bajo'
+  if (caso.queryType === 'baja') return { prioridad, texto: 'Baja' }
+  if (caso.queryType === 'vencimiento') return { prioridad, texto: 'Vencimientos' }
+  if (caso.severity === 'medio') return { prioridad, texto: 'Medio' }
+  if (caso.severity === 'bajo') return { prioridad, texto: 'Bajo' }
+  return { prioridad, texto: 'Sin nivel' }
+}
+
+function BadgePrioridad({ caso }: { caso: CasoBandeja }) {
+  const { prioridad, texto } = prioridadDelCaso(caso)
+  const { clase, Icono } = BADGES_PRIORIDAD[prioridad]
   return (
     <span className={clase}>
-      {Icono ? <Icono className="chip__icono" /> : null}
+      <Icono className="badge-prioridad__icono" />
       {texto}
     </span>
   )
 }
 
-function ChipEtiqueta({ etiqueta }: { etiqueta: EtiquetaBandeja | null }) {
-  if (etiqueta === null) return null
-  return (
-    <span className="chip chip--alerta">
-      <IconoReloj className="chip__icono" />
-      {ETIQUETAS[etiqueta]}
-    </span>
-  )
+function detalleAlerta(caso: CasoBandeja): string {
+  switch (caso.label) {
+    case 'alta-pendiente':
+      return 'Alta pendiente de aprobación'
+    case 'alta-rechazada':
+      return 'Alta rechazada: avisar al cliente'
+    case 'pedido-pendiente':
+      return 'Pedido pendiente de aprobación'
+    case 'cambio-telefono-pendiente':
+      return 'Cambio de teléfono pendiente de aprobación'
+  }
+  switch (caso.queryType) {
+    case 'siniestro':
+      return 'Siniestro pendiente de revisión'
+    case 'reclamo':
+      return 'Reclamo pendiente de revisión'
+    case 'baja':
+      return 'Baja pendiente de aprobación'
+    case 'modificación':
+      return 'Modificación pendiente de aprobación'
+    case 'cotización':
+      return 'Cotización pendiente de revisión'
+    case 'cobertura':
+      return 'Consulta de cobertura pendiente de revisión'
+    case 'vencimiento':
+      return 'Vencimiento pendiente de seguimiento'
+    default:
+      return caso.severity === 'crítico'
+        ? 'Caso crítico'
+        : caso.severity === 'alto'
+          ? 'Caso de prioridad alta'
+          : caso.severity === 'medio'
+            ? 'Caso de prioridad media'
+            : 'Caso en seguimiento'
+  }
+}
+
+// El banner muestra solo el mensaje dinámico; el color sale de la prioridad.
+function mensajeAlerta(caso: CasoBandeja, alertas: AlertaBandeja[]): { clase: string; texto: string } {
+  const { prioridad } = prioridadDelCaso(caso)
+  const prefijo = prioridad === 'critico' ? 'Atención' : prioridad === 'medio' ? 'Revisión' : 'Seguimiento'
+  const pendientes =
+    alertas.length > 0
+      ? ` · ${alertas.length} ${alertas.length === 1 ? 'alerta sin atender' : 'alertas sin atender'}`
+      : ''
+  return { clase: BANNERS_ALERTA[prioridad], texto: `${prefijo}: ${detalleAlerta(caso)}${pendientes}` }
 }
 
 const formatoDia = new Intl.DateTimeFormat('es-AR', {
@@ -134,10 +202,12 @@ function inicial(caso: CasoBandeja): string {
   return nombre ? nombre.charAt(0).toUpperCase() : '?'
 }
 
-// Documento y teléfono debajo del nombre; sin cliente identificado, solo el teléfono.
+// Documento, teléfono y patente (si el caso la trae) debajo del nombre.
 function subtituloDelCaso(caso: CasoBandeja): string {
-  if (caso.customer === null) return `Teléfono ${caso.phone} · nadie se identificó en la conversación`
-  return `${caso.customer.document ?? 'Sin documento'} · Teléfono ${caso.phone}`
+  const patente = patenteEstructurada(caso)
+  const telefono = `Teléfono ${caso.phone}${patente ? ` · Patente ${patente}` : ''}`
+  if (caso.customer === null) return `${telefono} · nadie se identificó en la conversación`
+  return `${caso.customer.document ?? 'Sin documento'} · ${telefono}`
 }
 
 // El caso de un alta (pendiente o rechazada) pide un motivo para cerrarse.
@@ -148,7 +218,7 @@ function pideMotivo(caso: CasoBandeja): boolean {
 // Por qué no se puede cerrar, o null si quien usa el panel puede cerrarlo.
 function motivoSinCierre(caso: CasoBandeja): string | null {
   if (!caso.handedOff) return 'Se decide en Trámites'
-  if (!caso.assignedToMe) return 'Tomá el caso para cerrarlo'
+  if (!caso.assignedToMe) return 'Intervení el caso para cerrarlo'
   return null
 }
 
@@ -238,11 +308,6 @@ function CajaRespuesta({
   const deOtro = !caso.assignedToMe && caso.assignee !== null
   const texto = borrador.trim()
   const deshabilitado = deOtro || ocupado
-  const ayuda = deOtro
-    ? `Tomá el caso para contestar: lo tiene ${caso.assignee?.name ?? 'otra persona'}.`
-    : caso.assignee === null
-      ? 'Al enviar vas a tomar el caso. El mensaje sale por WhatsApp desde el número del asistente.'
-      : 'El mensaje sale por WhatsApp desde el número del asistente. Enter envía; Shift + Enter, salto de línea.'
 
   function alEnviar(evento: FormEvent) {
     evento.preventDefault()
@@ -269,7 +334,6 @@ function CajaRespuesta({
           maxLength={LARGO_MAXIMO_RESPUESTA}
           value={borrador}
           disabled={deshabilitado}
-          aria-describedby={`${id}-ayuda`}
           placeholder={deOtro ? 'Tomá el caso para contestar' : 'Escribí la respuesta…'}
           onChange={(evento) => onCambiar(evento.target.value)}
           onKeyDown={alTeclear}
@@ -278,16 +342,13 @@ function CajaRespuesta({
           {ocupado ? 'Enviando…' : 'Enviar'}
         </button>
       </div>
-      <p className="respuesta__ayuda" id={`${id}-ayuda`}>
-        {ayuda}
-      </p>
     </form>
   )
 }
 
 /**
- * Confirmación del cierre: pide el motivo en los casos de alta y la revisión de las alertas
- * sin atender (RF-SUP-04). El botón final se habilita solo con lo obligatorio completo.
+ * Confirmación del cierre: pide el motivo en los casos de alta. El caso con alertas
+ * sin atender se cierra dejándolas atendidas a nombre de quien cierra (RF-SUP-04).
  */
 function DialogoCierre({
   caso,
@@ -307,10 +368,8 @@ function DialogoCierre({
   const id = useId()
   const dialogo = useRef<HTMLDialogElement>(null)
   const [motivo, setMotivo] = useState('')
-  const [revisadas, setRevisadas] = useState(false)
   const conMotivo = pideMotivo(caso)
   const motivoValido = !conMotivo || (motivo.trim().length >= LARGO_MINIMO_MOTIVO && motivo.trim().length <= LARGO_MAXIMO_MOTIVO)
-  const alertasValidas = alertas.length === 0 || revisadas
 
   useEffect(() => {
     const elemento = dialogo.current
@@ -320,7 +379,7 @@ function DialogoCierre({
 
   function alConfirmar(evento: FormEvent) {
     evento.preventDefault()
-    if (!motivoValido || !alertasValidas || ocupado) return
+    if (!motivoValido || ocupado) return
     onConfirmar({
       ...(conMotivo ? { motivo: motivo.trim() } : {}),
       ...(alertas.length > 0 ? { alertasRevisadas: true } : {}),
@@ -371,25 +430,6 @@ function DialogoCierre({
           </div>
         ) : null}
 
-        {alertas.length > 0 ? (
-          <fieldset className="dialogo__alertas">
-            <legend>
-              {alertas.length === 1 ? 'Este caso tiene 1 alerta sin atender' : `Este caso tiene ${alertas.length} alertas sin atender`}
-            </legend>
-            <ul>
-              {alertas.map((alerta, indice) => (
-                <li key={`${alerta.type}-${indice}`}>
-                  <ChipGravedad gravedad={alerta.level} /> {alerta.type}
-                </li>
-              ))}
-            </ul>
-            <label className="dialogo__casilla">
-              <input type="checkbox" checked={revisadas} onChange={(evento) => setRevisadas(evento.target.checked)} />
-              Revisé las alertas (quedan atendidas a mi nombre)
-            </label>
-          </fieldset>
-        ) : null}
-
         {error !== null ? (
           <p className="aviso-accion aviso-accion--riesgo" role="alert">
             {error}
@@ -400,7 +440,7 @@ function DialogoCierre({
           <button type="button" className="boton" onClick={onCancelar} disabled={ocupado}>
             Cancelar
           </button>
-          <button type="submit" className="boton boton--primario" disabled={!motivoValido || !alertasValidas || ocupado}>
+          <button type="submit" className="boton boton--primario" disabled={!motivoValido || ocupado}>
             {ocupado ? 'Cerrando…' : 'Cerrar caso'}
           </button>
         </div>
@@ -416,6 +456,7 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
   const [errorInicial, setErrorInicial] = useState<string | null>(null)
   const [fallaActualizacion, setFallaActualizacion] = useState(false)
   const [actualizado, setActualizado] = useState<Date | null>(null)
+  const [busqueda, setBusqueda] = useState('')
   const [seleccionado, setSeleccionado] = useState<number | null>(null)
   const [detalle, setDetalle] = useState<DetalleCasoBandeja | null>(null)
   const [errorDetalle, setErrorDetalle] = useState<string | null>(null)
@@ -423,7 +464,7 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
   const [reintento, setReintento] = useState(0)
   // Acciones: un borrador por caso (sobrevive al sondeo), lo que está en curso y su resultado.
   const [borradores, setBorradores] = useState<Record<number, string>>({})
-  const [accion, setAccion] = useState<'tomar' | 'contestar' | 'cerrar' | null>(null)
+  const [accion, setAccion] = useState<'tomar' | 'liberar' | 'contestar' | 'cerrar' | null>(null)
   const [avisoCaso, setAvisoCaso] = useState<Aviso | null>(null)
   const [avisoLista, setAvisoLista] = useState<Aviso | null>(null)
   const [dialogoCierre, setDialogoCierre] = useState(false)
@@ -516,6 +557,9 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
   }, [])
 
   const ahora = actualizado ?? new Date()
+  const consulta = normalizarTexto(busqueda)
+  const casosFiltrados =
+    casos === null || consulta === '' ? casos : casos.filter((caso) => textoDelCaso(caso).includes(consulta))
   const detalleActual = detalle !== null && detalle.case.caseId === seleccionado ? detalle : null
   const casoDeLista = seleccionado === null ? null : casos?.find((caso) => caso.caseId === seleccionado) ?? null
   const casoDelDetalle = detalleActual?.case ?? casoDeLista
@@ -528,6 +572,25 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
       setAvisoCaso({ tono: 'exito', texto: 'Tomaste el caso: ahora sos el responsable.' })
     } catch (error) {
       setAvisoCaso({ tono: 'riesgo', texto: mensajeDeError(error, 'No se pudo tomar el caso.') })
+    } finally {
+      setAccion(null)
+      refrescar()
+    }
+  }
+
+  async function liberar(caso: CasoBandeja) {
+    setAccion('liberar')
+    setAvisoCaso(null)
+    try {
+      const resultado = await liberarCaso(caso.caseId)
+      setAvisoCaso({
+        tono: 'exito',
+        texto: resultado.assistantResumed
+          ? 'Devolviste el caso al bot: ya no sos el responsable y el asistente vuelve a atender la conversación.'
+          : 'Liberaste el caso: ya no sos el responsable.',
+      })
+    } catch (error) {
+      setAvisoCaso({ tono: 'riesgo', texto: mensajeDeError(error, 'No se pudo liberar el caso.') })
     } finally {
       setAccion(null)
       refrescar()
@@ -605,10 +668,20 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
         </div>
       )
     }
+    if (casosFiltrados !== null && casosFiltrados.length === 0) {
+      return (
+        <div className="bandeja__estado">
+          <EstadoPanel
+            titulo="Ningún caso coincide con la búsqueda"
+            descripcion="Probá con otro teléfono, nombre o patente. Se buscan los casos de esta página."
+          />
+        </div>
+      )
+    }
 
     return (
       <ul className="bandeja__casos" aria-label="Casos, del más grave al menos grave">
-        {casos.map((caso) => (
+        {(casosFiltrados ?? []).map((caso) => (
           <li key={caso.caseId}>
             <button
               type="button"
@@ -634,19 +707,7 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
                     : 'Sin mensajes'}
                 </span>
                 <span className="tarjeta-caso__chips">
-                  <ChipGravedad gravedad={caso.severity} />
-                  <ChipEtiqueta etiqueta={caso.label} />
-                </span>
-                <span className="tarjeta-caso__pie">
-                  <span>
-                    {caso.queryType ?? 'Sin tipo'} ·{' '}
-                    {caso.assignee ? (
-                      caso.assignedToMe ? `${caso.assignee.name} (vos)` : caso.assignee.name
-                    ) : (
-                      <span className="bandeja__sin-tomar">Sin tomar</span>
-                    )}
-                  </span>
-                  <span>Espera {espera(caso.waitingSince, ahora)}</span>
+                  <BadgePrioridad caso={caso} />
                 </span>
               </span>
             </button>
@@ -659,30 +720,48 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
   function accionesDelCaso(caso: CasoBandeja): ReactNode {
     const sinCierre = motivoSinCierre(caso)
     return (
-      <div className="conversacion__acciones">
-        {caso.assignedToMe ? null : (
-          <button type="button" className="boton" onClick={() => void tomar(caso)} disabled={accion !== null}>
-            {accion === 'tomar'
-              ? 'Tomando…'
-              : caso.assignee
-                ? `Tomar caso (lo tiene ${caso.assignee.name})`
-                : 'Tomar caso'}
+      <div className="conversacion__acciones" role="group" aria-label="Acciones del caso">
+        {caso.assignedToMe ? (
+          <button
+            type="button"
+            className="conversacion__accion conversacion__accion--activa"
+            onClick={() => void liberar(caso)}
+            disabled={accion !== null}
+            aria-busy={accion === 'liberar'}
+            aria-pressed="true"
+            title="Devolver el caso al asistente para que retome la conversación"
+          >
+            <IconoReanudar className="conversacion__accion-icono" />
+            {accion === 'liberar' ? 'Reanudando…' : 'Reanudar Bot'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="conversacion__accion conversacion__accion--principal"
+            onClick={() => void tomar(caso)}
+            disabled={accion !== null}
+            aria-busy={accion === 'tomar'}
+            title={caso.assignee ? `Lo tiene ${caso.assignee.name}` : undefined}
+          >
+            <IconoPausa className="conversacion__accion-icono" />
+            {accion === 'tomar' ? 'Interviniendo…' : 'Intervenir'}
           </button>
         )}
         <button
           type="button"
-          className="boton boton--primario"
+          className="conversacion__accion conversacion__accion--cerrar"
           onClick={() => {
             setErrorCierre(null)
             setDialogoCierre(true)
           }}
           disabled={sinCierre !== null || accion !== null}
+          title={sinCierre ?? undefined}
           aria-describedby={sinCierre !== null ? `motivo-sin-cierre-${caso.caseId}` : undefined}
         >
           Cerrar caso
         </button>
         {sinCierre !== null ? (
-          <span className="conversacion__sin-cierre" id={`motivo-sin-cierre-${caso.caseId}`}>
+          <span className="visually-hidden" id={`motivo-sin-cierre-${caso.caseId}`}>
             {sinCierre}
           </span>
         ) : null}
@@ -703,91 +782,64 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
     }
 
     const caso = casoDelDetalle
-    const franjaDeRiesgo = caso?.severity === 'crítico' || caso?.severity === 'alto'
     const alertas = detalleActual?.alerts ?? []
+    const alerta = caso ? mensajeAlerta(caso, alertas) : null
     return (
       <>
-        <header className="conversacion__encabezado">
-          <button type="button" className="boton conversacion__volver" onClick={cerrarDetalle}>
-            Volver a la lista
-          </button>
-          {caso ? (
-            <span className={`avatar${caso.customer === null ? ' avatar--sin-identificar' : ''}`} aria-hidden="true">
-              {inicial(caso)}
-            </span>
-          ) : null}
-          <div className="conversacion__datos">
-            <h2 className="conversacion__nombre">{caso ? nombreDelCaso(caso) : `Caso ${seleccionado}`}</h2>
-            {caso ? <p className="conversacion__sub">{subtituloDelCaso(caso)}</p> : null}
+        <header className="chat-header">
+          <div className="chat-header__principal">
+            <button type="button" className="boton conversacion__volver" onClick={cerrarDetalle}>
+              Volver a la lista
+            </button>
+            {caso ? (
+              <span className={`avatar${caso.customer === null ? ' avatar--sin-identificar' : ''}`} aria-hidden="true">
+                {inicial(caso)}
+              </span>
+            ) : null}
+            <div className="conversacion__datos">
+              <h2 className="conversacion__nombre">{caso ? nombreDelCaso(caso) : `Caso ${seleccionado}`}</h2>
+              {caso ? <p className="conversacion__sub">{subtituloDelCaso(caso)}</p> : null}
+            </div>
+            {caso && !fueraDeBandeja ? accionesDelCaso(caso) : null}
           </div>
-          {caso && !fueraDeBandeja ? accionesDelCaso(caso) : null}
-          {/* Oculta la conversación; no cierra el caso. */}
-          <button type="button" className="detalle-panel__cerrar" onClick={cerrarDetalle}>
-            Ocultar
-          </button>
+
+          {alerta ? (
+            <p className={alerta.clase} role="status">
+              {alerta.texto}
+            </p>
+          ) : null}
         </header>
 
-        {caso ? (
-          <div className={`conversacion__franja${franjaDeRiesgo ? ' conversacion__franja--riesgo' : ''}`}>
-            <ChipGravedad gravedad={caso.severity} />
-            <ChipEtiqueta etiqueta={caso.label} />
-            {alertas.length > 0 ? (
-              <span className="chip chip--riesgo">
-                <IconoAlerta className="chip__icono" />
-                {alertas.length === 1 ? '1 alerta sin atender' : `${alertas.length} alertas sin atender`}
-              </span>
-            ) : null}
-            <span className="conversacion__dato">
-              Consulta: <strong>{caso.queryType ?? 'Sin tipo'}</strong>
-            </span>
-            {caso.handoffReason ? (
-              <span className="conversacion__dato">
-                Motivo: <strong>{caso.handoffReason}</strong>
-              </span>
-            ) : null}
-            <span className="conversacion__dato">
-              Responsable:{' '}
-              {caso.assignee ? (
-                <strong>{caso.assignedToMe ? `${caso.assignee.name} (vos)` : caso.assignee.name}</strong>
-              ) : (
-                <span className="bandeja__sin-tomar">Sin tomar</span>
-              )}
-            </span>
-            <span className="conversacion__dato">
-              Espera: <strong>{espera(caso.waitingSince, ahora)}</strong>
-              {caso.waitingSince ? ` (desde ${fechaHora(caso.waitingSince)})` : ''}
-            </span>
-          </div>
-        ) : null}
+        <div className="chat-body">
+          <AvisoAccion aviso={avisoCaso} />
 
-        <AvisoAccion aviso={avisoCaso} />
-
-        {fueraDeBandeja ? (
-          <p className="bandeja__aviso" role="status">
-            Este caso ya no está en la bandeja: se cerró o ya no tiene nada pendiente.
-            {detalleActual ? ' Se muestra la última conversación cargada.' : ''}
-          </p>
-        ) : null}
-
-        {errorDetalle !== null && detalleActual === null ? (
-          <p className="conversacion__estado detalle-panel__aviso detalle-panel__aviso--riesgo" role="alert">
-            {errorDetalle}
-          </p>
-        ) : detalleActual === null ? (
-          fueraDeBandeja ? null : (
-            <p className="conversacion__estado detalle-panel__aviso" role="status">
-              Cargando la conversación…
+          {fueraDeBandeja ? (
+            <p className="bandeja__aviso" role="status">
+              Este caso ya no está en la bandeja: se cerró o ya no tiene nada pendiente.
+              {detalleActual ? ' Se muestra la última conversación cargada.' : ''}
             </p>
-          )
-        ) : detalleActual.messages.length === 0 ? (
-          <p className="conversacion__estado detalle-panel__aviso">La conversación no tiene mensajes guardados.</p>
-        ) : (
-          <ol className="hilo" aria-label="Mensajes de la conversación, del más viejo al más nuevo">
-            {detalleActual.messages.map((mensaje) => (
-              <MensajeDelHilo key={mensaje.id} mensaje={mensaje} idCaso={detalleActual.case.caseId} />
-            ))}
-          </ol>
-        )}
+          ) : null}
+
+          {errorDetalle !== null && detalleActual === null ? (
+            <p className="conversacion__estado detalle-panel__aviso detalle-panel__aviso--riesgo" role="alert">
+              {errorDetalle}
+            </p>
+          ) : detalleActual === null ? (
+            fueraDeBandeja ? null : (
+              <p className="conversacion__estado detalle-panel__aviso" role="status">
+                Cargando la conversación…
+              </p>
+            )
+          ) : detalleActual.messages.length === 0 ? (
+            <p className="conversacion__estado detalle-panel__aviso">La conversación no tiene mensajes guardados.</p>
+          ) : (
+            <ol className="hilo" aria-label="Mensajes de la conversación, del más viejo al más nuevo">
+              {detalleActual.messages.map((mensaje) => (
+                <MensajeDelHilo key={mensaje.id} mensaje={mensaje} idCaso={detalleActual.case.caseId} />
+              ))}
+            </ol>
+          )}
+        </div>
 
         {caso && caso.handedOff && !fueraDeBandeja ? (
           <CajaRespuesta
@@ -813,19 +865,25 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
     )
   }
 
-  const desde = offset + 1
   const hasta = offset + (casos?.length ?? 0)
   return (
-    <div className={`bandeja${seleccionado !== null ? ' bandeja--con-caso' : ''}`}>
-      <section className="bandeja__lista" aria-busy={casos === null} aria-labelledby="bandeja-titulo">
+    <div className={`bandeja-container${seleccionado !== null ? ' bandeja-container--con-caso' : ''}`}>
+      <section className="bandeja-lista-panel" aria-busy={casos === null} aria-labelledby="bandeja-titulo">
         <header className="bandeja__lista-encabezado">
           <h1 className="bandeja__titulo" id="bandeja-titulo">
             {modulo.nombre}
           </h1>
-          <p className="bandeja__resumen">
-            {casos === null || casos.length === 0 ? 'Sin casos' : `${desde}–${hasta} de ${total} casos`}
-            {actualizado ? ` · actualizada a las ${formatoHora.format(actualizado)}` : ''}
-          </p>
+          <div className="bandeja__busqueda">
+            <input
+              className="bandeja__busqueda-campo"
+              type="search"
+              autoComplete="off"
+              aria-label="Buscar por teléfono, nombre o patente"
+              placeholder="Buscar por teléfono, nombre o patente..."
+              value={busqueda}
+              onChange={(evento) => setBusqueda(evento.target.value)}
+            />
+          </div>
         </header>
 
         {fallaActualizacion && casos !== null ? (
@@ -860,8 +918,8 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
         ) : null}
       </section>
 
-      <section className="conversacion" aria-label="Conversación del caso">
-        {contenidoDeLaConversacion()}
+      <section className="bandeja-detalle-panel" aria-label="Conversación del caso">
+        <div className="conversacion">{contenidoDeLaConversacion()}</div>
       </section>
     </div>
   )

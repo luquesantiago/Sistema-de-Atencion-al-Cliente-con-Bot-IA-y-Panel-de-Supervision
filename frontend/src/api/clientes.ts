@@ -121,7 +121,6 @@ export async function obtenerCliente(id: string): Promise<ClienteDetalle> {
   const respuesta = await fetch(`/api/clientes/${encodeURIComponent(id)}`)
   return (await leer<ClienteDetalle>(respuesta)) as ClienteDetalle
 }
-
 // Entradas de las ediciones del panel: el backend las valida y normaliza.
 // El DNI no se puede modificar nunca: es el identificador del cliente.
 

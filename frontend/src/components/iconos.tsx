@@ -67,6 +67,44 @@ export function IconoClientes({ className }: IconoProps) {
   )
 }
 
+export function IconoConversacion({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H6l-3 2 1-4.5A7.5 7.5 0 1 1 20 11.5Z" />
+      <path d="M8 10h8M8 13.5h5" />
+    </PanelIcono>
+  )
+}
+
+export function IconoFichaCliente({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <rect x="4" y="3.5" width="16" height="17" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="M6.5 15a2.5 2.5 0 0 1 5 0" />
+      <path d="M14 9h3.5M14 13h3.5M14 17h3.5" />
+    </PanelIcono>
+  )
+}
+
+export function IconoPausa({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 8.5v7M14.5 8.5v7" />
+    </PanelIcono>
+  )
+}
+
+export function IconoReanudar({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 8.5 15 12l-5 3.5z" />
+    </PanelIcono>
+  )
+}
+
 export function IconoSalir({ className }: IconoProps) {
   return (
     <PanelIcono className={className}>
