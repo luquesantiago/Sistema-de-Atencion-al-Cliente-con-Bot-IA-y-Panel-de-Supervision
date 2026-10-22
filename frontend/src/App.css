@@ -1820,12 +1820,19 @@
   border-bottom-left-radius: 4px;
 }
 
-.hilo__mensaje--asistente,
+.hilo__mensaje--asistente {
+  align-self: flex-end;
+  border-color: var(--color-accent-light);
+  border-bottom-right-radius: 4px;
+  background: var(--color-surface);
+  color: #1e293b;
+}
+
 .hilo__mensaje--operador {
   align-self: flex-end;
-  border-color: var(--primario);
+  border-color: var(--color-primary);
   border-bottom-right-radius: 4px;
-  background: var(--primario);
+  background: var(--color-primary);
   color: #ffffff;
 }
 
@@ -1843,7 +1850,10 @@
   font-size: 0.72rem;
 }
 
-.hilo__mensaje--asistente .hilo__meta,
+.hilo__mensaje--asistente .hilo__meta {
+  color: var(--color-text-muted);
+}
+
 .hilo__mensaje--operador .hilo__meta {
   color: rgba(255, 255, 255, 0.85);
 }
