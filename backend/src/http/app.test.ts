@@ -80,6 +80,12 @@ class FakeInbox implements InboxRepository {
     return this.state !== null
   }
 
+  public async release(_caseId: number, expectedAssigneeId: number): Promise<boolean> {
+    if (!this.state || this.state.assigneeId !== expectedAssigneeId) return false
+    this.state = { ...this.state, assigneeId: null, handedOff: false }
+    return true
+  }
+
   public async close(caseId: number, actor: PanelActor, input: CloseInput, at: Date): Promise<CloseOutcome> {
     if (this.state?.caseId !== caseId) return { ok: false, error: 'not-in-inbox' }
     const plan = decideClose(this.state, actor, input)
@@ -1040,6 +1046,20 @@ describe('Bandeja de Atención', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({ caseId: 12 })
     expect(inbox.state?.assigneeId).toBe(10)
+  })
+
+  it('libera un caso tomado y avisa que el asistente retoma la conversación', async () => {
+    await post('/api/bandeja/12/toma')
+    const response = await post('/api/bandeja/12/liberacion')
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ caseId: 12, assistantResumed: true })
+    expect(inbox.state?.assigneeId).toBeNull()
+  })
+
+  it('liberar un caso sin responsable da 409', async () => {
+    const response = await post('/api/bandeja/12/liberacion')
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'CONFLICT' } })
   })
 
   it('contesta: 201 con el mensaje guardado y el texto enviado por WhatsApp', async () => {

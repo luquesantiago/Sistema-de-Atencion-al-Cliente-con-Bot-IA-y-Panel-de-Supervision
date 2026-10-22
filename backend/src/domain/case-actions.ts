@@ -24,6 +24,7 @@ export const minReasonLength = 3
 export const maxReasonLength = 2000
 
 export type TakeError = 'not-in-inbox'
+export type ReleaseError = 'not-in-inbox' | 'not-assignee'
 export type ReplyError = 'invalid-text' | 'not-in-inbox' | 'not-handed-off' | 'taken-by-other' | 'no-customer-message'
 export type CloseError =
   | 'not-in-inbox'
@@ -34,6 +35,9 @@ export type CloseError =
   | 'alerts-not-reviewed'
 
 export type TakeDecision = { ok: true } | { ok: false; error: TakeError }
+export type ReleaseDecision =
+  | { ok: true; resumeAssistant: boolean }
+  | { ok: false; error: ReleaseError }
 
 // take: el caso no tiene responsable y queda tomado por quien contesta.
 export type ReplyDecision = { ok: true; take: boolean; text: string } | { ok: false; error: ReplyError }
@@ -53,6 +57,12 @@ export type CloseInput = { reason?: string | null; alertsReviewed?: boolean }
 // Se puede tomar cualquier caso de la bandeja, tenga o no responsable.
 export function decideTake(state: CaseActionState): TakeDecision {
   return state.inInbox ? { ok: true } : { ok: false, error: 'not-in-inbox' }
+}
+
+export function decideRelease(state: CaseActionState, actor: PanelActor): ReleaseDecision {
+  if (!state.inInbox) return { ok: false, error: 'not-in-inbox' }
+  if (state.assigneeId !== actor.userId) return { ok: false, error: 'not-assignee' }
+  return { ok: true, resumeAssistant: state.handedOff }
 }
 
 // Solo en casos derivados: en los demás el asistente sigue atendiendo la conversación.

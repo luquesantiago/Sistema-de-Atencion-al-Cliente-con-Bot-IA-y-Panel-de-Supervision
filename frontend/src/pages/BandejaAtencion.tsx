@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import type { Modulo } from '../navigation'
 import EstadoPanel from '../components/EstadoPanel'
-import { IconoAlerta, IconoInfo, IconoReloj } from '../components/iconos'
+import { IconoAlerta, IconoInfo, IconoPausa, IconoReanudar, IconoReloj } from '../components/iconos'
 import {
   cerrarCaso,
   contestarCaso,
+  liberarCaso,
   listarBandeja,
   obtenerCasoBandeja,
   obtenerImagenMensaje,
@@ -12,7 +13,6 @@ import {
   type AlertaBandeja,
   type CasoBandeja,
   type DetalleCasoBandeja,
-  type Gravedad,
   type MensajeBandeja,
   type OrigenMensaje,
 } from '../api/bandeja'
@@ -25,16 +25,6 @@ const INTERVALO_ACTUALIZACION_MS = 5000
 const LARGO_MAXIMO_RESPUESTA = 4096
 const LARGO_MINIMO_MOTIVO = 3
 const LARGO_MAXIMO_MOTIVO = 2000
-
-// Los cuatro niveles del DER más «Sin nivel». Se distinguen por texto e ícono, no solo por
-// color: crítico es el único chip relleno.
-const GRAVEDADES: Record<Gravedad | 'sin-nivel', { texto: string; clase: string; Icono: typeof IconoAlerta | null }> = {
-  crítico: { texto: 'Crítico', clase: 'chip chip--riesgo-fuerte', Icono: IconoAlerta },
-  alto: { texto: 'Alto', clase: 'chip chip--riesgo', Icono: IconoAlerta },
-  medio: { texto: 'Medio', clase: 'chip chip--alerta', Icono: IconoReloj },
-  bajo: { texto: 'Bajo', clase: 'chip chip--neutro', Icono: IconoInfo },
-  'sin-nivel': { texto: 'Sin nivel', clase: 'chip chip--neutro chip--sin-nivel', Icono: null },
-}
 
 type Prioridad = 'critico' | 'medio' | 'bajo'
 
@@ -113,16 +103,6 @@ function patenteDelCaso(caso: CasoBandeja): string {
 // Lo que se puede buscar de un caso: teléfono, nombre del cliente y patente.
 function textoDelCaso(caso: CasoBandeja): string {
   return normalizarTexto([caso.phone, caso.customer?.name ?? '', patenteDelCaso(caso)].join(' '))
-}
-
-function ChipGravedad({ gravedad }: { gravedad: Gravedad | null }) {
-  const { texto, clase, Icono } = GRAVEDADES[gravedad ?? 'sin-nivel']
-  return (
-    <span className={clase}>
-      {Icono ? <Icono className="chip__icono" /> : null}
-      {texto}
-    </span>
-  )
 }
 
 // Prioridad visible de la tarjeta. Respeta los cuatro niveles del DER: el color
@@ -238,7 +218,7 @@ function pideMotivo(caso: CasoBandeja): boolean {
 // Por qué no se puede cerrar, o null si quien usa el panel puede cerrarlo.
 function motivoSinCierre(caso: CasoBandeja): string | null {
   if (!caso.handedOff) return 'Se decide en Trámites'
-  if (!caso.assignedToMe) return 'Tomá el caso para cerrarlo'
+  if (!caso.assignedToMe) return 'Intervení el caso para cerrarlo'
   return null
 }
 
@@ -328,11 +308,6 @@ function CajaRespuesta({
   const deOtro = !caso.assignedToMe && caso.assignee !== null
   const texto = borrador.trim()
   const deshabilitado = deOtro || ocupado
-  const ayuda = deOtro
-    ? `Tomá el caso para contestar: lo tiene ${caso.assignee?.name ?? 'otra persona'}.`
-    : caso.assignee === null
-      ? 'Al enviar vas a tomar el caso. El mensaje sale por WhatsApp desde el número del asistente.'
-      : 'El mensaje sale por WhatsApp desde el número del asistente. Enter envía; Shift + Enter, salto de línea.'
 
   function alEnviar(evento: FormEvent) {
     evento.preventDefault()
@@ -359,7 +334,6 @@ function CajaRespuesta({
           maxLength={LARGO_MAXIMO_RESPUESTA}
           value={borrador}
           disabled={deshabilitado}
-          aria-describedby={`${id}-ayuda`}
           placeholder={deOtro ? 'Tomá el caso para contestar' : 'Escribí la respuesta…'}
           onChange={(evento) => onCambiar(evento.target.value)}
           onKeyDown={alTeclear}
@@ -368,16 +342,13 @@ function CajaRespuesta({
           {ocupado ? 'Enviando…' : 'Enviar'}
         </button>
       </div>
-      <p className="respuesta__ayuda" id={`${id}-ayuda`}>
-        {ayuda}
-      </p>
     </form>
   )
 }
 
 /**
- * Confirmación del cierre: pide el motivo en los casos de alta y la revisión de las alertas
- * sin atender (RF-SUP-04). El botón final se habilita solo con lo obligatorio completo.
+ * Confirmación del cierre: pide el motivo en los casos de alta. El caso con alertas
+ * sin atender se cierra dejándolas atendidas a nombre de quien cierra (RF-SUP-04).
  */
 function DialogoCierre({
   caso,
@@ -397,10 +368,8 @@ function DialogoCierre({
   const id = useId()
   const dialogo = useRef<HTMLDialogElement>(null)
   const [motivo, setMotivo] = useState('')
-  const [revisadas, setRevisadas] = useState(false)
   const conMotivo = pideMotivo(caso)
   const motivoValido = !conMotivo || (motivo.trim().length >= LARGO_MINIMO_MOTIVO && motivo.trim().length <= LARGO_MAXIMO_MOTIVO)
-  const alertasValidas = alertas.length === 0 || revisadas
 
   useEffect(() => {
     const elemento = dialogo.current
@@ -410,7 +379,7 @@ function DialogoCierre({
 
   function alConfirmar(evento: FormEvent) {
     evento.preventDefault()
-    if (!motivoValido || !alertasValidas || ocupado) return
+    if (!motivoValido || ocupado) return
     onConfirmar({
       ...(conMotivo ? { motivo: motivo.trim() } : {}),
       ...(alertas.length > 0 ? { alertasRevisadas: true } : {}),
@@ -461,25 +430,6 @@ function DialogoCierre({
           </div>
         ) : null}
 
-        {alertas.length > 0 ? (
-          <fieldset className="dialogo__alertas">
-            <legend>
-              {alertas.length === 1 ? 'Este caso tiene 1 alerta sin atender' : `Este caso tiene ${alertas.length} alertas sin atender`}
-            </legend>
-            <ul>
-              {alertas.map((alerta, indice) => (
-                <li key={`${alerta.type}-${indice}`}>
-                  <ChipGravedad gravedad={alerta.level} /> {alerta.type}
-                </li>
-              ))}
-            </ul>
-            <label className="dialogo__casilla">
-              <input type="checkbox" checked={revisadas} onChange={(evento) => setRevisadas(evento.target.checked)} />
-              Revisé las alertas (quedan atendidas a mi nombre)
-            </label>
-          </fieldset>
-        ) : null}
-
         {error !== null ? (
           <p className="aviso-accion aviso-accion--riesgo" role="alert">
             {error}
@@ -490,7 +440,7 @@ function DialogoCierre({
           <button type="button" className="boton" onClick={onCancelar} disabled={ocupado}>
             Cancelar
           </button>
-          <button type="submit" className="boton boton--primario" disabled={!motivoValido || !alertasValidas || ocupado}>
+          <button type="submit" className="boton boton--primario" disabled={!motivoValido || ocupado}>
             {ocupado ? 'Cerrando…' : 'Cerrar caso'}
           </button>
         </div>
@@ -514,7 +464,7 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
   const [reintento, setReintento] = useState(0)
   // Acciones: un borrador por caso (sobrevive al sondeo), lo que está en curso y su resultado.
   const [borradores, setBorradores] = useState<Record<number, string>>({})
-  const [accion, setAccion] = useState<'tomar' | 'contestar' | 'cerrar' | null>(null)
+  const [accion, setAccion] = useState<'tomar' | 'liberar' | 'contestar' | 'cerrar' | null>(null)
   const [avisoCaso, setAvisoCaso] = useState<Aviso | null>(null)
   const [avisoLista, setAvisoLista] = useState<Aviso | null>(null)
   const [dialogoCierre, setDialogoCierre] = useState(false)
@@ -622,6 +572,25 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
       setAvisoCaso({ tono: 'exito', texto: 'Tomaste el caso: ahora sos el responsable.' })
     } catch (error) {
       setAvisoCaso({ tono: 'riesgo', texto: mensajeDeError(error, 'No se pudo tomar el caso.') })
+    } finally {
+      setAccion(null)
+      refrescar()
+    }
+  }
+
+  async function liberar(caso: CasoBandeja) {
+    setAccion('liberar')
+    setAvisoCaso(null)
+    try {
+      const resultado = await liberarCaso(caso.caseId)
+      setAvisoCaso({
+        tono: 'exito',
+        texto: resultado.assistantResumed
+          ? 'Devolviste el caso al bot: ya no sos el responsable y el asistente vuelve a atender la conversación.'
+          : 'Liberaste el caso: ya no sos el responsable.',
+      })
+    } catch (error) {
+      setAvisoCaso({ tono: 'riesgo', texto: mensajeDeError(error, 'No se pudo liberar el caso.') })
     } finally {
       setAccion(null)
       refrescar()
@@ -751,30 +720,48 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
   function accionesDelCaso(caso: CasoBandeja): ReactNode {
     const sinCierre = motivoSinCierre(caso)
     return (
-      <div className="conversacion__acciones">
-        {caso.assignedToMe ? null : (
-          <button type="button" className="boton" onClick={() => void tomar(caso)} disabled={accion !== null}>
-            {accion === 'tomar'
-              ? 'Tomando…'
-              : caso.assignee
-                ? `Tomar caso (lo tiene ${caso.assignee.name})`
-                : 'Tomar caso'}
+      <div className="conversacion__acciones" role="group" aria-label="Acciones del caso">
+        {caso.assignedToMe ? (
+          <button
+            type="button"
+            className="conversacion__accion conversacion__accion--activa"
+            onClick={() => void liberar(caso)}
+            disabled={accion !== null}
+            aria-busy={accion === 'liberar'}
+            aria-pressed="true"
+            title="Devolver el caso al asistente para que retome la conversación"
+          >
+            <IconoReanudar className="conversacion__accion-icono" />
+            {accion === 'liberar' ? 'Reanudando…' : 'Reanudar Bot'}
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="conversacion__accion conversacion__accion--principal"
+            onClick={() => void tomar(caso)}
+            disabled={accion !== null}
+            aria-busy={accion === 'tomar'}
+            title={caso.assignee ? `Lo tiene ${caso.assignee.name}` : undefined}
+          >
+            <IconoPausa className="conversacion__accion-icono" />
+            {accion === 'tomar' ? 'Interviniendo…' : 'Intervenir'}
           </button>
         )}
         <button
           type="button"
-          className="boton boton--primario"
+          className="conversacion__accion conversacion__accion--cerrar"
           onClick={() => {
             setErrorCierre(null)
             setDialogoCierre(true)
           }}
           disabled={sinCierre !== null || accion !== null}
+          title={sinCierre ?? undefined}
           aria-describedby={sinCierre !== null ? `motivo-sin-cierre-${caso.caseId}` : undefined}
         >
           Cerrar caso
         </button>
         {sinCierre !== null ? (
-          <span className="conversacion__sin-cierre" id={`motivo-sin-cierre-${caso.caseId}`}>
+          <span className="visually-hidden" id={`motivo-sin-cierre-${caso.caseId}`}>
             {sinCierre}
           </span>
         ) : null}
@@ -814,10 +801,6 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
               {caso ? <p className="conversacion__sub">{subtituloDelCaso(caso)}</p> : null}
             </div>
             {caso && !fueraDeBandeja ? accionesDelCaso(caso) : null}
-            {/* Oculta la conversación; no cierra el caso. */}
-            <button type="button" className="detalle-panel__cerrar" onClick={cerrarDetalle}>
-              Ocultar
-            </button>
           </div>
 
           {alerta ? (

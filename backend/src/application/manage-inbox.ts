@@ -1,8 +1,10 @@
 import {
+  decideRelease,
   decideReply,
   decideTake,
   type CloseError,
   type PanelActor,
+  type ReleaseError,
   type ReplyError,
 } from '../domain/case-actions.js'
 import type { MessageOrigin, QueryType } from '../domain/conversation.js'
@@ -62,6 +64,8 @@ export type ReplyResult =
   | { sent: true; saved: true; messageId: number }
   | { sent: true; saved: false; warning: string }
 
+export type ReleaseResult = { caseId: number; releasedAt: Date; assistantResumed: boolean }
+
 export type CloseRequest = { reason?: string | null; alertsReviewed?: boolean }
 
 const replyErrors: Record<ReplyError, () => RequestManagementError> = {
@@ -70,6 +74,12 @@ const replyErrors: Record<ReplyError, () => RequestManagementError> = {
   'not-handed-off': () => new RequestManagementError(409, 'CONFLICT', 'En este caso el asistente sigue atendiendo: solo se contesta un caso derivado.'),
   'taken-by-other': () => new RequestManagementError(409, 'CONFLICT', 'El caso lo tiene otra persona: tomalo para contestar.'),
   'no-customer-message': () => new RequestManagementError(409, 'CONFLICT', 'El caso no tiene un mensaje del cliente para responder.'),
+}
+
+const releaseErrors: Record<ReleaseError | 'changed', () => RequestManagementError> = {
+  'not-in-inbox': () => new RequestManagementError(404, 'NOT_FOUND', 'El caso no está en la bandeja.'),
+  'not-assignee': () => new RequestManagementError(409, 'CONFLICT', 'Solo quien intervino el caso puede devolverlo al bot.'),
+  changed: () => new RequestManagementError(409, 'CONFLICT', 'El caso cambió mientras lo liberabas. Volvé a intentarlo.'),
 }
 
 const closeErrors: Record<CloseError | 'changed', () => RequestManagementError> = {
@@ -121,6 +131,19 @@ export class ManageInbox {
     const conversation = await this.repository.findConversation(caseId)
     if (!conversation) throw notInInbox()
     return toItem(conversation.entry, actor)
+  }
+
+  public async release(id: string, actor: PanelActor): Promise<ReleaseResult> {
+    const caseId = parseCaseId(id)
+    const state = await this.repository.findActionState(caseId)
+    if (!state) throw releaseErrors['not-in-inbox']()
+    const decision = decideRelease(state, actor)
+    if (!decision.ok) throw releaseErrors[decision.error]()
+    const releasedAt = this.clock()
+    const released = await this.repository.release(caseId, actor.userId, decision.resumeAssistant)
+    if (!released) throw releaseErrors.changed()
+    console.log(`[bandeja] caso ${caseId} liberado por el usuario ${actor.userId}`)
+    return { caseId, releasedAt, assistantResumed: decision.resumeAssistant }
   }
 
   // Primero WhatsApp y después la base (decisión 5): la base registra lo que efectivamente salió.

@@ -1894,17 +1894,96 @@
   font-size: 0.8rem;
 }
 
+/* Acciones del caso: a la derecha de la cabecera, con una sola acción principal */
+
 .conversacion__acciones {
   display: flex;
+  flex: none;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px 8px;
+  gap: 8px;
+  margin-left: auto;
 }
 
-.conversacion__sin-cierre {
-  color: var(--texto-suave);
-  font-size: 0.78rem;
+.conversacion__accion {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.conversacion__accion:hover {
+  border-color: var(--color-secondary);
+  background: var(--color-accent-light);
+}
+
+.conversacion__accion--principal {
+  border-color: var(--color-primary);
+  background: var(--color-accent-light);
+  color: var(--color-primary);
+  font-weight: 650;
+}
+
+.conversacion__accion--principal:hover {
+  border-color: var(--color-primary-hover);
+  background: var(--color-primary);
+  color: #ffffff;
+}
+
+.conversacion__accion--activa {
+  border-color: var(--color-success-text);
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+  font-weight: 650;
+}
+
+.conversacion__accion--activa:hover {
+  border-color: var(--color-success-text);
+  background: var(--color-success-text);
+  color: #ffffff;
+}
+
+.conversacion__accion--cerrar {
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-text);
+}
+
+.conversacion__accion--cerrar:hover {
+  border-color: var(--color-danger-text);
+  background: var(--color-danger-bg);
+}
+
+.conversacion__accion:focus-visible {
+  outline: 3px solid var(--color-secondary);
+  outline-offset: 2px;
+}
+
+.conversacion__accion[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.conversacion__accion[aria-busy='true'] {
+  pointer-events: none;
+}
+
+.conversacion__accion-icono {
+  flex: none;
+  width: 17px;
+  height: 17px;
 }
 
 .aviso-accion {
@@ -1974,7 +2053,6 @@
   cursor: not-allowed;
 }
 
-.respuesta__ayuda,
 .dialogo__ayuda {
   margin-top: 6px;
   color: var(--texto-suave);
@@ -2020,37 +2098,6 @@
   display: block;
   margin-bottom: 6px;
   font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.dialogo__alertas {
-  margin: 0;
-  padding: 10px 12px;
-  border: 1px solid #f2c2bd;
-  border-radius: var(--radio-chico);
-  background: var(--riesgo-suave);
-  font-size: 0.85rem;
-}
-
-.dialogo__alertas legend {
-  padding: 0 4px;
-  color: var(--riesgo);
-  font-weight: 650;
-}
-
-.dialogo__alertas ul {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 4px 0 10px;
-  padding: 0;
-  list-style: none;
-}
-
-.dialogo__casilla {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-weight: 600;
 }
 
@@ -2530,4 +2577,5 @@
   .modal__acciones .boton {
     flex: 1;
   }
+}
 }

@@ -96,6 +96,15 @@ export function IconoPausa({ className }: IconoProps) {
   )
 }
 
+export function IconoReanudar({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 8.5 15 12l-5 3.5z" />
+    </PanelIcono>
+  )
+}
+
 export function IconoSalir({ className }: IconoProps) {
   return (
     <PanelIcono className={className}>
