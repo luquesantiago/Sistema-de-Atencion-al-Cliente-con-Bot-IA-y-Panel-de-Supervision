@@ -218,6 +218,7 @@ function pideMotivo(caso: CasoBandeja): boolean {
 // Por qué no se puede cerrar, o null si quien usa el panel puede cerrarlo.
 function motivoSinCierre(caso: CasoBandeja): string | null {
   if (!caso.handedOff) return 'Se decide en Trámites'
+  if (caso.assignee !== null && !caso.assignedToMe) return `Lo tiene ${caso.assignee.name}: solo su responsable lo cierra`
   if (!caso.assignedToMe) return 'Intervení el caso para cerrarlo'
   return null
 }
@@ -334,7 +335,7 @@ function CajaRespuesta({
           maxLength={LARGO_MAXIMO_RESPUESTA}
           value={borrador}
           disabled={deshabilitado}
-          placeholder={deOtro ? 'Tomá el caso para contestar' : 'Escribí la respuesta…'}
+          placeholder={deOtro ? `Lo tiene ${caso.assignee?.name ?? 'otra persona'}: solo su responsable contesta` : 'Escribí la respuesta…'}
           onChange={(evento) => onCambiar(evento.target.value)}
           onKeyDown={alTeclear}
         />
@@ -582,11 +583,11 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
     setAccion('liberar')
     setAvisoCaso(null)
     try {
-      const resultado = await liberarCaso(caso.caseId)
+      await liberarCaso(caso.caseId)
       setAvisoCaso({
         tono: 'exito',
-        texto: resultado.assistantResumed
-          ? 'Devolviste el caso al bot: ya no sos el responsable y el asistente vuelve a atender la conversación.'
+        texto: caso.handedOff
+          ? 'Liberaste el caso: ya no sos el responsable. El asistente sigue sin responder hasta que alguien cierre el caso.'
           : 'Liberaste el caso: ya no sos el responsable.',
       })
     } catch (error) {
@@ -729,19 +730,19 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
             disabled={accion !== null}
             aria-busy={accion === 'liberar'}
             aria-pressed="true"
-            title="Devolver el caso al asistente para que retome la conversación"
+            title="Dejar el caso sin responsable para que lo tome otra persona"
           >
             <IconoReanudar className="conversacion__accion-icono" />
-            {accion === 'liberar' ? 'Reanudando…' : 'Reanudar Bot'}
+            {accion === 'liberar' ? 'Liberando…' : 'Liberar caso'}
           </button>
         ) : (
           <button
             type="button"
             className="conversacion__accion conversacion__accion--principal"
             onClick={() => void tomar(caso)}
-            disabled={accion !== null}
+            disabled={caso.assignee !== null || accion !== null}
             aria-busy={accion === 'tomar'}
-            title={caso.assignee ? `Lo tiene ${caso.assignee.name}` : undefined}
+            title={caso.assignee ? `Lo tiene ${caso.assignee.name}: tiene que liberarlo antes` : undefined}
           >
             <IconoPausa className="conversacion__accion-icono" />
             {accion === 'tomar' ? 'Interviniendo…' : 'Intervenir'}

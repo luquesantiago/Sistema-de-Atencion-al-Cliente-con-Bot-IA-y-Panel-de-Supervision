@@ -75,7 +75,7 @@ export interface InboxRepository {
   // false si el responsable ya no es expectedAssigneeId o el caso se cerró.
   take(caseId: number, actor: PanelActor, expectedAssigneeId: number | null, at: Date): Promise<boolean>
   // false si el responsable ya no es expectedAssigneeId o el caso se cerró.
-  release(caseId: number, expectedAssigneeId: number, resumeAssistant: boolean): Promise<boolean>
+  release(caseId: number, expectedAssigneeId: number): Promise<boolean>
   // Decide con decideClose dentro de la misma transacción que escribe.
   close(caseId: number, actor: PanelActor, input: CloseInput, at: Date): Promise<CloseOutcome>
   // Guarda lo que ya salió por WhatsApp; toma el caso solo si sigue sin responsable.

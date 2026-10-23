@@ -105,9 +105,12 @@ export async function tomarCaso(idCaso: number): Promise<CasoBandeja> {
   return leer<CasoBandeja>(await fetch(`${rutaCaso(idCaso)}/toma`, { method: 'POST' }))
 }
 
-export type ResultadoLiberacion = { caseId: number; releasedAt: string; assistantResumed: boolean }
+export type ResultadoLiberacion = { caseId: number; releasedAt: string }
 
-/** Libera el caso tomado; si estaba derivado, el asistente retoma la conversación. */
+/**
+ * Deja el caso sin responsable. Un caso derivado sigue derivado: el asistente no
+ * vuelve a atender la conversación hasta que se cierre (RF-DER-03).
+ */
 export async function liberarCaso(idCaso: number): Promise<ResultadoLiberacion> {
   return leer<ResultadoLiberacion>(await fetch(`${rutaCaso(idCaso)}/liberacion`, { method: 'POST' }))
 }

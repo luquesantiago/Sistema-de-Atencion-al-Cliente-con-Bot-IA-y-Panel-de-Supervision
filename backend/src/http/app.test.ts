@@ -82,7 +82,7 @@ class FakeInbox implements InboxRepository {
 
   public async release(_caseId: number, expectedAssigneeId: number): Promise<boolean> {
     if (!this.state || this.state.assigneeId !== expectedAssigneeId) return false
-    this.state = { ...this.state, assigneeId: null, handedOff: false }
+    this.state = { ...this.state, assigneeId: null }
     return true
   }
 
@@ -1048,12 +1048,15 @@ describe('Bandeja de Atención', () => {
     expect(inbox.state?.assigneeId).toBe(10)
   })
 
-  it('libera un caso tomado y avisa que el asistente retoma la conversación', async () => {
+  it('libera un caso tomado: queda sin responsable y sigue derivado', async () => {
     await post('/api/bandeja/12/toma')
     const response = await post('/api/bandeja/12/liberacion')
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toMatchObject({ caseId: 12, assistantResumed: true })
+    const body: unknown = await response.json()
+    expect(body).toMatchObject({ caseId: 12 })
+    expect(body).not.toHaveProperty('assistantResumed')
     expect(inbox.state?.assigneeId).toBeNull()
+    expect(inbox.state?.handedOff).toBe(true)
   })
 
   it('liberar un caso sin responsable da 409', async () => {
