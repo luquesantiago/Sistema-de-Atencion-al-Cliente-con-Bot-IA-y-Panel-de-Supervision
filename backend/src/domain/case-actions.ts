@@ -23,7 +23,7 @@ export const maxReplyLength = 4096
 export const minReasonLength = 3
 export const maxReasonLength = 2000
 
-export type TakeError = 'not-in-inbox'
+export type TakeError = 'not-in-inbox' | 'taken-by-other'
 export type ReleaseError = 'not-in-inbox' | 'not-assignee'
 export type ReplyError = 'invalid-text' | 'not-in-inbox' | 'not-handed-off' | 'taken-by-other' | 'no-customer-message'
 export type CloseError =
@@ -35,9 +35,7 @@ export type CloseError =
   | 'alerts-not-reviewed'
 
 export type TakeDecision = { ok: true } | { ok: false; error: TakeError }
-export type ReleaseDecision =
-  | { ok: true; resumeAssistant: boolean }
-  | { ok: false; error: ReleaseError }
+export type ReleaseDecision = { ok: true } | { ok: false; error: ReleaseError }
 
 // take: el caso no tiene responsable y queda tomado por quien contesta.
 export type ReplyDecision = { ok: true; take: boolean; text: string } | { ok: false; error: ReplyError }
@@ -54,15 +52,21 @@ export type CloseDecision = ({ ok: true } & ClosePlan) | { ok: false; error: Clo
 
 export type CloseInput = { reason?: string | null; alertsReviewed?: boolean }
 
-// Se puede tomar cualquier caso de la bandeja, tenga o no responsable.
-export function decideTake(state: CaseActionState): TakeDecision {
-  return state.inInbox ? { ok: true } : { ok: false, error: 'not-in-inbox' }
+// Se toma un caso sin responsable, o uno propio (no cambia nada). El de otra persona no: lo
+// tiene que liberar antes su responsable.
+export function decideTake(state: CaseActionState, actor: PanelActor): TakeDecision {
+  if (!state.inInbox) return { ok: false, error: 'not-in-inbox' }
+  if (state.assigneeId !== null && state.assigneeId !== actor.userId) return { ok: false, error: 'taken-by-other' }
+  return { ok: true }
 }
 
+// Liberar solo deja el caso sin responsable: el silencio de un caso derivado sigue hasta que
+// se cierre (RF-DER-03). Si el asistente volviera a atender con el caso abierto, derivaría
+// otra vez y la conversación quedaría con varios casos derivados abiertos.
 export function decideRelease(state: CaseActionState, actor: PanelActor): ReleaseDecision {
   if (!state.inInbox) return { ok: false, error: 'not-in-inbox' }
   if (state.assigneeId !== actor.userId) return { ok: false, error: 'not-assignee' }
-  return { ok: true, resumeAssistant: state.handedOff }
+  return { ok: true }
 }
 
 // Solo en casos derivados: en los demás el asistente sigue atendiendo la conversación.

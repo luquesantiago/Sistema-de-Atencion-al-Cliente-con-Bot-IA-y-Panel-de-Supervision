@@ -18,27 +18,31 @@ function caseState(overrides: Partial<CaseActionState> = {}): CaseActionState {
 }
 
 describe('tomar un caso (RF-DER-02)', () => {
-  it('se puede tomar un caso sin responsable o de otro responsable', () => {
-    expect(decideTake(caseState({ assigneeId: null }))).toEqual({ ok: true })
-    expect(decideTake(caseState({ assigneeId: graciela }))).toEqual({ ok: true })
+  it('se puede tomar un caso sin responsable o uno propio', () => {
+    expect(decideTake(caseState({ assigneeId: null }), me)).toEqual({ ok: true })
+    expect(decideTake(caseState({ assigneeId: me.userId }), me)).toEqual({ ok: true })
+  })
+
+  it('el caso que tiene otra persona no se puede tomar', () => {
+    expect(decideTake(caseState({ assigneeId: graciela }), me)).toEqual({ ok: false, error: 'taken-by-other' })
   })
 
   it('el cambio de teléfono pendiente, que no se deriva, también se puede tomar', () => {
-    expect(decideTake(caseState({ handedOff: false, assigneeId: null }))).toEqual({ ok: true })
+    expect(decideTake(caseState({ handedOff: false, assigneeId: null }), me)).toEqual({ ok: true })
   })
 
   it('un caso que no está en la bandeja no se toma', () => {
-    expect(decideTake(caseState({ inInbox: false }))).toEqual({ ok: false, error: 'not-in-inbox' })
+    expect(decideTake(caseState({ inInbox: false }), me)).toEqual({ ok: false, error: 'not-in-inbox' })
   })
 })
 
-describe('devolver un caso al bot', () => {
-  it('el responsable libera el caso y el asistente retoma la conversación', () => {
-    expect(decideRelease(caseState(), me)).toEqual({ ok: true, resumeAssistant: true })
+describe('liberar un caso (RF-DER-03)', () => {
+  it('el responsable libera un caso derivado sin que el asistente retome la conversación', () => {
+    expect(decideRelease(caseState(), me)).toEqual({ ok: true })
   })
 
-  it('un caso sin derivar se libera solo del responsable', () => {
-    expect(decideRelease(caseState({ handedOff: false }), me)).toEqual({ ok: true, resumeAssistant: false })
+  it('un caso sin derivar también se libera', () => {
+    expect(decideRelease(caseState({ handedOff: false }), me)).toEqual({ ok: true })
   })
 
   it('un caso sin responsable o de otro no se libera', () => {
