@@ -2157,7 +2157,7 @@
   .panel {
     grid-template-columns: minmax(0, 1fr);
   }
-
+}
 .detalle-panel__telefono {
   display: flex;
   align-items: center;
@@ -2587,5 +2587,4 @@
   .modal__acciones .boton {
     flex: 1;
   }
-}
 }
