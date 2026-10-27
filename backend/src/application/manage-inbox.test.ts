@@ -58,7 +58,7 @@ class InMemoryInbox implements InboxRepository {
   public readonly replies: Array<{ caseId: number; text: string; take: boolean }> = []
   public readonly closed: Array<{ caseId: number; input: CloseInput }> = []
   public readonly takes: Array<{ caseId: number; expected: number | null }> = []
-  public readonly releases: Array<{ caseId: number; expected: number; resumeAssistant: boolean }> = []
+  public readonly releases: Array<{ caseId: number; expected: number }> = []
   public failReplySave = false
   public takeConflict = false
   public releaseConflict = false
@@ -92,8 +92,8 @@ class InMemoryInbox implements InboxRepository {
     return true
   }
 
-  public async release(caseId: number, expected: number, resumeAssistant: boolean): Promise<boolean> {
-    this.releases.push({ caseId, expected, resumeAssistant })
+  public async release(caseId: number, expected: number): Promise<boolean> {
+    this.releases.push({ caseId, expected })
     if (this.releaseConflict || !this.state) return false
     this.state = { ...this.state, assigneeId: null }
     return true
@@ -203,10 +203,16 @@ describe('ManageInbox.findCase', () => {
 describe('ManageInbox.take (RF-DER-02)', () => {
   const conversation: InboxConversation = { entry: entry(), alerts: [], messages: [] }
 
-  it('toma un caso de otro responsable con el responsable que se leyó', async () => {
-    const repository = new InMemoryInbox([], conversation, actionState({ assigneeId: 20 }))
+  it('toma un caso sin responsable', async () => {
+    const repository = new InMemoryInbox([], conversation, actionState())
     await inbox(repository).take('12', me)
-    expect(repository.takes).toEqual([{ caseId: 12, expected: 20 }])
+    expect(repository.takes).toEqual([{ caseId: 12, expected: null }])
+  })
+
+  it('el caso de otro responsable da CONFLICT y no se toma', async () => {
+    const repository = new InMemoryInbox([], conversation, actionState({ assigneeId: 20 }))
+    await expect(inbox(repository).take('12', me)).rejects.toMatchObject({ statusCode: 409, code: 'CONFLICT' })
+    expect(repository.takes).toEqual([])
   })
 
   it('un caso que ya es mío no se vuelve a tomar', async () => {
@@ -228,17 +234,11 @@ describe('ManageInbox.take (RF-DER-02)', () => {
   })
 })
 
-describe('ManageInbox.release', () => {
-  it('el responsable devuelve el caso y el asistente retoma la conversación', async () => {
+describe('ManageInbox.release (RF-DER-03)', () => {
+  it('el responsable libera el caso derivado y queda sin responsable', async () => {
     const repository = new InMemoryInbox([], null, actionState({ assigneeId: me.userId }))
-    await expect(inbox(repository).release('12', me)).resolves.toEqual({ caseId: 12, releasedAt: now, assistantResumed: true })
-    expect(repository.releases).toEqual([{ caseId: 12, expected: me.userId, resumeAssistant: true }])
-  })
-
-  it('un caso sin derivar se libera sin tocar al asistente', async () => {
-    const repository = new InMemoryInbox([], null, actionState({ assigneeId: me.userId, handedOff: false }))
-    await expect(inbox(repository).release('12', me)).resolves.toMatchObject({ assistantResumed: false })
-    expect(repository.releases).toEqual([{ caseId: 12, expected: me.userId, resumeAssistant: false }])
+    await expect(inbox(repository).release('12', me)).resolves.toEqual({ caseId: 12, releasedAt: now })
+    expect(repository.releases).toEqual([{ caseId: 12, expected: me.userId }])
   })
 
   it('un caso sin responsable o de otro responsable da CONFLICT', async () => {
@@ -329,7 +329,7 @@ describe('ManageInbox.close (RF-DER-02, RF-DER-03, RF-SUP-04)', () => {
 
   it('un caso sin tomar pide tomarlo primero', async () => {
     const repository = new InMemoryInbox([], null, actionState())
-    await expect(inbox(repository).close('12', me, {})).rejects.toMatchObject({ statusCode: 409, message: 'Tomá el caso antes de cerrarlo.' })
+    await expect(inbox(repository).close('12', me, {})).rejects.toMatchObject({ statusCode: 409, message: 'Solo el responsable puede cerrar el caso: si no tiene responsable, tomalo antes.' })
   })
 })
 

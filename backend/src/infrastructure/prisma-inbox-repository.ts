@@ -138,21 +138,14 @@ export class PrismaInboxRepository implements InboxRepository {
     return claim.count === 1
   }
 
-  public async release(caseId: number, expectedAssigneeId: number, resumeAssistant: boolean): Promise<boolean> {
-    return this.prisma.$transaction(async (transaction) => {
-      const released = await transaction.caso.updateMany({
-        where: { id_caso: caseId, fecha_cierre: null, id_usuario_asignado: expectedAssigneeId },
-        data: { id_usuario_asignado: null, fecha_toma: null },
-      })
-      if (released.count !== 1) return false
-      if (!resumeAssistant) return true
-      const caseRow = await transaction.caso.findUniqueOrThrow({
-        where: { id_caso: caseId },
-        select: { id_conversacion: true },
-      })
-      await releaseSilence(transaction, caseRow.id_conversacion)
-      return true
+  // ck_caso_toma no deja fecha_toma sin responsable: liberar la borra. La conversación sigue
+  // en silencio hasta que se cierre el caso (RF-DER-03).
+  public async release(caseId: number, expectedAssigneeId: number): Promise<boolean> {
+    const released = await this.prisma.caso.updateMany({
+      where: { id_caso: caseId, fecha_cierre: null, id_usuario_asignado: expectedAssigneeId },
+      data: { id_usuario_asignado: null, fecha_toma: null },
     })
+    return released.count === 1
   }
 
   public async close(caseId: number, actor: PanelActor, input: CloseInput, at: Date): Promise<CloseOutcome> {

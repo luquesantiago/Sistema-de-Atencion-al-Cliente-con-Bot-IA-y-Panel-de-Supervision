@@ -107,15 +107,19 @@ El sistema SHALL pedirle al proveedor de IA, en la misma clasificación que elig
 
 ### Requirement: Tomar un caso desde la bandeja
 
-El sistema SHALL permitir que un empleado tome desde la Bandeja de Atención un caso que esté en la bandeja, tenga o no responsable, y que desde ese momento quede como responsable del caso; la fecha de toma registra la primera vez que el caso se tomó y no cambia si otro empleado lo vuelve a tomar; tomar un caso no le envía nada al cliente ni cambia el silencio de la conversación; mientras el panel no tenga autenticación, el empleado que actúa es el usuario de prueba operador (RF-DER-02).
+El sistema SHALL permitir que un empleado tome desde la Bandeja de Atención un caso que esté en la bandeja y no tenga responsable, y que desde ese momento quede como responsable del caso con la fecha y hora de la toma; un caso que tiene otro responsable no se puede tomar hasta que su responsable lo libere, y tomar un caso propio no lo cambia; tomar un caso no le envía nada al cliente ni cambia el silencio de la conversación; mientras el panel no tenga autenticación, el empleado que actúa es el usuario de prueba operador (RF-DER-02).
 
 #### Scenario: Caso sin tomar
 - **WHEN** un empleado toma un caso derivado que no tiene responsable
 - **THEN** el caso queda con ese empleado como responsable y con la fecha y hora de la toma, y la bandeja deja de mostrarlo «Sin tomar»
 
 #### Scenario: Caso de otro responsable
-- **WHEN** un empleado toma un caso migrado de la planilla que tiene como responsable a Graciela
-- **THEN** el caso pasa a tener como responsable a quien lo tomó y conserva la fecha de toma que tenía
+- **WHEN** un empleado intenta tomar un caso migrado de la planilla que tiene como responsable a Graciela
+- **THEN** el sistema rechaza la toma y avisa que el caso lo tiene otra persona y que tiene que liberarlo antes, y el caso no cambia
+
+#### Scenario: Caso propio
+- **WHEN** el responsable de un caso lo vuelve a tomar
+- **THEN** el caso no cambia
 
 #### Scenario: Tomar no cambia la conversación
 - **WHEN** un empleado toma un caso derivado y después el cliente escribe
@@ -131,7 +135,7 @@ El sistema SHALL permitir que un empleado tome desde la Bandeja de Atención un 
 
 ### Requirement: Contestarle al cliente desde la bandeja
 
-El sistema SHALL permitir que un empleado le escriba desde la Bandeja de Atención al cliente de un caso derivado sin cerrar, enviando el texto por WhatsApp al número de la conversación desde el número del asistente, y guardándolo en ese caso como mensaje de origen operador y como respuesta escrita por ese empleado al último mensaje del cliente del caso; si el caso no tiene responsable, al enviar queda como responsable quien escribe, y si tiene otro responsable, el envío se rechaza hasta que lo tome; el asistente sigue en silencio en esa conversación hasta que se cierre el caso (RF-DER-02, RF-SUP-01).
+El sistema SHALL permitir que un empleado le escriba desde la Bandeja de Atención al cliente de un caso derivado sin cerrar, enviando el texto por WhatsApp al número de la conversación desde el número del asistente, y guardándolo en ese caso como mensaje de origen operador y como respuesta escrita por ese empleado al último mensaje del cliente del caso; si el caso no tiene responsable, al enviar queda como responsable quien escribe, y si tiene otro responsable, el envío se rechaza, porque solo su responsable puede contestar; el asistente sigue en silencio en esa conversación hasta que se cierre el caso (RF-DER-02, RF-SUP-01).
 
 #### Scenario: Respuesta en un caso tomado
 - **WHEN** el responsable de un caso derivado le escribe al cliente desde la bandeja
@@ -143,7 +147,7 @@ El sistema SHALL permitir que un empleado le escriba desde la Bandeja de Atenci�
 
 #### Scenario: Caso de otro responsable
 - **WHEN** un empleado le escribe al cliente de un caso derivado que tiene otro responsable
-- **THEN** el sistema rechaza el envío y pide tomar el caso primero, no se envía nada al cliente y el caso no cambia
+- **THEN** el sistema rechaza el envío y avisa que solo su responsable puede contestar, no se envía nada al cliente y el caso no cambia
 
 #### Scenario: Caso sin derivar
 - **WHEN** un empleado intenta escribirle al cliente de un caso de la bandeja que no está derivado, como el de una solicitud de cambio de teléfono pendiente
@@ -179,7 +183,7 @@ El sistema SHALL permitir que solo el responsable de un caso derivado sin cerrar
 
 #### Scenario: Caso de otro responsable
 - **WHEN** un empleado intenta cerrar un caso derivado que tiene otro responsable
-- **THEN** el sistema rechaza el cierre y pide tomar el caso primero, y el caso no cambia
+- **THEN** el sistema rechaza el cierre y avisa que solo su responsable puede cerrarlo, y el caso no cambia
 
 #### Scenario: Baja o modificación
 - **WHEN** el responsable de un caso derivado de una baja o de una modificación lo cierra sin motivo
@@ -208,3 +212,23 @@ El sistema SHALL permitir que solo el responsable de un caso derivado sin cerrar
 #### Scenario: El asistente vuelve a atender
 - **WHEN** se cerró el caso derivado de una conversación y el cliente vuelve a escribir
 - **THEN** el asistente lo atiende según el requirement «El asistente se calla después de derivar», en el escenario «Conversación que deja de estar en silencio»
+
+### Requirement: Liberar un caso desde la bandeja
+
+El sistema SHALL permitir que solo el responsable de un caso de la bandeja lo libere desde la Bandeja de Atención, y que el caso quede sin responsable y sin fecha de toma, sin enviarle nada al cliente y sin cambiar el silencio de la conversación: un caso derivado liberado sigue derivado y el asistente no responde en esa conversación hasta que se cierre el caso (RF-DER-02, RF-DER-03).
+
+#### Scenario: El responsable libera un caso derivado
+- **WHEN** el responsable de un caso derivado lo libera
+- **THEN** el caso queda sin responsable y sin fecha de toma, la bandeja lo muestra «Sin tomar» y el cliente no recibe ningún mensaje
+
+#### Scenario: El asistente sigue callado
+- **WHEN** se liberó un caso derivado y el cliente vuelve a escribir
+- **THEN** el asistente no le contesta, no abre otro caso derivado y el mensaje queda guardado en el caso derivado
+
+#### Scenario: Caso sin responsable o de otro responsable
+- **WHEN** un empleado intenta liberar un caso que no tiene responsable o que tiene otro responsable
+- **THEN** el sistema rechaza el pedido y el caso no cambia
+
+#### Scenario: Caso que ya no está en la bandeja
+- **WHEN** un empleado intenta liberar un caso cerrado
+- **THEN** el sistema responde que el caso no está en la bandeja y el caso no cambia

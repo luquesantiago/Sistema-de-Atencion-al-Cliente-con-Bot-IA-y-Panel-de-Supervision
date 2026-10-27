@@ -6,6 +6,7 @@ import {
   type PanelActor,
   type ReleaseError,
   type ReplyError,
+  type TakeError,
 } from '../domain/case-actions.js'
 import type { MessageOrigin, QueryType } from '../domain/conversation.js'
 import {
@@ -64,28 +65,33 @@ export type ReplyResult =
   | { sent: true; saved: true; messageId: number }
   | { sent: true; saved: false; warning: string }
 
-export type ReleaseResult = { caseId: number; releasedAt: Date; assistantResumed: boolean }
+export type ReleaseResult = { caseId: number; releasedAt: Date }
 
 export type CloseRequest = { reason?: string | null; alertsReviewed?: boolean }
+
+const takeErrors: Record<TakeError, () => RequestManagementError> = {
+  'not-in-inbox': () => notInInbox(),
+  'taken-by-other': () => new RequestManagementError(409, 'CONFLICT', 'El caso lo tiene otra persona: tiene que liberarlo antes.'),
+}
 
 const replyErrors: Record<ReplyError, () => RequestManagementError> = {
   'invalid-text': () => new RequestManagementError(400, 'VALIDATION_ERROR', 'El mensaje no puede estar vacío ni superar los 4096 caracteres.'),
   'not-in-inbox': () => new RequestManagementError(404, 'NOT_FOUND', 'El caso no está en la bandeja.'),
   'not-handed-off': () => new RequestManagementError(409, 'CONFLICT', 'En este caso el asistente sigue atendiendo: solo se contesta un caso derivado.'),
-  'taken-by-other': () => new RequestManagementError(409, 'CONFLICT', 'El caso lo tiene otra persona: tomalo para contestar.'),
+  'taken-by-other': () => new RequestManagementError(409, 'CONFLICT', 'El caso lo tiene otra persona: solo su responsable puede contestar.'),
   'no-customer-message': () => new RequestManagementError(409, 'CONFLICT', 'El caso no tiene un mensaje del cliente para responder.'),
 }
 
 const releaseErrors: Record<ReleaseError | 'changed', () => RequestManagementError> = {
   'not-in-inbox': () => new RequestManagementError(404, 'NOT_FOUND', 'El caso no está en la bandeja.'),
-  'not-assignee': () => new RequestManagementError(409, 'CONFLICT', 'Solo quien intervino el caso puede devolverlo al bot.'),
+  'not-assignee': () => new RequestManagementError(409, 'CONFLICT', 'Solo el responsable puede liberar el caso.'),
   changed: () => new RequestManagementError(409, 'CONFLICT', 'El caso cambió mientras lo liberabas. Volvé a intentarlo.'),
 }
 
 const closeErrors: Record<CloseError | 'changed', () => RequestManagementError> = {
   'not-in-inbox': () => new RequestManagementError(404, 'NOT_FOUND', 'El caso no está en la bandeja.'),
   'not-handed-off': () => new RequestManagementError(409, 'CONFLICT', 'Este caso no está derivado: se cierra al decidir el trámite en Trámites.'),
-  'not-assignee': () => new RequestManagementError(409, 'CONFLICT', 'Tomá el caso antes de cerrarlo.'),
+  'not-assignee': () => new RequestManagementError(409, 'CONFLICT', 'Solo el responsable puede cerrar el caso: si no tiene responsable, tomalo antes.'),
   'reason-required': () => new RequestManagementError(400, 'VALIDATION_ERROR', 'Para cerrar el caso de un alta hace falta un motivo.'),
   'invalid-reason': () => new RequestManagementError(400, 'VALIDATION_ERROR', 'El motivo debe tener entre 3 y 2000 caracteres.'),
   'alerts-not-reviewed': () => new RequestManagementError(409, 'CONFLICT', 'El caso tiene alertas sin revisar: confirmá que las revisaste para cerrarlo.'),
@@ -121,12 +127,13 @@ export class ManageInbox {
   public async take(id: string, actor: PanelActor): Promise<InboxItem> {
     const caseId = parseCaseId(id)
     const state = await this.repository.findActionState(caseId)
-    if (!state || !decideTake(state).ok) throw notInInbox()
+    if (!state) throw notInInbox()
+    const decision = decideTake(state, actor)
+    if (!decision.ok) throw takeErrors[decision.error]()
     if (state.assigneeId !== actor.userId) {
       const taken = await this.repository.take(caseId, actor, state.assigneeId, this.clock())
       if (!taken) throw new RequestManagementError(409, 'CONFLICT', 'El caso cambió mientras lo tomabas. Volvé a intentarlo.')
-      // Sin historial de reasignaciones hasta que exista la auditoría: queda en el log, sin datos del cliente.
-      console.log(`[bandeja] caso ${caseId} tomado por el usuario ${actor.userId} (antes: ${state.assigneeId ?? 'sin responsable'})`)
+      console.log(`[bandeja] caso ${caseId} tomado por el usuario ${actor.userId}`)
     }
     const conversation = await this.repository.findConversation(caseId)
     if (!conversation) throw notInInbox()
@@ -140,10 +147,10 @@ export class ManageInbox {
     const decision = decideRelease(state, actor)
     if (!decision.ok) throw releaseErrors[decision.error]()
     const releasedAt = this.clock()
-    const released = await this.repository.release(caseId, actor.userId, decision.resumeAssistant)
+    const released = await this.repository.release(caseId, actor.userId)
     if (!released) throw releaseErrors.changed()
     console.log(`[bandeja] caso ${caseId} liberado por el usuario ${actor.userId}`)
-    return { caseId, releasedAt, assistantResumed: decision.resumeAssistant }
+    return { caseId, releasedAt }
   }
 
   // Primero WhatsApp y después la base (decisión 5): la base registra lo que efectivamente salió.
