@@ -2,7 +2,7 @@
 
 ## 0. Directrices principales para la IA
 
-- **Identidad visual:** confianza, calidez y profesionalismo; paleta castaño y crema con efectos Liquid Glass sutiles.
+- **Identidad visual:** confianza, calidez y profesionalismo; paleta bordó y crema con efectos Liquid Glass sutiles.
 - **Evitar dashboards genéricos:** no usar por defecto fondos gris-azulados (`#F3F4F6`), azul estándar (`#3B82F6`) ni interfaces sin identidad.
 - **Prioridad:** funcionalidad, legibilidad, accesibilidad y claridad de la información por encima de los efectos decorativos.
 - **Consistencia:** reutilizar variables CSS y clases existentes. No crear estilos diferentes para componentes equivalentes.
@@ -19,16 +19,16 @@ Todos los valores de este documento se centralizan en `:root`. Los componentes d
   /* Superficies */
   --color-bg: #F7F4EF;               /* Crema Avena */
   --color-surface: #FFFFFF;
-  --color-sidebar: rgba(74, 53, 37, 0.92);
+  --color-sidebar: rgba(74, 25, 34, 0.92);
   --color-sidebar-text: #F7F4EF;
 
   /* Acción y acento */
-  --color-primary: #7F5539;          /* Marrón Castaño Rico */
-  --color-primary-hover: #65422B;
-  --color-secondary: #B08968;        /* Caramelo / Latte */
-  --color-accent-light: #EDE0D4;     /* Crema Almendra */
-  --color-text: #2B1E16;             /* Café Profundo */
-  --color-text-muted: #7D6B5D;       /* Taupe / Tierra Suave */
+  --color-primary: #7A1F2E;          /* Bordó Profundo */
+  --color-primary-hover: #5F1522;
+  --color-secondary: #BA7380;        /* Vino Suave */
+  --color-accent-light: #F1DFE2;     /* Rubor Claro */
+  --color-text: #2B1A1F;             /* Vino Tinta */
+  --color-text-muted: #7D6268;       /* Malva Tierra */
 
   /* Estados semánticos */
   --color-success-bg: #E6F4EA;
@@ -43,14 +43,14 @@ Todos los valores de este documento se centralizan en `:root`. Los componentes d
   --nav-overlay: rgba(247, 244, 239, 0.15);
   --nav-borde: rgba(247, 244, 239, 0.14);
   --nav-texto: rgba(247, 244, 239, 0.78);
-  --velo-modal: rgba(43, 30, 22, 0.45);
-  --sombra-modal: 0 12px 32px rgba(43, 30, 22, 0.22);
+  --velo-modal: rgba(43, 18, 24, 0.45);
+  --sombra-modal: 0 12px 32px rgba(43, 18, 24, 0.22);
 
   /* Liquid Glass — ver sección 2 */
   --glass-fondo: linear-gradient(135deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.55) 100%);
   --glass-borde: rgba(255, 255, 255, 0.75);
   --glass-desenfoque: blur(16px) saturate(150%);
-  --glass-sidebar: linear-gradient(180deg, rgba(92,66,46,0.9) 0%, rgba(74,53,37,0.93) 48%, rgba(56,38,26,0.96) 100%);
+  --glass-sidebar: linear-gradient(180deg, rgba(92,34,45,0.9) 0%, rgba(74,25,34,0.93) 48%, rgba(56,16,24,0.96) 100%);
 
   /* Tipografía */
   --font-sans: "SoDo Sans", Inter, Manrope, "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -58,7 +58,7 @@ Todos los valores de este documento se centralizan en `:root`. Los componentes d
   /* Radios, sombras y layout */
   --radius-md: 12px;
   --radius-lg: 16px;
-  --shadow-soft: 0 2px 8px rgba(43, 30, 22, 0.08);
+  --shadow-soft: 0 2px 8px rgba(43, 18, 24, 0.08);
   --sidebar-width: 18rem;            /* 288px */
 }
 ```
@@ -78,7 +78,7 @@ La estética debe ser cálida, sobria y profesional. Liquid Glass es un recurso 
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);   /* reflejo del borde superior */
 }
 
-/* Barra de navegación: vidrio castaño, más oscuro, con borde luminoso */
+/* Barra de navegación: vidrio bordó, más oscuro, con borde luminoso */
 .sidebar {
   background: var(--glass-sidebar);
   -webkit-backdrop-filter: blur(22px) saturate(150%);
@@ -87,7 +87,7 @@ La estética debe ser cálida, sobria y profesional. Liquid Glass es un recurso 
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     inset -1px 0 0 rgba(255, 255, 255, 0.07),
-    0 10px 30px rgba(43, 30, 22, 0.3);
+    0 10px 30px rgba(43, 18, 24, 0.3);
 }
 
 /* Fondo ambiental: capa fija que cubre la ventana y no agrega alto a la página */
@@ -121,7 +121,7 @@ La estética debe ser cálida, sobria y profesional. Liquid Glass es un recurso 
 
 - **Reflejo especular:** todo cristal lleva una luz blanca que cae desde el borde superior (`inset 0 1px 0`) y se desvanece; es lo que da el aspecto de vidrio. No acumular más de un brillo por componente.
 - **Degradado y desenfoque:** usar `backdrop-filter` de forma moderada y solo cuando el contenido de fondo no afecte la lectura.
-- **Fondo ambiental:** dos orbes de luz cálida difuminados (caramelo y castaño) dentro de una capa fija, para que las superficies de cristal tengan algo que refractar. No deben distraer ni reducir el contraste.
+- **Fondo ambiental:** dos orbes de luz cálida difuminados (vino y bordó) dentro de una capa fija, para que las superficies de cristal tengan algo que refractar. No deben distraer ni reducir el contraste.
 - **Dónde se usa el cristal:** en superficies de apoyo —la barra de navegación, las tarjetas de indicadores, el panel destacado y la búsqueda de la cartera—.
 - **Dónde NO:** tablas, ficha del cliente, modales y formularios usan fondos sólidos o casi opacos para asegurar la lectura clara de los datos. Los botones y los campos son sólidos: el vidrio no se aplica a los controles de acción.
 - Evitar acumular transparencias, sombras intensas, brillos y desenfoques en un mismo componente.
@@ -134,19 +134,19 @@ La estética debe ser cálida, sobria y profesional. Liquid Glass es un recurso 
 |---|---|---|
 | Fondo principal | `--color-bg` | `#F7F4EF` |
 | Superficie de tarjetas | `--color-surface` | `#FFFFFF` |
-| Sidebar | `--color-sidebar` | `rgba(74, 53, 37, 0.92)` |
+| Sidebar | `--color-sidebar` | `rgba(74, 25, 34, 0.92)` |
 | Texto sobre sidebar | `--color-sidebar-text` | `#F7F4EF` |
 
 ### Colores de acción y acento
 
 | Uso | Token | Valor |
 |---|---|---|
-| Primary | `--color-primary` | `#7F5539` |
-| Primary hover | `--color-primary-hover` | `#65422B` |
-| Secondary | `--color-secondary` | `#B08968` |
-| Accent light | `--color-accent-light` | `#EDE0D4` |
-| Texto principal | `--color-text` | `#2B1E16` |
-| Texto secundario | `--color-text-muted` | `#7D6B5D` |
+| Primary | `--color-primary` | `#7A1F2E` |
+| Primary hover | `--color-primary-hover` | `#5F1522` |
+| Secondary | `--color-secondary` | `#BA7380` |
+| Accent light | `--color-accent-light` | `#F1DFE2` |
+| Texto principal | `--color-text` | `#2B1A1F` |
+| Texto secundario | `--color-text-muted` | `#7D6268` |
 
 ### Derivados y superficies de cristal
 
@@ -155,12 +155,12 @@ La estética debe ser cálida, sobria y profesional. Liquid Glass es un recurso 
 | Fondo de cristal claro | `--glass-fondo` | degradado blanco 82% → 55% |
 | Borde de cristal claro | `--glass-borde` | `rgba(255, 255, 255, 0.75)` |
 | Desenfoque de cristal | `--glass-desenfoque` | `blur(16px) saturate(150%)` |
-| Fondo del sidebar | `--glass-sidebar` | degradado castaño |
+| Fondo del sidebar | `--glass-sidebar` | degradado bordó |
 | Texto sobre sidebar (secundario) | `--nav-texto` | `rgba(247, 244, 239, 0.78)` |
 | Hover/activo sobre sidebar | `--nav-overlay` | `rgba(247, 244, 239, 0.15)` |
 | Borde sobre sidebar | `--nav-borde` | `rgba(247, 244, 239, 0.14)` |
-| Velo de modal y de menú | `--velo-modal` | `rgba(43, 30, 22, 0.45)` |
-| Sombra de modal | `--sombra-modal` | `0 12px 32px rgba(43, 30, 22, 0.22)` |
+| Velo de modal y de menú | `--velo-modal` | `rgba(43, 18, 24, 0.45)` |
+| Sombra de modal | `--sombra-modal` | `0 12px 32px rgba(43, 18, 24, 0.22)` |
 | Peligro (hover) | `--color-danger-hover` | `#8F1D17` |
 
 ### Estados semánticos
@@ -339,7 +339,7 @@ Los listados de cartera usan **una fila por tarjeta**: cada fila es una superfic
 
 ### Navegación
 
-La barra lateral es una superficie de **cristal castaño** (sección 2). Los ítems al pasar el mouse o estar activos se vuelven pastillas de vidrio crema, y el acento caramelo marca la sección activa.
+La barra lateral es una superficie de **cristal bordó** (sección 2). Los ítems al pasar el mouse o estar activos se vuelven pastillas de vidrio crema, y el acento vino marca la sección activa.
 
 ```css
 .sidebar {
@@ -350,11 +350,11 @@ La barra lateral es una superficie de **cristal castaño** (sección 2). Los ít
   color: var(--color-sidebar-text);
 }
 
-/* Ítem activo: pastilla de vidrio + barra caramelo (nunca solo color) */
+/* Ítem activo: pastilla de vidrio + barra vino (nunca solo color) */
 .nav-link[aria-current="page"] {
   background: linear-gradient(180deg, rgba(247,244,239,0.26), rgba(247,244,239,0.13));
   border-left: 3px solid var(--color-secondary);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.32), 0 3px 10px rgba(20,12,8,0.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.32), 0 3px 10px rgba(20,8,12,0.28);
   font-weight: 600;
 }
 .nav-link:focus-visible { outline: 3px solid var(--color-secondary); outline-offset: 2px; }
@@ -392,7 +392,7 @@ La barra lateral es una superficie de **cristal castaño** (sección 2). Los ít
 
 ### Marca
 
-El nombre "Seguros Castaño" se acompaña de una insignia cuadrada con degradado caramelo→castaño y un escudo, el nombre en crema en negrita y un subrayado caramelo que se desvanece. El subtítulo va en versalitas espaciadas.
+El nombre "Seguros Castaño" se acompaña de una insignia cuadrada con degradado vino→bordó y un escudo, el nombre en crema en negrita y un subrayado vino que se desvanece. El subtítulo va en versalitas espaciadas.
 
 ```css
 .marca { display: flex; align-items: center; gap: 10px; }
@@ -407,20 +407,20 @@ El nombre "Seguros Castaño" se acompaña de una insignia cuadrada con degradado
 
 ### Ingreso
 
-La pantalla de inicio de sesión es el único ítem que dueña el viewport: un campo castaño a sangre con los orbes de la casa, sin tarjeta de cristal centrada. Sobre el fondo, crema como única interfaz.
+La pantalla de inicio de sesión es el único ítem que dueña el viewport: un campo bordó a sangre con los orbes de la casa, sin tarjeta de cristal centrada. Sobre el fondo, crema como única interfaz.
 
-- Fondo: degradado castaño profundo `#4A3525 → #38261A → #2B1E16` a sangre (`min-height: 100svh`), con dos orbes radiales caramelo/castaño difuminados (los mismos `ambient-orb` del panel, en tono tenue).
+- Fondo: degradado bordó profundo `#4A1922 → #381018 → #3A141C` a sangre (`min-height: 100svh`), con dos orbes radiales vino/bordó difuminados (los mismos `ambient-orb` del panel, en tono tenue).
 - Wordmark display «SEGUROS / CASTAÑO» apilado abajo a la izquierda (`clamp(2.75rem, 6.5vw, 5.5rem)`, peso 800, tracking -0.03em, versalitas), con «PANEL DE ATENCIÓN» en versalitas tracked debajo.
-- Formulario a la derecha del wordmark (una columna en `<768px`): inputs con hairline crema translúcida y fondo castaño translúcido, botón primario relleno crema (`--color-sidebar-text`) con texto castaño, foco en `--color-secondary`. El toggle de contraseña va junto al campo (asociado al input, 48×48).
+- Formulario a la derecha del wordmark (una columna en `<768px`): inputs con hairline crema translúcida y fondo bordó translúcido, botón primario relleno crema (`--color-sidebar-text`) con texto bordó, foco en `--color-secondary`. El toggle de contraseña va junto al campo (asociado al input, 48×48).
 - Al pie: línea de autor con escudo y «Operadores y administración», y debajo la ayuda con las credenciales de prueba; el copyright va al extremo opuesto. Sin riel de íconos lateral.
 - Errores como slip crema/rojo (`--color-danger-bg` / `--color-danger-text`) con `role="alert"`. Ranura `.login__estado` reservada para el error de servidor del Parcial 2.
 - Entrance seco: un solo momento (`steps(2, end)`, 120ms), contenido visible por defecto y muerto por `prefers-reduced-motion`.
 
 ```css
-.login { min-height: 100svh; background: linear-gradient(158deg, #4a3525 0%, #38261a 46%, #2b1e16 100%);
+.login { min-height: 100svh; background: linear-gradient(158deg, #4a1922 0%, #381018 46%, #3a141c 100%);
   color: var(--color-sidebar-text); }
 .login__formulario input { border: 1px solid rgba(247, 244, 239, 0.38);
-  background: rgba(43, 30, 22, 0.35); color: var(--color-sidebar-text); caret-color: var(--color-secondary); }
+  background: rgba(43, 18, 24, 0.35); color: var(--color-sidebar-text); caret-color: var(--color-secondary); }
 .login__boton { background: var(--color-sidebar-text); color: var(--color-text); }
 ```
 
