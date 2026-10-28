@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<title>Puerta de doble sello — Seguros Castaño</title>
+<style>
+  :root { --bg:#F7F4EF; --surface:#FFFFFF; --primary:#7F5539; --accent:#EDE0D4; --text:#2B1E16; --muted:#7D6B5D; --faint:#9A8877; --secondary:#B08968; }
+  * { box-sizing:border-box; margin:0; }
+  body { width:1440px; height:900px; overflow:hidden; background:var(--bg); font-family:"SoDo Sans",Inter,Manrope,"Helvetica Neue",Helvetica,Arial,sans-serif; color:var(--text); }
+  .scene { display:grid; place-items:center; height:100%; position:relative; }
+  .orb { position:absolute; border-radius:50%; filter:blur(120px); pointer-events:none; }
+  .orb-a { top:-160px; left:180px; width:480px; height:480px; background:radial-gradient(circle at 40% 40%,#B08968,transparent 70%); opacity:.38; }
+  .orb-b { bottom:-140px; right:200px; width:420px; height:420px; background:radial-gradient(circle at 50% 50%,#7F5539,transparent 70%); opacity:.26; }
+  .puerta { position:relative; width:520px; padding:56px 56px 48px; background:var(--surface); border:1px solid var(--accent); border-radius:16px; box-shadow:0 2px 8px rgba(43,30,22,.08); text-align:center; }
+  .cresta { width:64px; height:64px; margin:0 auto 20px; border-radius:14px; background:linear-gradient(135deg,#B08968,#7F5539); display:grid; place-items:center; color:#F7F4EF; }
+  .cresta svg { width:34px; height:34px; }
+  h1 { font-size:34px; font-weight:650; letter-spacing:-.01em; }
+  .sub { margin-top:8px; font-size:22px; color:var(--muted); letter-spacing:.16em; text-transform:uppercase; }
+  .paso { margin-top:36px; text-align:left; }
+  .paso__cab { display:flex; align-items:center; gap:14px; margin-bottom:12px; }
+  .num { flex:none; width:40px; height:40px; border-radius:50%; border:2px solid var(--primary); display:grid; place-items:center; font-size:22px; font-weight:700; color:var(--primary); }
+  .paso--hecho .num { background:var(--primary); color:#fff; }
+  .paso__titulo { font-size:22px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); }
+  .paso input { width:100%; height:56px; padding:0 16px; border:1px solid var(--secondary); border-radius:12px; font:inherit; font-size:24px; background:#fff; }
+  .paso input::placeholder { color:var(--faint); }
+  .filete { display:flex; align-items:center; gap:12px; margin:26px 0 0; }
+  .filete::before, .filete::after { content:""; height:1px; flex:1; background:var(--accent); }
+  .filete span { font-size:22px; font-weight:600; color:var(--secondary); letter-spacing:.3em; }
+  .btn { margin-top:36px; width:100%; height:56px; border:0; border-radius:12px; background:var(--primary); color:#fff; font:inherit; font-size:24px; font-weight:600; }
+  .ayuda { margin-top:24px; font-size:22px; color:var(--muted); }
+  .ayuda strong { color:var(--text); }
+  .pie { position:absolute; bottom:28px; font-size:22px; color:var(--faint); }
+</style>
+</head>
+<body>
+<div class="scene">
+  <div class="orb orb-a"></div><div class="orb orb-b"></div>
+  <main class="puerta">
+    <div class="cresta" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+    </div>
+    <h1>Seguros Castaño</h1>
+    <p class="sub">Panel de Atención</p>
+    <div class="paso paso--hecho">
+      <div class="paso__cab"><span class="num">1</span><span class="paso__titulo">Usuario</span></div>
+      <input value="operador" aria-label="Usuario">
+    </div>
+    <div class="filete"><span>II</span></div>
+    <div class="paso">
+      <div class="paso__cab"><span class="num">2</span><span class="paso__titulo">Contraseña</span></div>
+      <input type="password" value="••••" aria-label="Contraseña">
+    </div>
+    <button class="btn">Ingresar al Panel</button>
+    <p class="ayuda">Usuarios de prueba: <strong>admin</strong> u <strong>operador</strong> · Clave: <strong>1234</strong></p>
+  </main>
+  <div class="pie">© 2026 Seguros Castaño · Atención humana L-V 9 a 18</div>
+</div>
+</body>
+</html>

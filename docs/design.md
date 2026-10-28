@@ -405,6 +405,25 @@ El nombre "Seguros Castaño" se acompaña de una insignia cuadrada con degradado
   letter-spacing: 0.12em; color: var(--nav-texto); }
 ```
 
+### Ingreso
+
+La pantalla de inicio de sesión es el único ítem que dueña el viewport: un campo castaño a sangre con los orbes de la casa, sin tarjeta de cristal centrada. Sobre el fondo, crema como única interfaz.
+
+- Fondo: degradado castaño profundo `#4A3525 → #38261A → #2B1E16` a sangre (`min-height: 100svh`), con dos orbes radiales caramelo/castaño difuminados (los mismos `ambient-orb` del panel, en tono tenue).
+- Wordmark display «SEGUROS / CASTAÑO» apilado abajo a la izquierda (`clamp(2.75rem, 6.5vw, 5.5rem)`, peso 800, tracking -0.03em, versalitas), con «PANEL DE ATENCIÓN» en versalitas tracked debajo.
+- Formulario a la derecha del wordmark (una columna en `<768px`): inputs con hairline crema translúcida y fondo castaño translúcido, botón primario relleno crema (`--color-sidebar-text`) con texto castaño, foco en `--color-secondary`. El toggle de contraseña va junto al campo (asociado al input, 48×48).
+- Al pie: línea de autor con escudo y «Operadores y administración», y debajo la ayuda con las credenciales de prueba; el copyright va al extremo opuesto. Sin riel de íconos lateral.
+- Errores como slip crema/rojo (`--color-danger-bg` / `--color-danger-text`) con `role="alert"`. Ranura `.login__estado` reservada para el error de servidor del Parcial 2.
+- Entrance seco: un solo momento (`steps(2, end)`, 120ms), contenido visible por defecto y muerto por `prefers-reduced-motion`.
+
+```css
+.login { min-height: 100svh; background: linear-gradient(158deg, #4a3525 0%, #38261a 46%, #2b1e16 100%);
+  color: var(--color-sidebar-text); }
+.login__formulario input { border: 1px solid rgba(247, 244, 239, 0.38);
+  background: rgba(43, 30, 22, 0.35); color: var(--color-sidebar-text); caret-color: var(--color-secondary); }
+.login__boton { background: var(--color-sidebar-text); color: var(--color-text); }
+```
+
 ## 6. Responsive
 
 Breakpoints (mobile-first, con `min-width`):
