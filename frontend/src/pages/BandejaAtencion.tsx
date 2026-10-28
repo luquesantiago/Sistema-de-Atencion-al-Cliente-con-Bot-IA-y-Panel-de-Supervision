@@ -324,25 +324,21 @@ function CajaRespuesta({
 
   return (
     <form className="respuesta" onSubmit={alEnviar}>
-      <label className="respuesta__etiqueta" htmlFor={`${id}-texto`}>
-        Responder al cliente
-      </label>
-      <div className="respuesta__fila">
-        <textarea
-          id={`${id}-texto`}
-          className="respuesta__texto"
-          rows={2}
-          maxLength={LARGO_MAXIMO_RESPUESTA}
-          value={borrador}
-          disabled={deshabilitado}
-          placeholder={deOtro ? `Lo tiene ${caso.assignee?.name ?? 'otra persona'}: solo su responsable contesta` : 'Escribí la respuesta…'}
-          onChange={(evento) => onCambiar(evento.target.value)}
-          onKeyDown={alTeclear}
-        />
-        <button type="submit" className="boton boton--primario" disabled={deshabilitado || texto.length === 0}>
-          {ocupado ? 'Enviando…' : 'Enviar'}
-        </button>
-      </div>
+      <textarea
+        id={`${id}-texto`}
+        className="respuesta__texto"
+        rows={1}
+        maxLength={LARGO_MAXIMO_RESPUESTA}
+        value={borrador}
+        disabled={deshabilitado}
+        aria-label="Respuesta al cliente"
+        placeholder={deOtro ? `Lo tiene ${caso.assignee?.name ?? 'otra persona'}: solo su responsable contesta` : 'Escribí una respuesta...'}
+        onChange={(evento) => onCambiar(evento.target.value)}
+        onKeyDown={alTeclear}
+      />
+      <button type="submit" className="boton boton--primario" disabled={deshabilitado || texto.length === 0}>
+        {ocupado ? 'Enviando…' : 'Enviar'}
+      </button>
     </form>
   )
 }
