@@ -9,7 +9,12 @@ import { MODULOS, type Modulo, type ModuloPanel } from './navigation'
 import type { UsuarioPanel } from './usuario'
 import './App.css'
 
-const PAGINAS: Record<Exclude<ModuloPanel, 'dashboard'>, ComponentType<{ modulo: Modulo }>> = {
+type PropsPagina = {
+  modulo: Modulo
+  onNavegar: (destino: ModuloPanel) => void
+}
+
+const PAGINAS: Record<Exclude<ModuloPanel, 'dashboard'>, ComponentType<PropsPagina>> = {
   bandeja: BandejaAtencion,
   tramites: TramitesAprobar,
   clientes: BaseClientes,
@@ -60,7 +65,7 @@ function App() {
         <main className="panel__principal" id="contenido">
           {Pagina === undefined
             ? <Dashboard modulo={modulo} rol={usuario.rol} onNavegar={setActivo} />
-            : <Pagina modulo={modulo} />}
+            : <Pagina modulo={modulo} onNavegar={setActivo} />}
         </main>
       </div>
     </>
