@@ -2691,3 +2691,459 @@
     flex: 1;
   }
 }
+
+.tramites-aviso {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.tramites-aviso--exito {
+  background: var(--color-success-bg);
+  border-color: var(--color-success-border);
+  color: var(--color-success-text);
+}
+
+.tramites-aviso--alerta {
+  background: var(--color-warning-bg);
+  border-color: var(--color-warning-border);
+  color: var(--color-warning-text);
+}
+
+.tramites-aviso--riesgo {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-text);
+}
+
+.tramites-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.tramites-lista-panel,
+.tramites-detalle-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.tramites-lista-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tramites-detalle-panel {
+  position: sticky;
+  top: 16px;
+  min-width: 0;
+  min-height: 280px;
+  overflow: hidden;
+}
+
+.tramites__lista {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tramite-card {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--color-accent-light);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tramite-card:hover {
+  background: var(--color-surface-alt);
+}
+
+.tramite-card:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+.tramite-card[aria-current='true'] {
+  background: var(--color-accent-light);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.tramite-card__cuerpo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tramite-card__fila {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.tramite-card__titulo {
+  overflow: hidden;
+  color: var(--color-text);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tramite-card__fecha {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tramite-card__meta {
+  overflow: hidden;
+  width: 100%;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tramites__estado {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 24px 18px;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.tramites__estado--error {
+  color: var(--color-danger-text);
+  font-weight: 600;
+}
+
+.tramites__vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 42px 22px;
+  text-align: center;
+}
+
+.tramites__vacio-icono {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 4px;
+  color: var(--color-secondary);
+}
+
+.tramites__vacio-titulo {
+  color: var(--color-text);
+  font-weight: 650;
+}
+
+.tramites__vacio-texto {
+  max-width: 34ch;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.tramites__pie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding: 10px 14px;
+  border-top: 1px solid var(--color-accent-light);
+}
+
+.tramites__conteo {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tramites__volver {
+  display: none;
+}
+
+.tramite-detalle {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+}
+
+.tramite-detalle__cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tramite-detalle__identidad {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.avatar--grande {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  font-size: 1.1rem;
+  font-weight: 650;
+}
+
+.tramite-detalle__tipo {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tramite-detalle__titulo {
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.tramite-detalle__subtitulo {
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.tramite-detalle__datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 14px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-md);
+}
+
+.tramite-detalle__datos dt {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.tramite-detalle__datos dd {
+  margin: 2px 0 0;
+  font-size: 0.875rem;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+.tramite__telefono {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+}
+
+.tramite-detalle__bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tramite-detalle__subtitulo-fuerte {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tramite__foto-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.tramite__foto {
+  display: block;
+  max-width: 100%;
+  max-height: 280px;
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+  object-fit: contain;
+}
+
+.tramite__ayuda {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.tramite-detalle__formulario {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tramite-detalle__grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-md);
+}
+
+.tramite-detalle__grupo legend {
+  padding: 0 4px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tramite-detalle__fila {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tramite-detalle__ayuda {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.tramite-telefonos {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tramite-telefono-opcion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.tramite-telefono-opcion:hover {
+  border-color: var(--color-secondary);
+}
+
+.tramite-telefono-opcion input {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  accent-color: var(--color-primary);
+}
+
+.tramite-telefono-opcion__nota {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.tramite-detalle__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+@media (max-width: 900px) {
+  .tramites-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tramites-detalle-panel {
+    position: static;
+  }
+
+  .tramites-layout--con-detalle .tramites-lista-panel {
+    display: none;
+  }
+
+  .tramites-layout:not(.tramites-layout--con-detalle) .tramites-detalle-panel {
+    display: none;
+  }
+
+  .tramites__volver {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 12px 12px 0;
+    padding: 6px 12px;
+    border: 1px solid var(--color-secondary);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-primary);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .tramites__volver:hover {
+    background: var(--color-accent-light);
+  }
+}
+
+@media (max-width: 600px) {
+  .tramite-detalle {
+    padding: 16px;
+  }
+
+  .tramite-detalle__fila {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tramite-detalle__acciones {
+    justify-content: stretch;
+  }
+
+  .tramite-detalle__acciones .boton {
+    flex: 1 1 140px;
+  }
+}
