@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<title>Turno de consola — Seguros Castaño</title>
+<style>
+  :root { --bg:#F7F4EF; --surface:#FFFFFF; --primary:#7F5539; --deep:#65422B; --accent:#EDE0D4; --text:#2B1E16; --muted:#7D6B5D; --faint:#9A8877; --secondary:#B08968; }
+  * { box-sizing:border-box; margin:0; }
+  body { width:1440px; height:900px; overflow:hidden; background:var(--bg); font-family:"SoDo Sans",Inter,Manrope,"Helvetica Neue",Helvetica,Arial,sans-serif; color:var(--text); display:flex; }
+  .accion { flex:1.1; display:flex; flex-direction:column; justify-content:center; padding:0 96px; }
+  .marca { display:flex; align-items:center; gap:14px; margin-bottom:36px; }
+  .escudo { width:52px; height:52px; border-radius:12px; background:linear-gradient(135deg,#B08968,#7F5539); display:grid; place-items:center; color:#F7F4EF; flex:none; }
+  .escudo svg { width:28px; height:28px; }
+  .marca b { font-size:28px; font-weight:700; letter-spacing:-.01em; }
+  .marca small { display:block; font-size:22px; font-weight:500; letter-spacing:.22em; text-transform:uppercase; color:var(--muted); margin-top:2px; }
+  h1 { font-size:40px; font-weight:650; letter-spacing:-.02em; line-height:1.15; }
+  .sub { margin-top:10px; font-size:24px; color:var(--muted); }
+  .campo { margin-top:28px; }
+  .campo label { display:block; font-size:22px; font-weight:600; margin-bottom:8px; }
+  .campo input { width:100%; max-width:460px; height:56px; padding:0 16px; border:1px solid var(--secondary); border-radius:12px; font:inherit; font-size:24px; }
+  .campo input::placeholder { color:var(--faint); }
+  .btn { margin-top:32px; width:max-content; min-width:280px; height:56px; padding:0 28px; border:0; border-radius:12px; background:var(--primary); color:#fff; font:inherit; font-size:24px; font-weight:600; }
+  .btn:hover { background:var(--deep); }
+  .ayuda { margin-top:26px; font-size:22px; color:var(--muted); }
+  .ayuda strong { color:var(--text); }
+  .preview { flex:1; height:100%; background:linear-gradient(180deg,rgba(92,66,46,.94),rgba(56,38,26,.97)); border-left:1px solid rgba(255,255,255,.14); color:#F7F4EF; display:flex; flex-direction:column; justify-content:center; gap:24px; padding:0 72px; box-shadow:inset 1px 0 0 rgba(255,255,255,.16); }
+  .preview h2 { font-size:26px; font-weight:650; letter-spacing:.04em; text-transform:uppercase; color:rgba(247,244,239,.8); }
+  .panel-vacio { background:rgba(247,244,239,.08); border:1px dashed rgba(247,244,239,.28); border-radius:16px; padding:36px 32px; }
+  .panel-vacio p { font-size:24px; line-height:1.55; color:rgba(247,244,239,.92); }
+  .panel-vacio .nota { margin-top:14px; font-size:22px; color:rgba(247,244,239,.66); }
+  .horario { display:flex; align-items:center; gap:10px; font-size:22px; color:rgba(247,244,239,.78); }
+  .punto { width:12px; height:12px; border-radius:50%; background:#7BC49A; flex:none; }
+  .pie { position:absolute; bottom:26px; left:96px; font-size:22px; color:var(--faint); }
+</style>
+</head>
+<body>
+  <main class="accion">
+    <div class="marca">
+      <div class="escudo" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+      </div>
+      <div><b>Seguros Castaño</b><small>Panel de Atención</small></div>
+    </div>
+    <h1>Abrí la consola de tu turno</h1>
+    <p class="sub">Ingresá con tu usuario para atender la bandeja.</p>
+    <div class="campo"><label for="u">Usuario</label><input id="u" placeholder="Ingresá tu usuario"></div>
+    <div class="campo"><label for="c">Contraseña</label><input id="c" type="password" placeholder="Ingresá tu contraseña"></div>
+    <button class="btn">Ingresar al Panel</button>
+    <p class="ayuda">Usuarios de prueba: <strong>admin</strong> u <strong>operador</strong> · Clave: <strong>1234</strong></p>
+    <div class="pie">© 2026 Seguros Castaño</div>
+  </main>
+  <aside class="preview">
+    <h2>Al entrar te espera</h2>
+    <div class="panel-vacio">
+      <p>La Bandeja de Atención se carga al ingresar, con los casos derivados ordenados por gravedad.</p>
+      <p class="nota">Nada de esta vista se envía al cliente: es solo tu consola.</p>
+    </div>
+    <div class="horario"><span class="punto" aria-hidden="true"></span>Equipo humano: L-V 9 a 18 · Asistente siempre disponible</div>
+  </aside>
+</body>
+</html>

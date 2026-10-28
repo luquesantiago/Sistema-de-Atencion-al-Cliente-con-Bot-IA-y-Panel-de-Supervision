@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<title>Libro de novedades — Seguros Castaño</title>
+<style>
+  :root { --bg:#F7F4EF; --surface:#FCFAF7; --primary:#7F5539; --accent:#EDE0D4; --text:#2B1E16; --muted:#7D6B5D; --faint:#9A8877; --secondary:#B08968; --renglon:#E7DFD3; }
+  * { box-sizing:border-box; margin:0; }
+  body { width:1440px; height:900px; overflow:hidden; background:var(--bg); font-family:"SoDo Sans",Inter,Manrope,"Helvetica Neue",Helvetica,Arial,sans-serif; color:var(--text); display:grid; place-items:center; position:relative; }
+  .orb { position:absolute; border-radius:50%; filter:blur(120px); pointer-events:none; }
+  .orb-a { top:-160px; left:140px; width:480px; height:480px; background:radial-gradient(circle,#B08968,transparent 70%); opacity:.3; }
+  .libro { position:relative; width:760px; background:var(--surface); border:1px solid var(--accent); border-left:6px solid var(--primary); border-radius:0 16px 16px 0; box-shadow:0 2px 8px rgba(43,30,22,.08); padding:52px 64px 48px; }
+  .encabezado { display:flex; justify-content:space-between; align-items:baseline; gap:20px; padding-bottom:18px; border-bottom:2px solid var(--primary); }
+  .encabezado h1 { font-size:30px; font-weight:650; letter-spacing:.02em; }
+  .encabezado .fecha { font-size:22px; font-weight:600; color:var(--muted); font-variant-numeric:tabular-nums; letter-spacing:.08em; }
+  .asiento { margin-top:10px; font-size:22px; color:var(--muted); }
+  .asiento strong { color:var(--text); }
+  .renglon { margin-top:30px; padding-bottom:12px; border-bottom:1px solid var(--renglon); }
+  .renglon label { display:block; font-size:22px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+  .renglon input { width:100%; height:44px; border:0; background:transparent; font:inherit; font-size:26px; color:var(--text); padding:0 2px; }
+  .renglon input::placeholder { color:var(--faint); font-size:24px; }
+  .acciones { margin-top:40px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
+  .btn { height:56px; padding:0 40px; border:0; border-radius:12px; background:var(--primary); color:#fff; font:inherit; font-size:24px; font-weight:600; }
+  .btn:hover { background:#65422B; }
+  .ayuda { font-size:22px; color:var(--muted); text-align:right; line-height:1.5; }
+  .ayuda strong { color:var(--text); }
+  .sello { position:absolute; right:-28px; bottom:-28px; width:110px; height:110px; border-radius:50%; border:3px double var(--secondary); background:var(--bg); display:grid; place-items:center; color:var(--primary); transform:rotate(-8deg); }
+  .sello svg { width:48px; height:48px; }
+  .sello span { position:absolute; bottom:14px; font-size:12px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; }
+  .pie { position:absolute; bottom:26px; font-size:22px; color:var(--faint); }
+</style>
+</head>
+<body>
+  <div class="orb orb-a"></div>
+  <main class="libro">
+    <div class="encabezado">
+      <h1>Libro de novedades · Acceso</h1>
+      <span class="fecha">28 · 10 · 2026</span>
+    </div>
+    <p class="asiento">Asiento de turno: <strong>ingreso de operadores y administración al panel de supervisión</strong></p>
+    <div class="renglon"><label for="u">Usuario</label><input id="u" placeholder="Escribí tu usuario"></div>
+    <div class="renglon"><label for="c">Contraseña</label><input id="c" type="password" placeholder="Escribí tu contraseña"></div>
+    <div class="acciones">
+      <button class="btn">Ingresar al Panel</button>
+      <p class="ayuda">Usuarios de prueba: <strong>admin</strong> u <strong>operador</strong><br>Clave: <strong>1234</strong></p>
+    </div>
+    <div class="sello" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+      <span>Castaño</span>
+    </div>
+  </main>
+  <div class="pie">© 2026 Seguros Castaño · Atención humana L-V 9 a 18</div>
+</body>
+</html>

@@ -1,0 +1,110 @@
+{
+  "title": "Mano nueva: elegí la composición del login",
+  "question": "El roll repartió «Ventanilla» como lead. Quedate con esa, tomá el alternate o pedí otra mano.",
+  "options": [
+    {
+      "id": "assigned",
+      "kind": "assigned",
+      "label": "Ventanilla",
+      "kicker": "THE ROLL",
+      "lineage": "composición propia · mostrador horizontal",
+      "thesis": "El ingreso como ventanilla de agencia: una banda ancha y baja con los campos en fila, bajo una marquesina delgada con la marca.",
+      "palette": ["#65422B", "#7F5539", "#EDE0D4", "#F7F4EF"],
+      "materials": ["marquesina de fachada", "mostrador reglado", "letrero de horario"],
+      "viewport": "Marquesina superior delgada con escudo y versalitas; al centro, banda blanca a todo ancho con usuario, contraseña y CTA en fila; a la izquierda de la banda, el letrero de horario del equipo; pie con credenciales de prueba.",
+      "risk": "En pantallas muy angostas la banda debe apilarse y perder su filo de mostrador.",
+      "raised": [
+        { "from": "tablero-de-andenes-split-flap", "raise": "Celdas fijas: los campos tienen ancho fijo y alineación inamovible dentro de la banda." },
+        { "from": "feed-de-video-vertical", "raise": "Compromiso del viewport: la ventanilla ocupa el ancho completo y nada compite con la tarea." },
+        { "from": "mapa-de-orienteering", "raise": "Capas: el suelo crema es el terreno fijo; solo la banda de la ventanilla es la acción." }
+      ],
+      "html": ".impeccable/mocks/decision/deal-ventanilla.html"
+    },
+    {
+      "id": "deal-turno",
+      "kind": "dealt",
+      "label": "Turno de consola",
+      "lineage": "composición propia · acción y previsualización",
+      "thesis": "Abrir la consola del turno: a la izquierda la acción de ingreso, a la derecha una previsualización honesta de lo que espera (la bandeja se carga al entrar).",
+      "palette": ["#7F5539", "#B08968", "#F7F4EF", "#FFFFFF"],
+      "materials": ["consola de turno", "panel de previsualización"],
+      "viewport": "Dos zonas: formulario con acción clara a la izquierda; a la derecha, un panel sereno que dice «La bandeja se carga al ingresar» con la marca del horario del equipo.",
+      "risk": "La zona de previsualización puede leerse como contenido decorativo si no se textura con estado honesto.",
+      "html": ".impeccable/mocks/decision/deal-turno.html"
+    },
+    {
+      "id": "deal-libro",
+      "kind": "dealt",
+      "label": "Libro de novedades",
+      "lineage": "composición propia · registro documental",
+      "thesis": "El ingreso como asiento en el libro de novedades de la agencia: encabezado fechado, renglones y el sello de la casa al pie.",
+      "palette": ["#F7F4EF", "#2B1E16", "#7F5539", "#B08968"],
+      "materials": ["papel de libro rayado", "sello de la casa", "encabezado fechado"],
+      "viewport": "Hoja crema con renglones tenues: encabezado «Libro de novedades · Acceso», fecha del día, campos sobre renglones y sello-escudo anclado abajo a la derecha.",
+      "risk": "Sin renglones ni sello, el documento se diluye en una tarjeta más.",
+      "html": ".impeccable/mocks/decision/deal-libro.html"
+    },
+    {
+      "id": "challenger-annual",
+      "kind": "challenger",
+      "catalogId": "design-annual-s-plate-section",
+      "label": "Sección de láminas de anuario",
+      "verdict": "competitive",
+      "lineage": "secciones de láminas de anuales de diseño",
+      "thesis": "El ingreso como lámina de anuario: marcas de registro en las esquinas, hairlines dividiendo la fila de créditos y un sello circular que prueba que alguien firmó.",
+      "palette": ["#F5F4F6", "#16181A", "#DCDDF3", "#C9C7C4"],
+      "materials": ["papel sin estucar", "marcas de registro", "sello circular letterpress"],
+      "viewport": "Hoja continua casi blanca: campos en una fila de 12 columnas, crosshairs en las esquinas de la lámina, etiquetas en mono versalitas y sello circular a un lado.",
+      "case": "Fusión sólida: las marcas de registro y las hairlines dan disciplina de estado y precisión impositiva; pierde en calidez —el papel casi blanco enfría la paleta castaño—.",
+      "risk": "Lee a catálogo de imprenta si el sello no se traduce al escudo de la agencia.",
+      "hero": "https://impeccable.style/worlds/cards/design-annual-s-plate-section-hero.webp",
+      "board": "https://impeccable.style/worlds/cards/design-annual-s-plate-section.webp"
+    },
+    {
+      "id": "decl-splitflap",
+      "kind": "challenger",
+      "catalogId": "signals-instruments-split-flap-concourse",
+      "label": "Tablero de andenes",
+      "verdict": "declined",
+      "lineage": "tableros split-flap de estación",
+      "thesis": "Filas vivas con celdas de carácter que se accionan en cascada.",
+      "palette": ["#111111", "#F5F5F0", "#D4A017", "#7A1F1F"],
+      "materials": ["caras mate", "acero cepillado"],
+      "viewport": "Grilla de filas regladas con estados que se actualizan carácter por carácter.",
+      "case": "Pierde en ambos ejes: un tablero de salidas es para mirar, no para ingresar, y su ritmo de andén no es el de una agencia.",
+      "kept": "Celdas fijas: ancho y alineación inamovibles.",
+      "hero": "https://impeccable.style/worlds/cards/signals-instruments-split-flap-concourse-hero.webp"
+    },
+    {
+      "id": "decl-feed",
+      "kind": "challenger",
+      "catalogId": "pop-culture-shelf-vertical-video-feed-surface",
+      "label": "Feed de video vertical",
+      "verdict": "declined",
+      "lineage": "feeds de video a pantalla completa",
+      "thesis": "Un ítem dueña el viewport completo; controles en riel derecho; un snap de distancia al siguiente.",
+      "palette": ["#000000", "#FFFFFF", "#111111"],
+      "materials": ["media a sangre", "scrim inferior"],
+      "viewport": "Objeto a pantalla completa con riel de acciones y pie de foto.",
+      "case": "Pierde en ambos ejes: no hay nada que scrollear en un ingreso y el feed es el anti-patrón de una herramienta de trabajo.",
+      "kept": "Compromiso total del primer viewport.",
+      "hero": "https://impeccable.style/worlds/cards/pop-culture-shelf-vertical-video-feed-surface-hero.webp"
+    },
+    {
+      "id": "decl-orienteering",
+      "kind": "challenger",
+      "catalogId": "notation-diagram-systems-orienteering-map",
+      "label": "Mapa de orienteering",
+      "verdict": "declined",
+      "lineage": "mapas de orienteering ISO",
+      "thesis": "Terreno fijo en colores ISO con la púrpura de curso reservada a la ruta activa.",
+      "palette": ["#FFFFFF", "#6B3FA0", "#C4A24A", "#7A8F55"],
+      "materials": ["tintas ISO", "curvas de nivel"],
+      "viewport": "Mapa con círculos de control numerados y legenda rankeada.",
+      "case": "Pierde en ambos ejes: la topografía no explica un ingreso y la capa de curso es un disfraz sobre un formulario.",
+      "kept": "Capas: el terreno fijo debajo, la tarea activa encima.",
+      "hero": "https://impeccable.style/worlds/cards/notation-diagram-systems-orienteering-map-hero.webp"
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] }
+}

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<title>Expediente de cartera — Seguros Castaño</title>
+<style>
+  :root { --bg:#F7F4EF; --surface:#FFFFFF; --primary:#7F5539; --primary-hover:#65422B; --accent:#EDE0D4; --text:#2B1E16; --muted:#7D6B5D; --faint:#9A8877; --radius:16px; }
+  * { box-sizing:border-box; margin:0; }
+  body { width:1440px; height:900px; overflow:hidden; background:var(--bg); font-family:"SoDo Sans",Inter,Manrope,"Helvetica Neue",Helvetica,Arial,sans-serif; color:var(--text); }
+  .scene { display:grid; place-items:center; height:100%; position:relative; }
+  .orb { position:absolute; border-radius:50%; filter:blur(110px); pointer-events:none; }
+  .orb-a { top:-140px; right:60px; width:520px; height:520px; background:radial-gradient(circle at 30% 30%,#B08968,transparent 70%); opacity:.4; }
+  .orb-b { bottom:-160px; left:40px; width:460px; height:460px; background:radial-gradient(circle at 60% 40%,#7F5539,transparent 70%); opacity:.28; }
+  .expediente { position:relative; display:flex; width:880px; min-height:560px; background:var(--surface); border:1px solid var(--accent); border-radius:var(--radius); box-shadow:0 2px 8px rgba(43,30,22,.08); overflow:hidden; }
+  .lomo { flex:none; width:72px; background:linear-gradient(180deg,#7F5539,#65422B); display:flex; align-items:flex-end; justify-content:center; padding-bottom:36px; }
+  .lomo span { writing-mode:vertical-rl; transform:rotate(180deg); font-size:22px; font-weight:600; letter-spacing:.34em; text-transform:uppercase; color:#F7F4EF; }
+  .cuerpo { flex:1; display:grid; grid-template-columns:1fr 320px; gap:48px; padding:56px 56px 48px; }
+  .marca-fila { grid-column:1 / -1; display:flex; align-items:center; gap:16px; margin-bottom:8px; }
+  .sello { width:56px; height:56px; border-radius:12px; background:linear-gradient(135deg,#B08968,#7F5539); display:grid; place-items:center; color:#F7F4EF; }
+  .sello svg { width:30px; height:30px; }
+  .wordmark { font-size:44px; font-weight:700; letter-spacing:-.02em; line-height:1.05; }
+  .wordmark small { display:block; font-size:22px; font-weight:500; letter-spacing:.22em; text-transform:uppercase; color:var(--muted); margin-top:6px; }
+  h1 { font-size:30px; font-weight:600; line-height:1.25; margin-bottom:10px; }
+  .entradilla { font-size:22px; color:var(--muted); line-height:1.5; max-width:38ch; }
+  .campo { margin-top:28px; }
+  .campo label { display:block; font-size:22px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+  .campo input { width:100%; height:56px; padding:0 16px; border:1px solid #B08968; border-radius:12px; background:#fff; font:inherit; font-size:24px; color:var(--text); }
+  .campo input::placeholder { color:var(--faint); }
+  .btn { margin-top:32px; width:100%; height:56px; border:0; border-radius:12px; background:var(--primary); color:#fff; font:inherit; font-size:24px; font-weight:600; }
+  .ayuda { align-self:end; padding:18px 20px; border:1px solid var(--accent); border-radius:12px; background:#FCFAF7; color:var(--muted); font-size:22px; line-height:1.55; }
+  .ayuda strong { color:var(--text); }
+  .pie { position:absolute; bottom:28px; font-size:22px; color:var(--faint); }
+</style>
+</head>
+<body>
+<div class="scene">
+  <div class="orb orb-a"></div><div class="orb orb-b"></div>
+  <div class="expediente">
+    <div class="lomo"><span>Acceso · Panel</span></div>
+    <div class="cuerpo">
+      <div class="marca-fila">
+        <div class="sello" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+        </div>
+        <div class="wordmark">Seguros Castaño<small>Expediente de acceso</small></div>
+      </div>
+      <div>
+        <h1>Ingresá al panel de supervisión</h1>
+        <p class="entradilla">La cartera es la fuente de verdad. Cada acción queda registrada.</p>
+        <div class="campo"><label>Usuario</label><input value="" placeholder="Ingresá tu usuario"></div>
+        <div class="campo"><label>Contraseña</label><input type="password" value="••••"></div>
+        <button class="btn">Ingresar al Panel</button>
+      </div>
+      <div class="ayuda">Usuarios de prueba: <strong>admin</strong> u <strong>operador</strong><br>Clave: <strong>1234</strong><br><br>Atención humana: <strong>L-V 9 a 18</strong></div>
+    </div>
+  </div>
+  <div class="pie">© 2026 Seguros Castaño</div>
+</div>
+</body>
+</html>

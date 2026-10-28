@@ -32,17 +32,21 @@ export default function Login({ onIngresar }: LoginProps) {
 
   return (
     <main className="login">
-      <section className="login__tarjeta" aria-labelledby="login-titulo">
-        <div className="login__escudo" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z" />
-            <path d="m9 12 2 2 4-4" />
-          </svg>
-        </div>
-        <h1 className="login__titulo" id="login-titulo">Seguros Castaño</h1>
-        <p className="login__subtitulo">Panel de Atención</p>
+      <div className="login__campo" aria-hidden="true">
+        <span className="login__orbe login__orbe--uno" />
+        <span className="login__orbe login__orbe--dos" />
+      </div>
 
-        <form className="login__formulario" onSubmit={manejarEnvio}>
+      <div className="login__bloque">
+        <header className="login__marca">
+          <h1 className="login__wordmark">
+            <span>Seguros</span>
+            <span>Castaño</span>
+          </h1>
+          <p className="login__descriptor">Panel de Atención</p>
+        </header>
+
+        <form className="login__formulario" onSubmit={manejarEnvio} noValidate>
           <label htmlFor="usuario">Usuario</label>
           <input
             id="usuario"
@@ -108,10 +112,27 @@ export default function Login({ onIngresar }: LoginProps) {
           {errorContrasena && <p className="login__error" id="contrasena-error" role="alert">{errorContrasena}</p>}
 
           <button className="login__boton" type="submit">Ingresar al Panel</button>
+          <div className="login__estado" role="status" aria-live="polite" />
         </form>
-        <p className="login__ayuda">Usuarios de prueba: <strong>admin</strong> u <strong>operador</strong> · Clave: <strong>1234</strong></p>
-      </section>
-      <footer className="login__pie">© 2026 Seguros Castaño</footer>
+      </div>
+
+      <footer className="login__pie">
+        <div className="login__autor">
+          <span className="login__autor-escudo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z" />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+          </span>
+          <p className="login__autor-datos">
+            <strong>Operadores y administración</strong>
+            <span className="login__ayuda" id="ayuda-credenciales">
+              Usuarios de prueba: <strong>admin</strong> u <strong>operador</strong> · Clave: <strong>1234</strong>
+            </span>
+          </p>
+        </div>
+        <p className="login__copy">© 2026 Seguros Castaño</p>
+      </footer>
     </main>
   )
 }

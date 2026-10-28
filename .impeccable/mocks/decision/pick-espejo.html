@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<title>Espejo del panel — Seguros Castaño</title>
+<style>
+  :root { --bg:#F7F4EF; --surface:#FFFFFF; --primary:#7F5539; --accent:#EDE0D4; --text:#2B1E16; --muted:#7D6B5D; --faint:#9A8877; --secondary:#B08968; --nav-texto:rgba(247,244,239,.78); }
+  * { box-sizing:border-box; margin:0; }
+  body { width:1440px; height:900px; overflow:hidden; background:var(--bg); font-family:"SoDo Sans",Inter,Manrope,"Helvetica Neue",Helvetica,Arial,sans-serif; color:var(--text); display:flex; }
+  .sidebar { flex:none; width:288px; height:100%; background:linear-gradient(180deg,rgba(92,66,46,.9) 0%,rgba(74,53,37,.93) 48%,rgba(56,38,26,.96) 100%); border-right:1px solid rgba(255,255,255,.16); box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 10px 30px rgba(43,30,22,.3); padding:24px 16px; display:flex; flex-direction:column; gap:28px; color:#F7F4EF; }
+  .marca { display:flex; align-items:center; gap:12px; padding:0 8px; }
+  .insignia { width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg,#B08968,#7F5539); display:grid; place-items:center; color:#F7F4EF; flex:none; }
+  .insignia svg { width:24px; height:24px; }
+  .marca b { font-size:24px; letter-spacing:-.01em; }
+  .marca small { display:block; font-size:22px; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--nav-texto); margin-top:2px; }
+  .nav { display:flex; flex-direction:column; gap:6px; opacity:.45; }
+  .nav .item { padding:12px 14px; border-radius:12px; border-left:3px solid transparent; color:var(--nav-texto); font-size:22px; font-weight:500; }
+  .nav .item.muted-note { font-size:22px; color:var(--nav-texto); padding:4px 14px 0; }
+  .nav .item.on { background:linear-gradient(180deg,rgba(247,244,239,.26),rgba(247,244,239,.13)); border-left:3px solid #B08968; color:#F7F4EF; font-weight:600; }
+  .main { flex:1; display:grid; place-items:center; position:relative; }
+  .orb { position:absolute; border-radius:50%; filter:blur(110px); pointer-events:none; }
+  .orb-a { top:-120px; right:80px; width:440px; height:440px; background:radial-gradient(circle,#B08968,transparent 70%); opacity:.35; }
+  .tarjeta { position:relative; width:480px; background:var(--surface); border:1px solid var(--accent); border-radius:16px; box-shadow:0 2px 8px rgba(43,30,22,.08); padding:48px 48px 40px; }
+  .tarjeta .sello { width:56px; height:56px; border-radius:12px; background:linear-gradient(135deg,#B08968,#7F5539); display:grid; place-items:center; color:#F7F4EF; margin-bottom:18px; }
+  .tarjeta .sello svg { width:30px; height:30px; }
+  .tarjeta h1 { font-size:32px; font-weight:650; }
+  .tarjeta .sub { margin-top:6px; font-size:22px; color:var(--muted); letter-spacing:.14em; text-transform:uppercase; }
+  .campo { margin-top:24px; }
+  .campo label { display:block; font-size:22px; font-weight:600; margin-bottom:8px; }
+  .campo input { width:100%; height:54px; padding:0 16px; border:1px solid var(--secondary); border-radius:12px; font:inherit; font-size:24px; }
+  .campo input::placeholder { color:var(--faint); }
+  .btn { margin-top:28px; width:100%; height:54px; border:0; border-radius:12px; background:var(--primary); color:#fff; font:inherit; font-size:24px; font-weight:600; }
+  .ayuda { margin-top:20px; padding:14px 16px; background:#FCFAF7; border:1px solid var(--accent); border-radius:12px; font-size:22px; color:var(--muted); line-height:1.5; }
+  .ayuda strong { color:var(--text); }
+  .pie { position:absolute; bottom:24px; right:40px; font-size:22px; color:var(--faint); }
+</style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="marca">
+      <div class="insignia" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+      </div>
+      <div><b>Seguros Castaño</b><small>Panel de Atención</small></div>
+    </div>
+    <nav class="nav" aria-label="Módulos (sesión cerrada)">
+      <div class="item on">Dashboard</div>
+      <div class="item">Bandeja de Atención</div>
+      <div class="item">Trámites por Aprobar</div>
+      <div class="item">Base de Clientes</div>
+      <div class="item muted-note">Con la sesión cerrada no se navega</div>
+    </nav>
+  </aside>
+  <main class="main">
+    <div class="orb orb-a"></div>
+    <div class="tarjeta">
+      <div class="sello" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+      </div>
+      <h1>Ingresá al panel</h1>
+      <p class="sub">Acceso de operadores</p>
+      <div class="campo"><label for="u">Usuario</label><input id="u" placeholder="Ingresá tu usuario"></div>
+      <div class="campo"><label for="c">Contraseña</label><input id="c" type="password" placeholder="Ingresá tu contraseña"></div>
+      <button class="btn">Ingresar al Panel</button>
+      <p class="ayuda">Usuarios de prueba: <strong>admin</strong> u <strong>operador</strong> · Clave: <strong>1234</strong></p>
+    </div>
+    <div class="pie">© 2026 Seguros Castaño</div>
+  </main>
+</body>
+</html>

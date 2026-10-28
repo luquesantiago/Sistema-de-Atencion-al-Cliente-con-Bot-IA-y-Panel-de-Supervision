@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<title>Ventanilla — Seguros Castaño</title>
+<style>
+  :root { --bg:#F7F4EF; --surface:#FFFFFF; --primary:#7F5539; --deep:#65422B; --accent:#EDE0D4; --text:#2B1E16; --muted:#7D6B5D; --faint:#9A8877; --secondary:#B08968; }
+  * { box-sizing:border-box; margin:0; }
+  body { width:1440px; height:900px; overflow:hidden; background:var(--bg); font-family:"SoDo Sans",Inter,Manrope,"Helvetica Neue",Helvetica,Arial,sans-serif; color:var(--text); display:flex; flex-direction:column; }
+  .marquesina { flex:none; height:88px; background:linear-gradient(90deg,#65422B,#7F5539 55%,#8A5E3F); color:#F7F4EF; display:flex; align-items:center; gap:16px; padding:0 64px; box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 2px 8px rgba(43,30,22,.12); }
+  .escudo { width:44px; height:44px; border-radius:10px; background:linear-gradient(135deg,#B08968,#7F5539); border:1px solid rgba(255,255,255,.3); display:grid; place-items:center; flex:none; }
+  .escudo svg { width:24px; height:24px; }
+  .marca b { font-size:24px; font-weight:700; letter-spacing:-.01em; }
+  .marca small { margin-left:14px; font-size:22px; font-weight:500; letter-spacing:.26em; text-transform:uppercase; color:rgba(247,244,239,.78); }
+  .cuerpo { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:36px; position:relative; }
+  .orb { position:absolute; border-radius:50%; filter:blur(110px); pointer-events:none; }
+  .orb-a { top:-100px; right:120px; width:420px; height:420px; background:radial-gradient(circle,#B08968,transparent 70%); opacity:.32; }
+  .ventanilla { position:relative; width:1216px; display:flex; align-items:stretch; background:var(--surface); border:1px solid var(--accent); border-radius:16px; box-shadow:0 2px 8px rgba(43,30,22,.08); overflow:hidden; }
+  .letrero { flex:none; width:280px; background:#FCFAF7; border-right:1px solid var(--accent); padding:36px 28px; display:flex; flex-direction:column; justify-content:center; gap:10px; }
+  .letrero .punto { display:inline-block; width:12px; height:12px; border-radius:50%; background:#00704A; margin-right:8px; vertical-align:1px; }
+  .letrero p { font-size:22px; color:var(--muted); line-height:1.5; }
+  .letrero strong { color:var(--text); }
+  .mostrador { flex:1; display:flex; align-items:flex-end; gap:24px; padding:44px 40px; }
+  .campo { flex:1; }
+  .campo label { display:block; font-size:22px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:10px; }
+  .campo input { width:100%; height:56px; padding:0 16px; border:1px solid var(--secondary); border-radius:12px; font:inherit; font-size:24px; background:#fff; }
+  .campo input::placeholder { color:var(--faint); }
+  .btn { flex:none; height:56px; padding:0 36px; border:0; border-radius:12px; background:var(--primary); color:#fff; font:inherit; font-size:24px; font-weight:600; }
+  .btn:hover { background:var(--deep); }
+  .ayuda { position:relative; width:1216px; text-align:center; font-size:22px; color:var(--muted); }
+  .ayuda strong { color:var(--text); }
+  .pie { position:absolute; bottom:26px; font-size:22px; color:var(--faint); }
+</style>
+</head>
+<body>
+  <header class="marquesina">
+    <div class="escudo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#F7F4EF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 19 6v5c0 4.6-2.8 8-7 10-4.2-2-7-5.4-7-10V6l7-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+    </div>
+    <div class="marca"><b>Seguros Castaño</b><small>Ventanilla de acceso · Panel de Atención</small></div>
+  </header>
+  <main class="cuerpo">
+    <div class="orb orb-a"></div>
+    <div class="ventanilla">
+      <div class="letrero">
+        <p><span class="punto" aria-hidden="true"></span>Asistente <strong>disponible siempre</strong></p>
+        <p>Equipo humano: <strong>L-V 9 a 18</strong></p>
+        <p style="font-size:22px;color:#9A8877">Mostrador único de operadores y administración</p>
+      </div>
+      <div class="mostrador">
+        <div class="campo"><label for="u">Usuario</label><input id="u" placeholder="Ingresá tu usuario"></div>
+        <div class="campo"><label for="c">Contraseña</label><input id="c" type="password" placeholder="Ingresá tu contraseña"></div>
+        <button class="btn">Ingresar al Panel</button>
+      </div>
+    </div>
+    <p class="ayuda">Usuarios de prueba: <strong>admin</strong> u <strong>operador</strong> · Clave: <strong>1234</strong></p>
+    <div class="pie">© 2026 Seguros Castaño</div>
+  </main>
+</body>
+</html>
