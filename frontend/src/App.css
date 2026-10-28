@@ -528,7 +528,7 @@
   color: var(--color-text-muted);
 }
 
-/* Panel destacado: superficie de cristal con acento caramelo */
+/* Panel destacado: superficie de cristal con acento vino */
 
 .operativo {
   display: flex;
@@ -1849,7 +1849,7 @@
   width: 100%;
   margin: 0;
   padding: 9px 20px;
-  border-top: 1px solid rgba(43, 30, 22, 0.08);
+  border-top: 1px solid rgba(43, 18, 24, 0.08);
   font-size: 0.83rem;
   font-weight: 600;
 }
@@ -2484,7 +2484,7 @@
 }
 
 /* Formularios de alta y edición (design.md §5): campos sólidos con
-   borde caramelo, foco visible y error junto al campo. */
+   borde vino, foco visible y error junto al campo. */
 
 .formulario {
   display: flex;
