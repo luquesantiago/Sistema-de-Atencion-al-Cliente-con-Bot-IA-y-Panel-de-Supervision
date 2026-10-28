@@ -1568,10 +1568,10 @@
 
 .bandeja-container {
   display: flex;
-  height: calc(100vh - 56px);
+  height: 100vh;
   min-height: 0;
   overflow: hidden;
-  background: var(--color-surface);
+  background: #f8f7f5;
 }
 
 .bandeja-lista-panel {
@@ -2228,7 +2228,7 @@
   /* Una columna por vez: la lista o la conversación elegida */
   .bandeja-container {
     flex-direction: column;
-    height: calc(100vh - 56px);
+    height: 100vh;
     min-height: 0;
   }
 
