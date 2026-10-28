@@ -1911,40 +1911,41 @@
   list-style: none;
 }
 
-.hilo__mensaje {
-  max-width: min(70%, 560px);
-  padding: 10px 12px;
-  border: 1px solid var(--borde);
-  border-radius: 12px;
-  background: var(--superficie);
-  box-shadow: var(--sombra-tarjeta);
+.mensaje-container {
+  display: flex;
+  width: 100%;
+}
+
+.mensaje-bubble {
+  max-width: 70%;
+  padding: 10px 14px;
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-md);
   font-size: 0.88rem;
+  line-height: 1.4;
 }
 
-/* El cliente a la izquierda; el asistente y el operador a la derecha. El origen va escrito. */
-.hilo__mensaje--cliente {
+.mensaje-container.cliente {
   align-self: flex-start;
-  border-bottom-left-radius: 4px;
 }
 
-.hilo__mensaje--asistente {
-  align-self: flex-end;
+.mensaje-container.cliente .mensaje-bubble {
   border-color: var(--color-accent-light);
-  border-bottom-right-radius: 4px;
   background: var(--color-surface);
-  color: #1e293b;
 }
 
-.hilo__mensaje--operador {
+.mensaje-container.agente {
   align-self: flex-end;
-  border-color: var(--color-primary);
-  border-bottom-right-radius: 4px;
-  background: var(--color-primary);
-  color: #ffffff;
+  justify-content: flex-end;
+}
+
+.mensaje-container.agente .mensaje-bubble {
+  border-color: var(--color-accent-light);
+  background: var(--color-accent-light);
 }
 
 /* Los mensajes de otros casos de la misma conversación quedan atenuados y dicen de qué caso son */
-.hilo__mensaje--otro-caso {
+.mensaje-container--otro-caso {
   opacity: 0.6;
 }
 
@@ -1953,16 +1954,8 @@
   flex-wrap: wrap;
   gap: 2px 8px;
   margin-top: 6px;
-  color: var(--texto-tenue);
-  font-size: 0.72rem;
-}
-
-.hilo__mensaje--asistente .hilo__meta {
   color: var(--color-text-muted);
-}
-
-.hilo__mensaje--operador .hilo__meta {
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
 }
 
 .hilo__origen {
@@ -1975,12 +1968,6 @@
 }
 
 /* Acciones sobre el caso (change bandeja-atender-casos) */
-
-/* El equipo, en azul marino: se distingue del asistente también por el texto «Operador · nombre» */
-.hilo__mensaje--operador {
-  border-color: var(--nav-fondo-alto);
-  background: var(--nav-fondo-alto);
-}
 
 .hilo__imagen {
   display: block;
@@ -2282,7 +2269,7 @@
     display: inline-flex;
   }
 
-  .hilo__mensaje {
+  .mensaje-bubble {
     max-width: 88%;
   }
 }

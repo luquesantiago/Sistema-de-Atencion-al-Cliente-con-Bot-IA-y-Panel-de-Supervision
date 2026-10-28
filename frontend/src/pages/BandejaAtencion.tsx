@@ -277,15 +277,18 @@ function ImagenDelMensaje({ idCaso, idMensaje }: { idCaso: number; idMensaje: nu
 }
 
 function MensajeDelHilo({ mensaje, idCaso }: { mensaje: MensajeBandeja; idCaso: number }) {
+  const esCliente = mensaje.origin === 'cliente'
   const origen = mensaje.origin === 'operador' && mensaje.author ? `Operador · ${mensaje.author.name}` : ORIGENES[mensaje.origin]
   return (
-    <li className={`hilo__mensaje hilo__mensaje--${mensaje.origin}${mensaje.inCase ? '' : ' hilo__mensaje--otro-caso'}`}>
-      <p className="hilo__texto">{mensaje.text}</p>
-      {mensaje.hasImage ? <ImagenDelMensaje idCaso={idCaso} idMensaje={mensaje.id} /> : null}
-      <div className="hilo__meta">
-        <span className="hilo__origen">{origen}</span>
-        <span>{fechaHora(mensaje.at)}</span>
-        <span>{mensaje.inCase ? 'Este caso' : `Otro caso (${mensaje.caseId})`}</span>
+    <li className={`mensaje-container ${esCliente ? 'cliente' : 'agente'}${mensaje.inCase ? '' : ' mensaje-container--otro-caso'}`}>
+      <div className="mensaje-bubble">
+        <p className="hilo__texto">{mensaje.text}</p>
+        {mensaje.hasImage ? <ImagenDelMensaje idCaso={idCaso} idMensaje={mensaje.id} /> : null}
+        <div className="hilo__meta">
+          <span className="hilo__origen">{origen}</span>
+          <span>{fechaHora(mensaje.at)}</span>
+          <span>{mensaje.inCase ? 'Este caso' : `Otro caso (${mensaje.caseId})`}</span>
+        </div>
       </div>
     </li>
   )
