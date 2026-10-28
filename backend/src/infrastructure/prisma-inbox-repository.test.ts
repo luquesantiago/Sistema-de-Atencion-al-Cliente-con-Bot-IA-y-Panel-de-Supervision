@@ -73,6 +73,20 @@ describe('consultas de la bandeja', () => {
     expect(query.values).toContain(12)
   })
 
+  it('el filtro por cliente restringe el listado y el total a ese cliente', () => {
+    const query = inboxOrderQuery({ limit: 25, offset: 0 }, undefined, 7)
+    expect(query.sql).toContain('JOIN conversacion conv ON conv.id_conversacion = c.id_conversacion')
+    expect(query.sql).toContain('AND conv.id_cliente = ?')
+    expect(query.values).toContain(7)
+    expect(inboxCountQuery(7).sql).toContain('AND conv.id_cliente = ?')
+    expect(inboxCountQuery(7).values).toContain(7)
+  })
+
+  it('sin filtro por cliente la consulta no restringe por cliente', () => {
+    expect(inboxOrderQuery({ limit: 25, offset: 0 }).sql).not.toContain('conv.id_cliente = ?')
+    expect(inboxCountQuery().sql).not.toContain('conv.id_cliente = ?')
+  })
+
   it('lee los números que MySQL devuelve como BigInt o texto', () => {
     expect(toOrderedCase({ caseId: 12n, severityOrder: '2' })).toEqual({ caseId: 12, severityOrder: 2 })
     expect(toOrderedCase({ caseId: 12, severityOrder: null })).toEqual({ caseId: 12, severityOrder: null })

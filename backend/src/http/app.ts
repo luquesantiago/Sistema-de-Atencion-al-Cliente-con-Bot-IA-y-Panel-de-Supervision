@@ -174,7 +174,8 @@ export function createApp(
   app.get('/api/bandeja', async (request, response, next) => {
     try {
       const page = parsePage(request.query.limit, request.query.offset)
-      const result = await manageInbox.listCases(page, await resolvePanelActor())
+      const customerId = parseCustomerId(request.query.customerId)
+      const result = await manageInbox.listCases(page, await resolvePanelActor(), customerId)
       response.status(200).json({ items: result.items, total: result.total, ...page })
     } catch (error) {
       handleRequestError(error, response, next)
@@ -346,6 +347,18 @@ function parseSearch(value: unknown): string | undefined {
     throw new RequestManagementError(400, 'VALIDATION_ERROR', 'buscar debe ser texto.')
   }
   return value
+}
+
+function parseCustomerId(value: unknown): number | undefined {
+  if (value === undefined) return undefined
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value)) {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', 'customerId debe ser un entero positivo.')
+  }
+  const id = Number(value)
+  if (!Number.isSafeInteger(id) || id > 4_294_967_295) {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', 'customerId está fuera del rango permitido.')
+  }
+  return id
 }
 
 function parseNonNegativeInteger(value: unknown, field: string): number {

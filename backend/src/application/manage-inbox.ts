@@ -107,9 +107,10 @@ export class ManageInbox {
     private readonly clock: () => Date = () => new Date(),
   ) {}
 
-  public async listCases(page: PageRequest, actor: PanelActor): Promise<InboxItemPage> {
+  public async listCases(page: PageRequest, actor: PanelActor, customerId?: number): Promise<InboxItemPage> {
     validatePage(page)
-    const result = await this.repository.listPage(page)
+    if (customerId !== undefined) validateCustomerId(customerId)
+    const result = await this.repository.listPage(page, customerId)
     return { items: result.entries.map((entry) => toItem(entry, actor)), total: result.total }
   }
 
@@ -241,5 +242,11 @@ function validatePage(page: PageRequest): void {
   if (!Number.isInteger(page.limit) || page.limit < 1 || page.limit > maxPageSize ||
     !Number.isInteger(page.offset) || page.offset < 0) {
     throw new RequestManagementError(400, 'VALIDATION_ERROR', 'La paginación no es válida.')
+  }
+}
+
+function validateCustomerId(customerId: number): void {
+  if (!Number.isInteger(customerId) || customerId < 1 || customerId > maxId) {
+    throw new RequestManagementError(400, 'VALIDATION_ERROR', 'El cliente no es válido.')
   }
 }

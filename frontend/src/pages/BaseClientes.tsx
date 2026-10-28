@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import type { Modulo } from '../navigation'
+import type { Modulo, ModuloPanel, OpcionesNavegacion } from '../navigation'
 import PageHeader from '../components/PageHeader'
 import EstadoPanel from '../components/EstadoPanel'
 import ConfirmarCambio, { type LineaConfirmacion } from '../components/ConfirmarCambio'
@@ -34,6 +34,7 @@ import {
   type EntradaEdicionPoliza,
 } from '../api/clientes'
 import { obtenerCatalogos, type Catalogos } from '../api/catalogos'
+import { listarBandeja } from '../api/bandeja'
 
 const LIMITE_PAGINA = 25
 const RETRASO_BUSQUEDA_MS = 300
@@ -193,7 +194,12 @@ function esPeligroso(confirmacion: ConfirmacionPendiente): boolean {
  * pólizas con bien asegurado y coberturas. Cada mutación pide confirmación
  * con el resumen del cambio; el DNI no se modifica nunca.
  */
-export default function BaseClientes({ modulo }: { modulo: Modulo }) {
+type PropsBaseClientes = {
+  modulo: Modulo
+  onNavegar: (destino: ModuloPanel, opciones?: OpcionesNavegacion) => void
+}
+
+export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
   const [texto, setTexto] = useState('')
   const [items, setItems] = useState<ClienteLista[]>([])
   const [total, setTotal] = useState(0)
@@ -219,6 +225,8 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
   const [errorConfirmacion, setErrorConfirmacion] = useState<string | null>(null)
   const [exito, setExito] = useState<string | null>(null)
   const [nuevoTelefono, setNuevoTelefono] = useState('')
+  const [clienteEnChat, setClienteEnChat] = useState<string | null>(null)
+  const [avisoChat, setAvisoChat] = useState<{ tono: 'info' | 'riesgo'; texto: string } | null>(null)
 
   const cargar = useCallback(async (busqueda: string, silencioso = false) => {
     const numero = ++numeroDeConsulta.current
@@ -288,6 +296,38 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
     setErrorDetalle(null)
     setCargandoDetalle(false)
   }, [])
+
+  // «Ir al chat»: busca los casos abiertos del cliente en la Bandeja de Atención. Si hay
+  // uno, abre esa conversación; si hay varios, llega a la bandeja filtrada por el cliente.
+  const irAlChat = useCallback(async (cliente: ClienteLista) => {
+    setClienteEnChat(cliente.id)
+    setAvisoChat(null)
+    try {
+      const { items } = await listarBandeja({ limit: 100, offset: 0, customerId: Number(cliente.id) })
+      if (items.length === 0) {
+        setAvisoChat({
+          tono: 'info',
+          texto: `${nombreCompleto(cliente)} no tiene chats abiertos en la Bandeja de Atención.`,
+        })
+        return
+      }
+      if (items.length === 1) {
+        const [unico] = items
+        onNavegar('bandeja', { bandeja: { caseId: unico.caseId } })
+        return
+      }
+      onNavegar('bandeja', {
+        bandeja: { customerId: Number(cliente.id), clienteNombre: nombreCompleto(cliente) },
+      })
+    } catch (errorDeChat) {
+      setAvisoChat({
+        tono: 'riesgo',
+        texto: mensajeDeError(errorDeChat, 'No se pudieron buscar los chats del cliente.'),
+      })
+    } finally {
+      setClienteEnChat(null)
+    }
+  }, [onNavegar])
 
   const recargarTrasEdicion = useCallback((fichaActualizada: ClienteDetalle | null, mensaje: string) => {
     if (fichaActualizada !== null) setDetalle(fichaActualizada)
@@ -650,23 +690,38 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
                   </td>
                   <td>{resumenDePolizas(cliente.policies)}</td>
                   <td className="tabla__accion">
-                    <button
-                      type="button"
-                      className={`tabla__ver${activo ? ' tabla__ver--activo' : ''}`}
-                      aria-expanded={activo}
-                      onClick={(evento) => {
-                        evento.stopPropagation()
-                        // «Viendo» alterna: tocarlo cierra la ficha, igual que el
-                        // botón Cerrar del panel, y vuelve la lista completa.
-                        if (activo) {
-                          cerrarDetalle()
-                          return
-                        }
-                        void abrirDetalle(cliente)
-                      }}
-                    >
-                      {activo ? 'Viendo' : 'Ver detalle'}
-                    </button>
+                    <div className="tabla__acciones">
+                      <button
+                        type="button"
+                        className="tabla__chat"
+                        onClick={(evento) => {
+                          evento.stopPropagation()
+                          void irAlChat(cliente)
+                        }}
+                        disabled={clienteEnChat !== null}
+                        aria-busy={clienteEnChat === cliente.id}
+                        title="Abrir la conversación de este cliente en la Bandeja de Atención"
+                      >
+                        {clienteEnChat === cliente.id ? 'Buscando…' : 'Ir al chat'}
+                      </button>
+                      <button
+                        type="button"
+                        className={`tabla__ver${activo ? ' tabla__ver--activo' : ''}`}
+                        aria-expanded={activo}
+                        onClick={(evento) => {
+                          evento.stopPropagation()
+                          // «Viendo» alterna: tocarlo cierra la ficha, igual que el
+                          // botón Cerrar del panel, y vuelve la lista completa.
+                          if (activo) {
+                            cerrarDetalle()
+                            return
+                          }
+                          void abrirDetalle(cliente)
+                        }}
+                      >
+                        {activo ? 'Viendo' : 'Ver detalle'}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )
@@ -703,6 +758,15 @@ export default function BaseClientes({ modulo }: { modulo: Modulo }) {
       {exito !== null ? (
         <p className="aviso-exito" role="status">
           {exito}
+        </p>
+      ) : null}
+
+      {avisoChat !== null ? (
+        <p
+          className={avisoChat.tono === 'riesgo' ? 'aviso-accion aviso-accion--riesgo' : 'aviso-exito'}
+          role={avisoChat.tono === 'riesgo' ? 'alert' : 'status'}
+        >
+          {avisoChat.texto}
         </p>
       ) : null}
 

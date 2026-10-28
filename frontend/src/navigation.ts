@@ -4,6 +4,18 @@ export type ModuloPanel =
   | 'tramites'
   | 'clientes'
 
+/** Lo que se abre al llegar a la Bandeja: un caso puntual o los casos de un cliente. */
+export type DestinoBandeja = {
+  caseId?: number
+  customerId?: number
+  clienteNombre?: string
+}
+
+/** Datos que acompañan a una navegación del panel. */
+export type OpcionesNavegacion = { bandeja?: DestinoBandeja }
+
+export type Navegar = (destino: ModuloPanel, opciones?: OpcionesNavegacion) => void
+
 export interface Modulo {
   id: ModuloPanel
   nombre: string
