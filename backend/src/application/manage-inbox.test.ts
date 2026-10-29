@@ -54,6 +54,7 @@ function actionState(overrides: Partial<InboxActionState> = {}): InboxActionStat
 // Repositorio en memoria: aplica las mismas reglas del dominio que el de Prisma.
 class InMemoryInbox implements InboxRepository {
   public readonly pages: PageRequest[] = []
+  public readonly customerFilters: Array<number | undefined> = []
   public readonly lookups: number[] = []
   public readonly replies: Array<{ caseId: number; text: string; take: boolean }> = []
   public readonly closed: Array<{ caseId: number; input: CloseInput }> = []
@@ -70,8 +71,9 @@ class InMemoryInbox implements InboxRepository {
     public state: InboxActionState | null = null,
   ) {}
 
-  public async listPage(page: PageRequest): Promise<InboxPage> {
+  public async listPage(page: PageRequest, customerId?: number): Promise<InboxPage> {
     this.pages.push(page)
+    this.customerFilters.push(customerId)
     return { entries: this.entries.slice(page.offset, page.offset + page.limit), total: this.entries.length }
   }
 
@@ -169,6 +171,19 @@ describe('ManageInbox.listCases', () => {
       expect(repository.pages).toEqual([])
     },
   )
+
+  it('pasa el filtro por cliente al repositorio', async () => {
+    const repository = new InMemoryInbox([entry()])
+    await inbox(repository).listCases({ limit: 25, offset: 0 }, me, 7)
+    expect(repository.customerFilters).toEqual([7])
+  })
+
+  it.each([0, -1, 1.5, 4_294_967_296])('rechaza el cliente %s sin consultar el repositorio', async (customerId) => {
+    const repository = new InMemoryInbox([entry()])
+    await expect(inbox(repository).listCases({ limit: 25, offset: 0 }, me, customerId))
+      .rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' })
+    expect(repository.customerFilters).toEqual([])
+  })
 })
 
 describe('ManageInbox.findCase', () => {

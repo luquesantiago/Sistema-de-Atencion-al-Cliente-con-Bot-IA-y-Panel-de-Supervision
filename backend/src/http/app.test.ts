@@ -58,9 +58,12 @@ class FakeAi implements AiClient {
 
 // Bandeja en memoria: la página es la que pide la prueba, ya ordenada. Datos ficticios.
 class FakeInbox implements InboxRepository {
+  public customerFilters: Array<number | undefined> = []
+
   public constructor(public entries: InboxEntry[] = [], public conversation: InboxConversation | null = null) {}
 
-  public async listPage(page: PageRequest): Promise<InboxPage> {
+  public async listPage(page: PageRequest, customerId?: number): Promise<InboxPage> {
+    this.customerFilters.push(customerId)
     return { entries: this.entries.slice(page.offset, page.offset + page.limit), total: this.entries.length }
   }
 
@@ -1022,10 +1025,16 @@ describe('Bandeja de Atención', () => {
     })
   })
 
-  it.each(['/api/bandeja?limit=0', '/api/bandeja?offset=-1', '/api/bandeja/abc'])('%s da 400', async (path) => {
+  it.each(['/api/bandeja?limit=0', '/api/bandeja?offset=-1', '/api/bandeja/abc', '/api/bandeja?customerId=abc', '/api/bandeja?customerId=0'])('%s da 400', async (path) => {
     const response = await fetch(`${baseUrl}${path}`)
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_ERROR' } })
+  })
+
+  it('pasa el filtro por cliente a la bandeja', async () => {
+    const response = await fetch(`${baseUrl}/api/bandeja?customerId=7`)
+    expect(response.status).toBe(200)
+    expect(inbox.customerFilters).toEqual([7])
   })
 
   it('un caso que no está en la bandeja da 404', async () => {

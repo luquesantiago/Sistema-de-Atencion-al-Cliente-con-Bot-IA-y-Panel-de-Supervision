@@ -1342,6 +1342,39 @@
   white-space: nowrap;
 }
 
+.tabla__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* «Ir al chat»: acción secundaria, al lado de «Ver detalle». */
+.tabla__chat {
+  padding: 4px 10px;
+  border: 1px solid var(--color-secondary);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tabla__chat:hover {
+  background: var(--color-accent-light);
+}
+
+.tabla__chat:focus-visible {
+  outline: 3px solid var(--color-secondary);
+  outline-offset: 1px;
+}
+
+.tabla__chat:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
 .tabla__ver {
   padding: 4px 10px;
   border: 1px solid var(--color-secondary);
@@ -1674,6 +1707,27 @@
   color: var(--color-warning-text);
   font-size: 0.83rem;
   font-weight: 600;
+}
+
+/* Filtro por cliente, al llegar desde «Ir al chat» con varios casos. */
+.bandeja__filtro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 10px 16px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--color-secondary);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-light);
+  color: var(--color-text);
+  font-size: 0.83rem;
+  font-weight: 600;
+}
+
+.bandeja__filtro-texto {
+  min-width: 0;
 }
 
 .tarjeta-caso {

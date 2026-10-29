@@ -67,7 +67,8 @@ export type InboxImageRef = { ref: string; phone: string }
 
 export interface InboxRepository {
   // La página ya ordenada: gravedad (sin nivel al final), sin tomar primero, mayor espera e id.
-  listPage(page: PageRequest): Promise<InboxPage>
+  // customerId limita la bandeja a los casos de la conversación identificada con ese cliente.
+  listPage(page: PageRequest, customerId?: number): Promise<InboxPage>
   // null si el caso no existe o no está en la bandeja.
   findConversation(caseId: number): Promise<InboxConversation | null>
   // null si el caso no existe.
