@@ -36,7 +36,7 @@ La cartera de clientes y pólizas es la fuente de verdad. El bot informa, pero n
 ## Brand Commitments
 
 - Nombre: Seguros Castaño. Tono: claro, profesional y natural rioplatense (voseo).
-- Paleta castaño y crema: fija e inamovible (tokens centralizados en `docs/design.md` §1).
+- Paleta bordó y crema: fija e inamovible (tokens centralizados en `docs/design.md` §1).
 - Efectos Liquid Glass sutiles solo en superficies de apoyo; controles, tablas y formularios sólidos para legibilidad.
 - Interfaz en español; prioridad de densidad operativa, lectura rápida, estados visibles y acciones inequívocas sobre decoración.
 

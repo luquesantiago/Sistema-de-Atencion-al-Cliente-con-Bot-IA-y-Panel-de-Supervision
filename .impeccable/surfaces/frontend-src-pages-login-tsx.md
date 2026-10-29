@@ -11,13 +11,13 @@ Panel de ingreso del panel de supervisión de Seguros Castaño. Modo Operate: un
 
 ## Direction contract
 
-THESIS: El ingreso como el único ítem que dueña el viewport: campo castaño a sangre con los orbes de la casa, el formulario anclado abajo-izquierda sobre el scrim, y el riel de glifos al borde derecho. Rechaza la tarjeta de cristal centrada flotando sobre crema.
+THESIS: El ingreso como el único ítem que dueña el viewport: campo bordó a sangre con los orbes de la casa, el formulario anclado abajo-izquierda sobre el scrim, y el riel de glifos al borde derecho. Rechaza la tarjeta de cristal centrada flotando sobre crema.
 
-OWN-WORLD: Suelo castaño profundo a sangre (#38261A→#2B1E16) con los orbes caramelo/castaño de la marca como atmósfera; glifos y tipografía crema (#F7F4EF) como única interfaz; wordmark display grande contra etiquetas tracked diminutas; controles estándar en lenguaje del feed: inputs con hairline crema translúcida, botón primario relleno crema con texto castaño, secundario outline. Paleta y tokens siguen siendo los de docs/design.md.
+OWN-WORLD: Suelo bordó profundo a sangre (#381018→#2B1A1F) con los orbes vino/bordó de la marca como atmósfera; glifos y tipografía crema (#F7F4EF) como única interfaz; wordmark display grande contra etiquetas tracked diminutas; controles estándar en lenguaje del feed: inputs con hairline crema translúcida, botón primario relleno crema con texto bordó, secundario outline. Paleta y tokens siguen siendo los de docs/design.md.
 
 STORY: La operadora abre el panel a diario; la marca dueña la pantalla en el primer vistazo, el formulario se entiende sin instrucciones y se ingresa en segundos. En móvil la composición se mantiene: un solo ítem, viewport completo.
 
-FIRST VIEWPORT: 1440x900. Fondo castaño a sangre + dos orbes difuminados. Abajo a la izquierda: wordmark «Seguros Castaño» en display (~96px, crema) con «PANEL DE ATENCIÓN» en versalitas tracked debajo; a la derecha del wordmark, el scrim carga el formulario (Usuario, Contraseña con toggle de ojo junto al campo —asociado al input por accesibilidad—, «Ingresar al Panel»); bajo el wordmark, la línea de autor (escudo + «Operadores y administración») y la ayuda con credenciales de prueba en texto tenue. Sin riel lateral: el usuario lo retiró por no tener utilidad (28/10/2026).
+FIRST VIEWPORT: 1440x900. Fondo bordó a sangre + dos orbes difuminados. Abajo a la izquierda: wordmark «Seguros Castaño» en display (~96px, crema) con «PANEL DE ATENCIÓN» en versalitas tracked debajo; a la derecha del wordmark, el scrim carga el formulario (Usuario, Contraseña con toggle de ojo junto al campo —asociado al input por accesibilidad—, «Ingresar al Panel»); bajo el wordmark, la línea de autor (escudo + «Operadores y administración») y la ayuda con credenciales de prueba en texto tenue. Sin riel lateral: el usuario lo retiró por no tener utilidad (28/10/2026).
 
 FORM: Superficie de feed vertical a pantalla completa (challenger del catálogo adoptado por el usuario en la ronda 2: pop-culture-shelf-vertical-video-feed-surface); la world solo aporta tipo, paleta, densidad y el movimiento de entrada seco; los controles siguen siendo los del platform. seed: a8445ede59eaf2ab.
 

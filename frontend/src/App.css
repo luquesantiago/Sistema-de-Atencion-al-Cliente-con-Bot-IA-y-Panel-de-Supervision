@@ -58,7 +58,7 @@
   opacity: 0.3;
 }
 
-/* Barra superior móvil: vidrio castaño con botón de menú (design.md §5) */
+/* Barra superior móvil: vidrio bordó con botón de menú (design.md §5) */
 
 .topbar {
   position: sticky;
@@ -103,7 +103,7 @@
   color: var(--color-sidebar-text);
 }
 
-/* Navegación: vidrio castaño; por debajo de escritorio es un panel
+/* Navegación: vidrio bordó; por debajo de escritorio es un panel
    contraíble desde la izquierda (design.md §5). */
 
 .panel__nav {
@@ -123,7 +123,7 @@
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.18),
     inset -1px 0 0 rgba(255, 255, 255, 0.07),
-    0 10px 30px rgba(43, 30, 22, 0.3);
+    0 10px 30px rgba(43, 18, 24, 0.3);
   color: var(--color-sidebar-text);
   transform: translateX(-100%);
   visibility: hidden;
@@ -143,8 +143,8 @@
   background: var(--velo-modal);
 }
 
-/* Marca: insignia caramelo→castaño con escudo, nombre en crema con
-   subrayado caramelo que se desvanece, y subtítulo en versalitas (design.md §5). */
+/* Marca: insignia vino→bordó con escudo, nombre en crema con
+   subrayado vino que se desvanece, y subtítulo en versalitas (design.md §5). */
 
 .marca {
   display: flex;
@@ -193,7 +193,7 @@
   width: 100%;
   height: 2px;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--color-secondary) 0%, rgba(176, 137, 104, 0) 100%);
+  background: linear-gradient(90deg, var(--color-secondary) 0%, rgba(186, 115, 128, 0) 100%);
 }
 
 .marca__rol {
@@ -240,12 +240,12 @@
   color: var(--color-sidebar-text);
 }
 
-/* Ítem activo: pastilla de vidrio crema + barra caramelo (design.md §5) */
+/* Ítem activo: pastilla de vidrio crema + barra vino (design.md §5) */
 
 .nav__item[aria-current='page'] {
   background: linear-gradient(180deg, rgba(247, 244, 239, 0.26), rgba(247, 244, 239, 0.13));
   border-left: 3px solid var(--color-secondary);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 3px 10px rgba(20, 12, 8, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 3px 10px rgba(20, 8, 12, 0.28);
   color: var(--color-sidebar-text);
   font-weight: 600;
 }
@@ -528,7 +528,7 @@
   color: var(--color-text-muted);
 }
 
-/* Panel destacado: superficie de cristal con acento caramelo */
+/* Panel destacado: superficie de cristal con acento vino */
 
 .operativo {
   display: flex;
@@ -775,7 +775,7 @@
   text-align: center;
 }
 
-/* Ingreso: el campo castaño a sangre dueña el viewport; wordmark display
+/* Ingreso: el campo bordó a sangre dueña el viewport; wordmark display
    abajo-izquierda, formulario sobre el scrim y riel de glifos al borde. */
 
 .login {
@@ -788,7 +788,7 @@
   gap: 28px;
   padding: clamp(24px, 5vw, 72px) clamp(20px, 6vw, 96px) clamp(20px, 3.5vw, 40px);
   overflow: hidden;
-  background: linear-gradient(158deg, #4a3525 0%, #38261a 46%, #3a281d 100%);
+  background: linear-gradient(158deg, #4a1922 0%, #381018 46%, #3a141c 100%);
   color: var(--color-sidebar-text);
 }
 
@@ -886,7 +886,7 @@
   padding: 0.625rem 0.9rem;
   border: 1px solid rgba(247, 244, 239, 0.38);
   border-radius: var(--radius-md);
-  background: rgba(43, 30, 22, 0.35);
+  background: rgba(43, 18, 24, 0.35);
   color: var(--color-sidebar-text);
   font: inherit;
   font-size: 1rem;
@@ -1903,7 +1903,7 @@
   width: 100%;
   margin: 0;
   padding: 9px 20px;
-  border-top: 1px solid rgba(43, 30, 22, 0.08);
+  border-top: 1px solid rgba(43, 18, 24, 0.08);
   font-size: 0.83rem;
   font-weight: 600;
 }
@@ -2538,7 +2538,7 @@
 }
 
 /* Formularios de alta y edición (design.md §5): campos sólidos con
-   borde caramelo, foco visible y error junto al campo. */
+   borde vino, foco visible y error junto al campo. */
 
 .formulario {
   display: flex;

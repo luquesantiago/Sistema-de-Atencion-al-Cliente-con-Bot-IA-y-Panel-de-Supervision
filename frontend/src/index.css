@@ -4,16 +4,16 @@
   /* Superficies (design.md §1) */
   --color-bg: #f7f4ef;
   --color-surface: #ffffff;
-  --color-sidebar: rgba(74, 53, 37, 0.92);
+  --color-sidebar: rgba(74, 25, 34, 0.92);
   --color-sidebar-text: #f7f4ef;
 
   /* Acción y acento (design.md §1) */
-  --color-primary: #7f5539;
-  --color-primary-hover: #65422b;
-  --color-secondary: #b08968;
-  --color-accent-light: #ede0d4;
-  --color-text: #2b1e16;
-  --color-text-muted: #7d6b5d;
+  --color-primary: #7a1f2e;
+  --color-primary-hover: #5f1522;
+  --color-secondary: #ba7380;
+  --color-accent-light: #f1dfe2;
+  --color-text: #2b1a1f;
+  --color-text-muted: #7d6268;
 
   /* Estados semánticos (design.md §1) */
   --color-success-bg: #e6f4ea;
@@ -25,9 +25,9 @@
 
   /* Derivados de la paleta para superficies que la guía no nombra */
   --color-danger-hover: #8f1d17;
-  --color-text-faint: #9a8877;
-  --color-surface-alt: #fcfaf7;
-  --color-accent-hover: #e3d3c1;
+  --color-text-faint: #9a858a;
+  --color-surface-alt: #fcf8f8;
+  --color-accent-hover: #e8cdd2;
   --color-success-border: #a9d8bd;
   --color-warning-border: #f3d89a;
   --color-danger-border: #f5c2c2;
@@ -35,14 +35,14 @@
   --nav-hover: rgba(247, 244, 239, 0.22);
   --nav-borde: rgba(247, 244, 239, 0.14);
   --nav-texto: rgba(247, 244, 239, 0.78);
-  --velo-modal: rgba(43, 30, 22, 0.45);
-  --sombra-modal: 0 12px 32px rgba(43, 30, 22, 0.22);
+  --velo-modal: rgba(43, 18, 24, 0.45);
+  --sombra-modal: 0 12px 32px rgba(43, 18, 24, 0.22);
 
   /* Liquid Glass — design.md §2 */
   --glass-fondo: linear-gradient(135deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.55) 100%);
   --glass-borde: rgba(255, 255, 255, 0.75);
   --glass-desenfoque: blur(16px) saturate(150%);
-  --glass-sidebar: linear-gradient(180deg, rgba(92, 66, 46, 0.9) 0%, rgba(74, 53, 37, 0.93) 48%, rgba(56, 38, 26, 0.96) 100%);
+  --glass-sidebar: linear-gradient(180deg, rgba(92, 34, 45, 0.9) 0%, rgba(74, 25, 34, 0.93) 48%, rgba(56, 16, 24, 0.96) 100%);
 
   /* Tipografía (design.md §4): sin fuentes nuevas, solo el fallback acordado */
   --font-sans: 'SoDo Sans', Inter, Manrope, 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -50,7 +50,7 @@
   /* Radios, sombras y layout (design.md §1) */
   --radius-md: 12px;
   --radius-lg: 16px;
-  --shadow-soft: 0 2px 8px rgba(43, 30, 22, 0.08);
+  --shadow-soft: 0 2px 8px rgba(43, 18, 24, 0.08);
   --sidebar-width: 18rem;
 }
 

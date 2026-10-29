@@ -6,6 +6,16 @@ Los endpoints de trámites están preparados para el panel (RF-ATE-05 y RF-CAR-0
 
 Todas las fechas se devuelven en UTC. Los listados aceptan `limit` (por defecto 25, máximo 100) y `offset` (por defecto 0).
 
+### Datos de demo
+
+Para cargar un alta y tres cambios de teléfono pendientes en una base recién migrada:
+
+```sh
+docker compose exec -T db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' < docs/seed_tramites_demo.sql
+```
+
+El script no borra datos y no duplica un trámite pendiente del mismo teléfono.
+
 ### Listar altas de prospectos
 
 `GET /api/tramites/prospectos?limit=25&offset=0`
