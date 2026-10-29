@@ -282,15 +282,18 @@ function ImagenDelMensaje({ idCaso, idMensaje }: { idCaso: number; idMensaje: nu
 }
 
 function MensajeDelHilo({ mensaje, idCaso }: { mensaje: MensajeBandeja; idCaso: number }) {
+  const esCliente = mensaje.origin === 'cliente'
   const origen = mensaje.origin === 'operador' && mensaje.author ? `Operador · ${mensaje.author.name}` : ORIGENES[mensaje.origin]
   return (
-    <li className={`hilo__mensaje hilo__mensaje--${mensaje.origin}${mensaje.inCase ? '' : ' hilo__mensaje--otro-caso'}`}>
-      <p className="hilo__texto">{mensaje.text}</p>
-      {mensaje.hasImage ? <ImagenDelMensaje idCaso={idCaso} idMensaje={mensaje.id} /> : null}
-      <div className="hilo__meta">
-        <span className="hilo__origen">{origen}</span>
-        <span>{fechaHora(mensaje.at)}</span>
-        <span>{mensaje.inCase ? 'Este caso' : `Otro caso (${mensaje.caseId})`}</span>
+    <li className={`mensaje-container ${esCliente ? 'cliente' : 'agente'}${mensaje.inCase ? '' : ' mensaje-container--otro-caso'}`}>
+      <div className="mensaje-bubble">
+        <p className="hilo__texto">{mensaje.text}</p>
+        {mensaje.hasImage ? <ImagenDelMensaje idCaso={idCaso} idMensaje={mensaje.id} /> : null}
+        <div className="hilo__meta">
+          <span className="hilo__origen">{origen}</span>
+          <span>{fechaHora(mensaje.at)}</span>
+          <span>{mensaje.inCase ? 'Este caso' : `Otro caso (${mensaje.caseId})`}</span>
+        </div>
       </div>
     </li>
   )
@@ -329,25 +332,21 @@ function CajaRespuesta({
 
   return (
     <form className="respuesta" onSubmit={alEnviar}>
-      <label className="respuesta__etiqueta" htmlFor={`${id}-texto`}>
-        Responder al cliente
-      </label>
-      <div className="respuesta__fila">
-        <textarea
-          id={`${id}-texto`}
-          className="respuesta__texto"
-          rows={2}
-          maxLength={LARGO_MAXIMO_RESPUESTA}
-          value={borrador}
-          disabled={deshabilitado}
-          placeholder={deOtro ? `Lo tiene ${caso.assignee?.name ?? 'otra persona'}: solo su responsable contesta` : 'Escribí la respuesta…'}
-          onChange={(evento) => onCambiar(evento.target.value)}
-          onKeyDown={alTeclear}
-        />
-        <button type="submit" className="boton boton--primario" disabled={deshabilitado || texto.length === 0}>
-          {ocupado ? 'Enviando…' : 'Enviar'}
-        </button>
-      </div>
+      <textarea
+        id={`${id}-texto`}
+        className="respuesta__texto"
+        rows={1}
+        maxLength={LARGO_MAXIMO_RESPUESTA}
+        value={borrador}
+        disabled={deshabilitado}
+        aria-label="Respuesta al cliente"
+        placeholder={deOtro ? `Lo tiene ${caso.assignee?.name ?? 'otra persona'}: solo su responsable contesta` : 'Escribí una respuesta...'}
+        onChange={(evento) => onCambiar(evento.target.value)}
+        onKeyDown={alTeclear}
+      />
+      <button type="submit" className="boton boton--primario" disabled={deshabilitado || texto.length === 0}>
+        {ocupado ? 'Enviando…' : 'Enviar'}
+      </button>
     </form>
   )
 }
