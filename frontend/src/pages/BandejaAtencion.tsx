@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
-import type { Modulo } from '../navigation'
+import type { DestinoBandeja, Modulo } from '../navigation'
 import EstadoPanel from '../components/EstadoPanel'
 import { IconoAlerta, IconoInfo, IconoPausa, IconoReanudar, IconoReloj } from '../components/iconos'
 import {
@@ -63,6 +63,11 @@ function fechaHora(iso: string): string {
 function nombreDelCaso(caso: CasoBandeja): string {
   if (caso.customer === null) return 'Sin identificar'
   return caso.customer.name ?? 'Cliente sin nombre cargado'
+}
+
+// Actividad del caso, para ordenar los chats de un cliente del más reciente al más viejo.
+function fechaDeActividad(caso: CasoBandeja): number {
+  return caso.lastMessage === null ? 0 : new Date(caso.lastMessage.at).getTime()
 }
 
 function mensajeDeError(error: unknown, textoPorDefecto: string): string {
@@ -449,7 +454,13 @@ function DialogoCierre({
   )
 }
 
-export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
+type PropsBandeja = {
+  modulo: Modulo
+  /** Lo que se abre al llegar desde otra pantalla (por ejemplo, «Ir al chat»). */
+  bandejaInicial?: DestinoBandeja
+}
+
+export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja) {
   const [offset, setOffset] = useState(0)
   const [casos, setCasos] = useState<CasoBandeja[] | null>(null)
   const [total, setTotal] = useState(0)
@@ -457,7 +468,12 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
   const [fallaActualizacion, setFallaActualizacion] = useState(false)
   const [actualizado, setActualizado] = useState<Date | null>(null)
   const [busqueda, setBusqueda] = useState('')
-  const [seleccionado, setSeleccionado] = useState<number | null>(null)
+  const [seleccionado, setSeleccionado] = useState<number | null>(bandejaInicial?.caseId ?? null)
+  const [filtroCliente, setFiltroCliente] = useState<{ id: number; nombre: string | null } | null>(
+    bandejaInicial?.customerId === undefined
+      ? null
+      : { id: bandejaInicial.customerId, nombre: bandejaInicial.clienteNombre ?? null },
+  )
   const [detalle, setDetalle] = useState<DetalleCasoBandeja | null>(null)
   const [errorDetalle, setErrorDetalle] = useState<string | null>(null)
   const [fueraDeBandeja, setFueraDeBandeja] = useState(false)
@@ -484,7 +500,7 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
       const propio = new AbortController()
       controlador = propio
       const [lista, caso] = await Promise.allSettled([
-        listarBandeja({ limit: LIMITE_PAGINA, offset }, propio.signal),
+        listarBandeja({ limit: LIMITE_PAGINA, offset, customerId: filtroCliente?.id }, propio.signal),
         seleccionado === null ? Promise.resolve(null) : obtenerCasoBandeja(seleccionado, propio.signal),
       ])
       if (!activo || propio.signal.aborted) return
@@ -533,7 +549,7 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
       controlador?.abort()
       document.removeEventListener('visibilitychange', alCambiarVisibilidad)
     }
-  }, [offset, seleccionado, reintento])
+  }, [offset, seleccionado, filtroCliente, reintento])
 
   // Después de cada acción se consulta enseguida, sin esperar al sondeo.
   const refrescar = useCallback(() => setReintento((valor) => valor + 1), [])
@@ -556,10 +572,21 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
     setDialogoCierre(false)
   }, [])
 
+  function quitarFiltroCliente() {
+    setFiltroCliente(null)
+    setOffset(0)
+  }
+
   const ahora = actualizado ?? new Date()
   const consulta = normalizarTexto(busqueda)
+  // Con el filtro por cliente, sus chats se muestran del más reciente al más viejo.
+  const casosOrdenados = casos !== null && filtroCliente !== null
+    ? [...casos].sort((a, b) => fechaDeActividad(b) - fechaDeActividad(a))
+    : casos
   const casosFiltrados =
-    casos === null || consulta === '' ? casos : casos.filter((caso) => textoDelCaso(caso).includes(consulta))
+    casosOrdenados === null || consulta === ''
+      ? casosOrdenados
+      : casosOrdenados.filter((caso) => textoDelCaso(caso).includes(consulta))
   const detalleActual = detalle !== null && detalle.case.caseId === seleccionado ? detalle : null
   const casoDeLista = seleccionado === null ? null : casos?.find((caso) => caso.caseId === seleccionado) ?? null
   const casoDelDetalle = detalleActual?.case ?? casoDeLista
@@ -659,6 +686,21 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
       )
     }
     if (casos.length === 0) {
+      if (filtroCliente !== null) {
+        return (
+          <div className="bandeja__estado">
+            <EstadoPanel
+              titulo="Este cliente no tiene chats abiertos"
+              descripcion="Cuando el asistente derive una consulta del cliente o quede algo pendiente de aprobación, el caso aparece acá."
+              acciones={
+                <button type="button" className="boton" onClick={quitarFiltroCliente}>
+                  Ver toda la bandeja
+                </button>
+              }
+            />
+          </div>
+        )
+      }
       return (
         <div className="bandeja__estado">
           <EstadoPanel
@@ -885,6 +927,17 @@ export default function BandejaAtencion({ modulo }: { modulo: Modulo }) {
             />
           </div>
         </header>
+
+        {filtroCliente !== null ? (
+          <div className="bandeja__filtro" role="status">
+            <span className="bandeja__filtro-texto">
+              Mostrando los chats de {filtroCliente.nombre ?? 'este cliente'}
+            </span>
+            <button type="button" className="boton" onClick={quitarFiltroCliente}>
+              Ver toda la bandeja
+            </button>
+          </div>
+        ) : null}
 
         {fallaActualizacion && casos !== null ? (
           <p className="bandeja__aviso" role="status">
