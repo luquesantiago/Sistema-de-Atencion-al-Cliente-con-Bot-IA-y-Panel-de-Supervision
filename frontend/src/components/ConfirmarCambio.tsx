@@ -1,4 +1,5 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
+import Dialogo from './Dialogo'
 
 // Una línea del resumen: el campo con su valor actual y el nuevo.
 export type LineaConfirmacion = {
@@ -19,6 +20,8 @@ interface ConfirmarCambioProps {
   /** Mientras la petición está en vuelco se bloquean los botones. */
   ocupado?: boolean
   error?: string | null
+  /** Se usa cuando la confirmación se abre encima de otro diálogo. */
+  superpuesto?: boolean
   onConfirmar: () => void
   onCancelar: () => void
 }
@@ -36,76 +39,70 @@ export default function ConfirmarCambio({
   peligro = false,
   ocupado = false,
   error = null,
+  superpuesto = false,
   onConfirmar,
   onCancelar,
 }: ConfirmarCambioProps) {
-  const panelRef = useRef<HTMLDivElement>(null)
-  const cancelarRef = useRef<HTMLButtonElement>(null)
+  const errorRef = useRef<HTMLParagraphElement>(null)
+  const descripcionId = useId()
+  const errorId = useId()
+  const descritoPor = [descripcion !== undefined ? descripcionId : null, error !== null ? errorId : null]
+    .filter((id): id is string => id !== null)
+    .join(' ')
 
   useEffect(() => {
-    cancelarRef.current?.focus()
-  }, [])
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape' && !ocupado) onCancelar()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [ocupado, onCancelar])
+    if (error !== null) errorRef.current?.focus()
+  }, [error])
 
   return (
-    <div
-      className="modal__atras"
-      onMouseDown={(evento) => {
-        if (evento.target === evento.currentTarget && !ocupado) onCancelar()
-      }}
+    <Dialogo
+      tituloId="confirmar-titulo"
+      descritoPor={descritoPor || undefined}
+      onCerrar={onCancelar}
+      bloqueado={ocupado}
+      superpuesto={superpuesto}
     >
-      <div
-        className="modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="confirmar-titulo"
-        ref={panelRef}
-      >
-        <h2 className="modal__titulo" id="confirmar-titulo">
-          {titulo}
-        </h2>
-        {descripcion !== undefined ? <p className="modal__descripcion">{descripcion}</p> : null}
+      <h2 className="modal__titulo" id="confirmar-titulo">
+        {titulo}
+      </h2>
+      {descripcion !== undefined ? (
+        <p className="modal__descripcion" id={descripcionId}>
+          {descripcion}
+        </p>
+      ) : null}
 
-        <dl className="modal__resumen">
-          {lineas.map((linea) => (
-            <div className="modal__linea" key={linea.etiqueta}>
-              <dt>{linea.etiqueta}</dt>
-              <dd>
-                <span className="modal__antes">{linea.antes}</span>
-                <span aria-hidden="true"> → </span>
-                <span className="modal__despues">{linea.despues}</span>
-              </dd>
-            </div>
-          ))}
-        </dl>
+      <dl className="modal__resumen">
+        {lineas.map((linea) => (
+          <div className="modal__linea" key={linea.etiqueta}>
+            <dt>{linea.etiqueta}</dt>
+            <dd>
+              <span className="modal__antes">{linea.antes}</span>
+              <span aria-hidden="true"> → </span>
+              <span className="modal__despues">{linea.despues}</span>
+            </dd>
+          </div>
+        ))}
+      </dl>
 
-        {error !== null ? (
-          <p className="modal__error" role="alert">
-            {error}
-          </p>
-        ) : null}
+      {error !== null ? (
+        <p className="modal__error" id={errorId} role="alert" tabIndex={-1} ref={errorRef}>
+          {error}
+        </p>
+      ) : null}
 
-        <div className="modal__acciones">
-          <button type="button" className="boton" onClick={onCancelar} disabled={ocupado} ref={cancelarRef}>
-            Cancelar
-          </button>
-          <button
-            type="button"
-            className={`boton ${peligro ? 'boton--peligro' : 'boton--primario'}`}
-            onClick={onConfirmar}
-            disabled={ocupado}
-          >
-            {ocupado ? 'Aplicando…' : etiquetaConfirmar}
-          </button>
-        </div>
+      <div className="modal__acciones">
+        <button type="button" className="boton" onClick={onCancelar} disabled={ocupado}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className={`boton ${peligro ? 'boton--peligro' : 'boton--primario'}`}
+          onClick={onConfirmar}
+          disabled={ocupado}
+        >
+          {ocupado ? 'Aplicando…' : etiquetaConfirmar}
+        </button>
       </div>
-    </div>
+    </Dialogo>
   )
 }

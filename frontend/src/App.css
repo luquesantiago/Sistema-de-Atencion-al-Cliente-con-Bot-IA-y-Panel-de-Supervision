@@ -1301,11 +1301,13 @@
 .tabla__nombre {
   font-weight: 600;
   color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
 .tabla__telefonos {
   color: var(--color-text-muted);
   font-size: 0.875rem;
+  overflow-wrap: anywhere;
 }
 
 /* Una línea por póliza en la lista: número, tipo y estado */
@@ -1464,6 +1466,17 @@
   font-weight: 600;
 }
 
+.detalle-panel__error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.detalle-panel__error .detalle-panel__aviso {
+  margin: 0;
+}
+
 .detalle-panel__datos {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -1480,6 +1493,7 @@
 .detalle-panel__datos dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .detalle-panel__telefonos {
@@ -2383,6 +2397,29 @@
   gap: 2px;
 }
 
+/* Aviso de «Ir al chat»: informativo o de riesgo, siempre con texto. */
+
+.cartera__aviso {
+  margin-bottom: 12px;
+  padding: 9px 13px;
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-md);
+  font-size: 0.87rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.cartera__aviso--info {
+  background: var(--color-accent-light);
+  color: var(--color-text);
+}
+
+.cartera__aviso--riesgo {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-text);
+}
+
 /* Aviso de éxito de una edición, con texto (nunca solo color) */
 
 .aviso-exito {
@@ -2426,30 +2463,24 @@
 }
 
 /* Modales: fondo velado y panel sólido centrado (design.md §2 «Dónde NO»).
-   El de confirmación se superpone a los formularios con .modal-superpuesto. */
+   Quedan por encima del topbar y del panel de navegación móvil; la
+   confirmación se superpone a los formularios con .modal__atras--superpuesto. */
 
 .modal__atras {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 70;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
   background: var(--velo-modal);
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
-.modal-superpuesto {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  pointer-events: none;
-}
-
-.modal-superpuesto .modal__atras {
-  z-index: 50;
-  pointer-events: auto;
+.modal__atras--superpuesto {
+  z-index: 80;
 }
 
 .modal {
@@ -2457,11 +2488,13 @@
   max-width: 460px;
   max-height: calc(100svh - 32px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px;
   background: var(--color-surface);
   border: 1px solid var(--color-accent-light);
   border-radius: var(--radius-lg);
   box-shadow: var(--sombra-modal);
+  overflow-wrap: anywhere;
 }
 
 .modal--ancho {
@@ -2507,6 +2540,7 @@
 
 .modal__linea dd {
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .modal__antes {
