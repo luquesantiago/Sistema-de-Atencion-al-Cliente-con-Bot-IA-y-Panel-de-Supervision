@@ -1,5 +1,5 @@
 // Intenciones que el modelo puede elegir: los valores del catálogo tipo_consulta
-// (migraciones 20260928140100, 20260929204929 y 20261007235643), más tres que no son
+// (migraciones 20260928140100, 20260929204929 y 20261007235643), más cuatro que no son
 // tipos de consulta.
 export const intents = [
   'saldo',
@@ -15,6 +15,8 @@ export const intents = [
   'cambio de teléfono',
   'información de la agencia',
   'no es de seguros',
+  // Quiere ser cliente o contratar un seguro: arranca el alta, que antes empezaba sola.
+  'contratar',
   // Se entiende, pero el asistente no lo responde: se deriva.
   'otra consulta',
   // No se entiende ni con los mensajes anteriores: se repregunta.
@@ -32,6 +34,8 @@ export type IntentAction =
   | { kind: 'clarify' }
   // Contesta, con un texto fijo, que no tiene que ver con la agencia.
   | { kind: 'unrelated' }
+  // Pide ser cliente: arranca el alta, que solo empieza cuando la persona lo pide.
+  | { kind: 'register' }
 
 export function isIntent(value: unknown): value is Intent {
   return typeof value === 'string' && intents.some((intent) => intent === value)
@@ -49,6 +53,8 @@ export function actionForIntent(intent: Intent): IntentAction {
       return { kind: 'answer', template: 'balance' }
     case 'saludo':
       return { kind: 'answer', template: 'courtesy' }
+    case 'contratar':
+      return { kind: 'register' }
     case 'información de la agencia':
       return { kind: 'answer', template: 'agency' }
     case 'baja':

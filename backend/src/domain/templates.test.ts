@@ -3,11 +3,15 @@ import type { Customer } from './customer.js'
 import {
   approvalNotice,
   argentinaToday,
-  clarificationRequest,
+  clarificationRequests,
+  courtesyTemplate,
   expirationsTemplate,
   handoffMessage,
+  newCustomerNoDataNotice,
+  newCustomerQueryOffer,
   notInsuranceMessage,
   statusesTemplate,
+  welcomeMessage,
 } from './templates.js'
 
 // 04/10/2026 a las 23:30 en Argentina: en UTC ya es el 05/10.
@@ -80,7 +84,28 @@ describe('textos fijos', () => {
   })
 
   it('la repregunta no lista datos de las pólizas', () => {
-    expect(clarificationRequest).not.toMatch(/\d|POL-/)
-    expect(clarificationRequest).not.toMatch(/\b(auto|moto|vida|hogar|embarcaciones|comercio)\b/)
+    for (const text of clarificationRequests) {
+      expect(text).not.toMatch(/\d|POL-/)
+      expect(text).not.toMatch(/\b(auto|moto|vida|hogar|embarcaciones|comercio)\b/)
+    }
+  })
+})
+
+describe('bienvenida y cortesía', () => {
+  it('saludan con «Hola» y el nombre del cliente', () => {
+    expect(welcomeMessage(customer)).toBe('Hola, Ana. ¿En qué lo puedo ayudar?')
+    expect(courtesyTemplate(customer)).toBe('Hola, Ana. ¿En qué lo puedo ayudar?')
+  })
+})
+
+describe('oferta de consulta al cliente nuevo', () => {
+  it('ofrece resolver consultas o dar datos de la empresa, y pide contratar para el alta', () => {
+    expect(newCustomerQueryOffer).toContain('consulta')
+    expect(newCustomerQueryOffer).toContain('contratar')
+  })
+
+  it('al que todavía no es cliente le avisa que no tiene pólizas ni datos', () => {
+    expect(newCustomerNoDataNotice).toContain('no tiene pólizas ni datos')
+    expect(newCustomerNoDataNotice).not.toMatch(/\d|POL-/)
   })
 })

@@ -87,6 +87,16 @@ describe('classifyIntent', () => {
     expect(intentInstructions).toContain('dudás entre opciones, elegí «otra consulta»')
   })
 
+  it('describe «contratar» como quien quiere ser cliente o iniciar el alta', async () => {
+    const requests: RecordedRequest[] = []
+    await clientWith(fakeFetch(200, completion({ intencion: 'contratar' }), requests)).classifyIntent('quiero contratar', [])
+    const body = requests[0]?.body as { response_format: { json_schema: { schema: { properties: { intencion: { enum: string[] } } } } } }
+    expect(body.response_format.json_schema.schema.properties.intencion.enum).toContain('contratar')
+    const line = intentInstructions.split('\n').find((item) => item.startsWith('- contratar:')) ?? ''
+    expect(line).toContain('quiere ser cliente o contratar un seguro')
+    expect(line).toContain('iniciar el alta')
+  })
+
   it('tiene «información de la agencia» y le da prioridad a lo que se deriva', async () => {
     const requests: RecordedRequest[] = []
     await clientWith(fakeFetch(200, completion({ intencion: 'información de la agencia' }), requests)).classifyIntent('¿dónde están?', [])

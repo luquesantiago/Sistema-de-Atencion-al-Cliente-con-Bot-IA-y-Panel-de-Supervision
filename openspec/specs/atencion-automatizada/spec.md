@@ -59,7 +59,7 @@ El sistema MUST rechazar todo aviso de mensaje entrante que no traiga el secreto
 
 ### Requirement: La acción sale de la intención
 
-El sistema SHALL hacer con cada mensaje de un cliente identificado una sola de estas cosas, según la intención que el proveedor de IA elige de una lista cerrada: responder, contestar con un texto fijo que la consulta no tiene que ver con la agencia, repreguntar, derivar o mandar a aprobar (RF-ATE-01). La lista tiene los tipos de consulta de la agencia, incluida «información de la agencia», más «no es de seguros», «otra consulta» y «no se entiende», y la acción la decide el sistema según esa intención, no el texto que genere el modelo. El asistente contesta lo que no implica riesgo, deriva lo que se entiende pero no puede responder, repregunta lo que no entiende y, a lo que no es una consulta para la agencia, le contesta con un texto fijo que no tiene que ver con Seguros Castaño.
+El sistema SHALL hacer con cada mensaje de un cliente identificado una sola de estas cosas, según la intención que el proveedor de IA elige de una lista cerrada: responder, contestar con un texto fijo que la consulta no tiene que ver con la agencia, repreguntar, derivar o mandar a aprobar (RF-ATE-01). La lista tiene los tipos de consulta de la agencia, incluida «información de la agencia», más «no es de seguros», «otra consulta», «no se entiende» y «contratar»; «contratar» no es un tipo de consulta de la base y existe solo en el código, y con un cliente identificado deriva, porque ya es cliente y no hay alta que hacer. La acción la decide el sistema según esa intención, no el texto que genere el modelo. El asistente contesta lo que no implica riesgo, deriva lo que se entiende pero no puede responder, repregunta lo que no entiende y, a lo que no es una consulta para la agencia, le contesta con un texto fijo que no tiene que ver con Seguros Castaño.
 
 #### Scenario: Consulta de vencimiento o de estado
 - **WHEN** la intención elegida es vencimiento o estado de póliza
@@ -80,6 +80,10 @@ El sistema SHALL hacer con cada mensaje de un cliente identificado una sola de e
 #### Scenario: Pedido de cambio de teléfono
 - **WHEN** la intención elegida es cambio de teléfono
 - **THEN** el asistente le pide, sin pedirle una redacción al proveedor de IA, que escriba desde el número nuevo, no cambia ningún dato y sigue atendiendo en esa conversación
+
+#### Scenario: Un cliente identificado pide contratar
+- **WHEN** un cliente identificado escribe que quiere contratar un seguro, por ejemplo «quiero contratar» o «quiero un seguro»
+- **THEN** el asistente le manda el mensaje de derivación y deja de responder en esa conversación, porque ya es cliente y no hay alta que hacer
 
 #### Scenario: Mensaje que no es de seguros
 - **WHEN** la intención elegida es «no es de seguros»
@@ -315,7 +319,19 @@ El sistema SHALL volver a preguntar si la persona ya es cliente o si es nueva ca
 
 #### Scenario: Es cliente nuevo
 - **WHEN** a la pregunta de si ya es cliente o es nuevo la persona contesta que es nueva
+- **THEN** el asistente no le pide todavía ningún dato: le ofrece resolver consultas sobre los servicios o darle un dato de la empresa, y le avisa que, si quiere contratar un seguro, debe indicarlo para que se le pidan los datos del alta
+
+#### Scenario: El cliente nuevo pide contratar
+- **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, escribe que quiere contratar un seguro
 - **THEN** el asistente le pide su nombre y apellido, después su DNI y después una foto del DNI
+
+#### Scenario: El cliente nuevo consulta algo de la empresa
+- **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, pide información de la agencia (ramos, planes, dirección, teléfono u horario)
+- **THEN** el asistente le responde esa información y vuelve a ofrecerle resolver consultas o contratar, sin avanzar en el alta
+
+#### Scenario: El cliente nuevo consulta algo que necesita ser cliente
+- **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, pregunta por un dato que solo un cliente identificado tiene (por ejemplo, cuánto debe)
+- **THEN** el asistente le avisa que, como todavía no es cliente, no tiene pólizas ni datos registrados, y vuelve a preguntarle si ya es cliente o es nuevo
 
 #### Scenario: Base sin la cartera migrada
 - **WHEN** la base no tiene cargada la planilla histórica y una persona escribe su DNI
@@ -343,10 +359,10 @@ El sistema SHALL dar por terminada la conversación de un número cuando ese nú
 
 ### Requirement: El cliente nuevo queda como prospecto
 
-El sistema SHALL registrar como prospecto pendiente de confirmación a la persona que dice ser cliente nueva, con el nombre y el DNI que declaró, después de recibir la foto de su DNI, sin guardar una copia de la foto ni darla de alta como cliente: el alta la confirma un operador, que puede ver la foto desde el panel obtenida de WhatsApp en el momento; si el operador rechaza el alta, el caso queda abierto y en silencio, a su cargo, para que le explique el rechazo al cliente antes de cerrarlo (RF-ATE-05).
+El sistema SHALL registrar como prospecto pendiente de confirmación a la persona que dice ser cliente nueva y pide contratar un seguro, con el nombre y el DNI que declaró, después de recibir la foto de su DNI, sin guardar una copia de la foto ni darla de alta como cliente: el alta la confirma un operador, que puede ver la foto desde el panel obtenida de WhatsApp en el momento; si el operador rechaza el alta, el caso queda abierto y en silencio, a su cargo, para que le explique el rechazo al cliente antes de cerrarlo (RF-ATE-05).
 
 #### Scenario: Prospecto registrado
-- **WHEN** la persona que dijo ser nueva escribe su nombre y apellido, después un DNI que no es de ningún cliente y después manda una foto
+- **WHEN** la persona que dijo ser nueva pidió contratar un seguro, escribe su nombre y apellido, después un DNI que no es de ningún cliente y después manda una foto
 - **THEN** queda un prospecto en estado pendiente, en un caso derivado de la conversación abierta, con el nombre como nombre declarado y ese DNI como DNI declarado; el mensaje de la foto guarda la referencia al mensaje de WhatsApp, sin la imagen; el asistente le avisa que un miembro autorizado del equipo va a revisar la solicitud, sin prometer tiempos, y deja de responder en esa conversación; no se crea ningún cliente
 
 #### Scenario: Mensaje sin DNI cuando se espera el DNI del cliente nuevo
@@ -379,7 +395,7 @@ El sistema SHALL registrar como prospecto pendiente de confirmación a la person
 
 ### Requirement: Información de la agencia en cualquier momento
 
-El sistema SHALL responder la consulta de información de la agencia con los ramos y los planes activos, la dirección, el teléfono y el horario de atención registrados en el sistema, sin datos de ningún cliente, en cualquier momento de la conversación: con el cliente identificado y también antes de identificarse, en el primer mensaje, mientras espera la respuesta a si ya es cliente o es nuevo y mientras espera el DNI, salvo mientras toma los datos de un cliente nuevo o mientras la conversación está en silencio después de una derivación (RF-ATE-06).
+El sistema SHALL responder la consulta de información de la agencia con los ramos y los planes activos, la dirección, el teléfono y el horario de atención registrados en el sistema, sin datos de ningún cliente, en cualquier momento de la conversación: con el cliente identificado y también antes de identificarse, en el primer mensaje, mientras espera la respuesta a si ya es cliente o es nuevo, mientras espera el DNI y mientras le ofrece la consulta a un cliente nuevo que todavía no pidió contratar, salvo mientras toma los datos del alta (nombre, DNI o foto) o mientras la conversación está en silencio después de una derivación (RF-ATE-06).
 
 #### Scenario: Número no vinculado antes de identificarse
 - **WHEN** desde un número no vinculado la persona escribe como primer mensaje «¿qué seguros tienen?»
@@ -401,9 +417,13 @@ El sistema SHALL responder la consulta de información de la agencia con los ram
 - **WHEN** un cliente identificado pregunta dónde están o a qué hora atienden
 - **THEN** el asistente le responde con la información de la agencia, con la dirección, el teléfono y el horario de atención, sin derivar, y el caso de esa consulta queda con el tipo «información de la agencia»
 
-#### Scenario: Mientras toma los datos de un cliente nuevo
-- **WHEN** el asistente le pidió a un cliente nuevo su nombre y apellido, su DNI o la foto del DNI, y la persona escribe una pregunta sobre la agencia
-- **THEN** el mensaje sigue el flujo del cliente nuevo, como cualquier otro texto en esa etapa, y no se responde como información de la agencia
+#### Scenario: Mientras le ofrece la consulta a un cliente nuevo
+- **WHEN** el asistente le ofreció a un cliente nuevo resolver consultas o darle datos de la empresa y todavía no pidió contratar, y la persona escribe una pregunta sobre la agencia
+- **THEN** el asistente le responde con la información de la agencia y en el mismo turno vuelve a ofrecerle resolver consultas o contratar, sin avanzar en el alta
+
+#### Scenario: Mientras toma los datos del alta de un cliente nuevo
+- **WHEN** el asistente le pidió a un cliente nuevo que pidió contratar su nombre y apellido, su DNI o la foto del DNI, y la persona escribe una pregunta sobre la agencia
+- **THEN** el mensaje sigue el flujo del alta, como cualquier otro texto en esa etapa, y no se responde como información de la agencia
 
 #### Scenario: Conversación en silencio
 - **WHEN** la conversación está en silencio porque tiene un caso derivado sin cerrar y la persona pregunta qué seguros tienen

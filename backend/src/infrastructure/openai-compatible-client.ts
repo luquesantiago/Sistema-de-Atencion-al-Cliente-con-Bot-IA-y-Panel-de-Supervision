@@ -27,6 +27,8 @@ const intentDescriptions: Record<Intent, string> = {
   modificación: 'cambiar algo de una póliza, incluido agregar o sacar un conductor',
   reclamo: 'una queja, un cobro indebido o un pedido de reembolso',
   saludo: 'solo un saludo, un agradecimiento o una despedida, sin otra consulta',
+  contratar:
+    'quiere ser cliente o contratar un seguro, o pide iniciar el alta (por ejemplo, «quiero contratar», «me quiero dar de alta», «quiero un seguro»)',
   'cambio de teléfono': 'registrar o cambiar su número de teléfono de contacto',
   'información de la agencia':
     'qué tipos de seguro o qué planes ofrece la agencia, o dónde está (su dirección), su teléfono o su horario de atención',
