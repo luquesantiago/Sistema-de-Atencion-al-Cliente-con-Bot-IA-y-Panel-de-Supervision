@@ -128,10 +128,11 @@ function prioridadDelCaso(caso: CasoBandeja): { prioridad: Prioridad; texto: str
 function BadgePrioridad({ caso }: { caso: CasoBandeja }) {
   const { prioridad, texto } = prioridadDelCaso(caso)
   const { clase, Icono } = BADGES_PRIORIDAD[prioridad]
+  const textoVisible = caso.handedOff ? texto : 'Resuelto'
   return (
     <span className={clase}>
       <Icono className="badge-prioridad__icono" />
-      {texto}
+      {textoVisible}
     </span>
   )
 }
@@ -175,6 +176,9 @@ function detalleAlerta(caso: CasoBandeja): string {
 
 // El banner muestra solo el mensaje dinámico; el color sale de la prioridad.
 function mensajeAlerta(caso: CasoBandeja, alertas: AlertaBandeja[]): { clase: string; texto: string } {
+  if (!caso.handedOff) {
+    return { clase: BANNERS_ALERTA.bajo, texto: 'Seguimiento: Sin seguimiento requerido' }
+  }
   const { prioridad } = prioridadDelCaso(caso)
   const prefijo = prioridad === 'critico' ? 'Atención' : prioridad === 'medio' ? 'Revisión' : 'Seguimiento'
   const pendientes =
@@ -468,6 +472,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
   const [fallaActualizacion, setFallaActualizacion] = useState(false)
   const [actualizado, setActualizado] = useState<Date | null>(null)
   const [busqueda, setBusqueda] = useState('')
+  const [filtroPestana, setFiltroPestana] = useState<'todos' | 'derivados'>('todos')
   const [seleccionado, setSeleccionado] = useState<number | null>(bandejaInicial?.caseId ?? null)
   const [filtroCliente, setFiltroCliente] = useState<{ id: number; nombre: string | null } | null>(
     bandejaInicial?.customerId === undefined
@@ -583,10 +588,11 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
   const casosOrdenados = casos !== null && filtroCliente !== null
     ? [...casos].sort((a, b) => fechaDeActividad(b) - fechaDeActividad(a))
     : casos
-  const casosFiltrados =
-    casosOrdenados === null || consulta === ''
-      ? casosOrdenados
-      : casosOrdenados.filter((caso) => textoDelCaso(caso).includes(consulta))
+  const casosFiltrados = casosOrdenados?.filter((caso) => {
+    const cumplePestana = filtroPestana === 'todos' || caso.handedOff === true
+    const cumpleBusqueda = consulta === '' || textoDelCaso(caso).includes(consulta)
+    return cumplePestana && cumpleBusqueda
+  }) ?? null
   const detalleActual = detalle !== null && detalle.case.caseId === seleccionado ? detalle : null
   const casoDeLista = seleccionado === null ? null : casos?.find((caso) => caso.caseId === seleccionado) ?? null
   const casoDelDetalle = detalleActual?.case ?? casoDeLista
@@ -842,7 +848,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
               <h2 className="conversacion__nombre">{caso ? nombreDelCaso(caso) : `Caso ${seleccionado}`}</h2>
               {caso ? <p className="conversacion__sub">{subtituloDelCaso(caso)}</p> : null}
             </div>
-            {caso && !fueraDeBandeja ? accionesDelCaso(caso) : null}
+            {caso && caso.handedOff && !fueraDeBandeja ? accionesDelCaso(caso) : null}
           </div>
 
           {alerta ? (
@@ -925,6 +931,26 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
               value={busqueda}
               onChange={(evento) => setBusqueda(evento.target.value)}
             />
+          </div>
+          <div className="bandeja__pestanas" role="tablist" aria-label="Filtros de conversaciones">
+            <button
+              type="button"
+              className="bandeja__pestana"
+              role="tab"
+              aria-selected={filtroPestana === 'todos'}
+              onClick={() => setFiltroPestana('todos')}
+            >
+              Todos
+            </button>
+            <button
+              type="button"
+              className="bandeja__pestana"
+              role="tab"
+              aria-selected={filtroPestana === 'derivados'}
+              onClick={() => setFiltroPestana('derivados')}
+            >
+              Derivados
+            </button>
           </div>
         </header>
 
