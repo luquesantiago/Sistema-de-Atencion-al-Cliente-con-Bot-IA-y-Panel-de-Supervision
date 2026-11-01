@@ -17,6 +17,12 @@ export const intents = [
   'no es de seguros',
   // Quiere ser cliente o contratar un seguro: arranca el alta, que antes empezaba sola.
   'contratar',
+  // Consulta sus datos registrados (nombre, DNI o teléfonos vinculados): no es un pedido
+  // de cambio de teléfono, que sigue siendo la opción de arriba.
+  'mis datos',
+  // Consulta el listado de sus pólizas: qué pólizas tiene a su nombre. No es el estado,
+  // el vencimiento ni el saldo de una póliza, que siguen siendo opciones propias.
+  'mis pólizas',
   // Se entiende, pero el asistente no lo responde: se deriva.
   'otra consulta',
   // No se entiende ni con los mensajes anteriores: se repregunta.
@@ -36,6 +42,10 @@ export type IntentAction =
   | { kind: 'unrelated' }
   // Pide ser cliente: arranca el alta, que solo empieza cuando la persona lo pide.
   | { kind: 'register' }
+  // Consulta sus datos registrados: se le muestran si está identificado.
+  | { kind: 'my-data' }
+  // Consulta el listado de sus pólizas: se lo muestra si está identificado.
+  | { kind: 'my-policies' }
 
 export function isIntent(value: unknown): value is Intent {
   return typeof value === 'string' && intents.some((intent) => intent === value)
@@ -55,6 +65,10 @@ export function actionForIntent(intent: Intent): IntentAction {
       return { kind: 'answer', template: 'courtesy' }
     case 'contratar':
       return { kind: 'register' }
+    case 'mis datos':
+      return { kind: 'my-data' }
+    case 'mis pólizas':
+      return { kind: 'my-policies' }
     case 'información de la agencia':
       return { kind: 'answer', template: 'agency' }
     case 'baja':

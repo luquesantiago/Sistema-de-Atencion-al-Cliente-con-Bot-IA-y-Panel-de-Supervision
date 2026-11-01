@@ -37,6 +37,44 @@ export const newCustomerQueryOffer =
 export const newCustomerNoDataNotice =
   'Como todavía no es cliente de Seguros Castaño, no tiene pólizas ni datos registrados en la empresa.'
 
+// La misma consulta por sus datos, con la oferta vuelta a mandar en el mismo mensaje.
+export const newCustomerNoDataAndOffer =
+  `${newCustomerNoDataNotice} ¿Tiene alguna consulta sobre nuestros servicios o necesita algún dato de la empresa? ` +
+  'Si quiere contratar un seguro, indíquemelo y le pido los datos para iniciar el alta.'
+
+// Aviso a quien pregunta por sus datos o sus teléfonos sin haberse identificado todavía.
+export const notIdentifiedDataNotice = 'Todavía no se identificó, por lo que no le puedo mostrar sus datos.'
+
+// El mismo aviso, para la consulta por el listado de sus pólizas.
+export const notIdentifiedPoliciesNotice = 'Todavía no se identificó, por lo que no le puedo mostrar sus pólizas.'
+
+// Cliente identificado sin ninguna póliza en la cartera: no hay listado que mostrar.
+export const noPoliciesMessage = 'No tiene pólizas registradas en la empresa.'
+
+// El listado de pólizas del cliente identificado, una línea por póliza con su número, su
+// ramo, su estado y su vencimiento. Como los datos personales, no pasa por la redacción
+// del proveedor de IA: son datos de la cartera y tienen que salir tal cual.
+export function customerPoliciesTemplate(customer: Customer, now: Date): string {
+  if (customer.policies.length === 0) return noPoliciesMessage
+  const lines = customer.policies.map((policy) => {
+    const verb = isExpired(policy, now) ? 'venció' : 'vence'
+    return `- ${policy.number} (${policy.ramo}): ${displayStatus(policy, now)}, ${verb} el ${displayDate(policy.expirationDate)}.`
+  })
+  return ['Sus pólizas:', ...lines].join('\n')
+}
+
+// Los datos registrados del cliente identificado, una línea por dato. No pasan por la
+// redacción del proveedor de IA: son datos personales y tienen que salir tal cual.
+export function customerDataTemplate(customer: Customer, phones: string[]): string {
+  const phoneLines = phones.length > 0 ? ['Teléfonos vinculados:', ...phones] : ['Teléfonos vinculados: ninguno']
+  return [
+    'Sus datos registrados:',
+    `Nombre y apellido: ${customer.firstName} ${customer.lastName}`,
+    `DNI: ${customer.dni}`,
+    ...phoneLines,
+  ].join('\n')
+}
+
 export const customerStatusRetryQuestion =
   'Disculpe, no pude identificar si ya es cliente o si sería un cliente nuevo. ¿Podría confirmármelo?'
 

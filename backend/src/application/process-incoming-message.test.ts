@@ -14,10 +14,14 @@ import {
   firstDniRequest,
   handoffMessage,
   newCustomerNameRequest,
+  newCustomerNoDataAndOffer,
   newCustomerNoDataNotice,
   newCustomerPhotoRequest,
   newCustomerPhotoRetryRequest,
   newCustomerQueryOffer,
+  noPoliciesMessage,
+  notIdentifiedDataNotice,
+  notIdentifiedPoliciesNotice,
   notInsuranceAndNewCustomerOffer,
   notInsuranceMessage,
   phoneChangePendingMessage,
@@ -402,6 +406,85 @@ describe('cambio de teléfono (RF-CAR-05)', () => {
   })
 })
 
+describe('datos del cliente', () => {
+  it('la consulta por los teléfonos vinculados muestra los datos, sin derivar ni pedir el cambio de teléfono', async () => {
+    customers.addPhoneLink(ana.id, 1, phone)
+    ai.intents.set('¿qué números tengo vinculados?', 'mis datos')
+    await expect(send('¿qué números tengo vinculados?')).resolves.toMatchObject({ status: 'CUSTOMER_DATA_SENT', intent: 'mis datos' })
+    expect(whatsapp.textsTo(phone)).toEqual([
+      `Sus datos registrados:\nNombre y apellido: ${ana.firstName} ${ana.lastName}\nDNI: ${ana.dni}\nTeléfonos vinculados:\n${phone}`,
+    ])
+    expect(ai.rewritten).toEqual([])
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
+  })
+
+  it('los datos sin teléfonos registrados los anuncia como ninguno', async () => {
+    link(phone, ana)
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await expect(send('¿qué datos tengo?')).resolves.toMatchObject({ status: 'CUSTOMER_DATA_SENT' })
+    expect(lastText()).toContain('Teléfonos vinculados: ninguno')
+    expect(lastText()).toContain(`DNI: ${ana.dni}`)
+  })
+
+  it('antes de identificarse, pedir los datos avisa que no se identificó y sigue con la pregunta pendiente en el mismo mensaje', async () => {
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await expect(send('¿qué datos tengo?')).resolves.toMatchObject({ status: 'IDENTIFICATION_REQUIRED' })
+    expect(lastText()).toBe(`${notIdentifiedDataNotice} ${customerStatusQuestion}`)
+    expect((await openConversation()).suspended).toBe(false)
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
+  })
+
+  it('mientras espera el DNI de un número con varios vinculados, avisa que no se identificó y vuelve a pedir el DNI', async () => {
+    link(phone, ana, bruno)
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await expect(send('¿qué datos tengo?')).resolves.toMatchObject({ status: 'IDENTIFICATION_REQUIRED' })
+    expect(lastText()).toBe(`${notIdentifiedDataNotice} ${repeatedDniRequest}`)
+    ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
+    await expect(send('ya soy cliente')).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'WELCOME_SENT' })
+  })
+})
+
+describe('pólizas del cliente', () => {
+  it('la consulta por sus pólizas muestra el listado con número, ramo, estado y vencimiento, sin derivar', async () => {
+    link(phone, ana)
+    ai.intents.set('¿cuáles son mis pólizas?', 'mis pólizas')
+    await expect(send('¿cuáles son mis pólizas?')).resolves.toMatchObject({ status: 'CUSTOMER_POLICIES_SENT', intent: 'mis pólizas' })
+    expect(whatsapp.textsTo(phone)).toEqual([
+      'Sus pólizas:\n- POL-90001 (auto): activa, vence el 15/03/2027.\n- POL-90002 (hogar): vencida, venció el 01/09/2026.',
+    ])
+    expect(ai.rewritten).toEqual([])
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
+  })
+
+  it('un cliente identificado sin ninguna póliza le avisa que no tiene registradas, sin derivar', async () => {
+    link(phone, carla)
+    ai.intents.set('¿qué pólizas tengo?', 'mis pólizas')
+    await expect(send('¿qué pólizas tengo?')).resolves.toMatchObject({ status: 'CUSTOMER_POLICIES_SENT' })
+    expect(lastText()).toBe(noPoliciesMessage)
+    expect(ai.rewritten).toEqual([])
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
+  })
+
+  it('antes de identificarse, pedir las pólizas avisa que no se identificó y sigue con la pregunta pendiente en el mismo mensaje', async () => {
+    ai.intents.set('¿cuáles son mis pólizas?', 'mis pólizas')
+    await expect(send('¿cuáles son mis pólizas?')).resolves.toMatchObject({ status: 'IDENTIFICATION_REQUIRED' })
+    expect(lastText()).toBe(`${notIdentifiedPoliciesNotice} ${customerStatusQuestion}`)
+    expect((await openConversation()).suspended).toBe(false)
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
+  })
+
+  it('mientras espera el DNI de un número con varios vinculados, avisa y vuelve a pedir el DNI', async () => {
+    link(phone, ana, bruno)
+    ai.intents.set('¿qué pólizas tengo?', 'mis pólizas')
+    await expect(send('¿qué pólizas tengo?')).resolves.toMatchObject({ status: 'IDENTIFICATION_REQUIRED' })
+    expect(lastText()).toBe(`${notIdentifiedPoliciesNotice} ${repeatedDniRequest}`)
+    ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
+    await expect(send('ya soy cliente')).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'WELCOME_SENT' })
+  })
+})
+
 describe('cliente nuevo (RF-ATE-05)', () => {
   // El alta no empieza sola: al decir que es nuevo se le ofrece resolver consultas y solo
   // cuando pide contratar se le piden los documentos.
@@ -508,6 +591,24 @@ describe('cliente nuevo (RF-ATE-05)', () => {
     expect(whatsapp.textsTo(phone).slice(-1)).toEqual([notInsuranceAndNewCustomerOffer])
     expect(notInsuranceAndNewCustomerOffer).toContain('no tiene que ver con Seguros Castaño')
     expect(notInsuranceAndNewCustomerOffer).toContain('contratar')
+  })
+
+  it('quien todavía no es cliente pregunta por sus datos: avisa que no tiene datos y vuelve a ofrecer en un solo mensaje', async () => {
+    await upToOffer()
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await expect(send('¿qué datos tengo?')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_NO_DATA' })
+    expect(whatsapp.textsTo(phone).slice(-1)).toEqual([newCustomerNoDataAndOffer])
+    expect(whatsapp.textsTo(phone).filter((text) => text === newCustomerNoDataAndOffer)).toHaveLength(1)
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
+  })
+
+  it('quien todavía no es cliente pregunta por sus pólizas: avisa que no tiene y vuelve a ofrecer en un solo mensaje', async () => {
+    await upToOffer()
+    ai.intents.set('¿cuáles son mis pólizas?', 'mis pólizas')
+    await expect(send('¿cuáles son mis pólizas?')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_NO_DATA' })
+    expect(whatsapp.textsTo(phone).slice(-1)).toEqual([newCustomerNoDataAndOffer])
+    expect(whatsapp.textsTo(phone).filter((text) => text === newCustomerNoDataAndOffer)).toHaveLength(1)
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
   })
 
   it('un saludo en la oferta vuelve a ofrecer, sin alta', async () => {

@@ -59,7 +59,7 @@ El sistema MUST rechazar todo aviso de mensaje entrante que no traiga el secreto
 
 ### Requirement: La acción sale de la intención
 
-El sistema SHALL hacer con cada mensaje de un cliente identificado una sola de estas cosas, según la intención que el proveedor de IA elige de una lista cerrada: responder, contestar con un texto fijo que la consulta no tiene que ver con la agencia, repreguntar, derivar o mandar a aprobar (RF-ATE-01). La lista tiene los tipos de consulta de la agencia, incluida «información de la agencia», más «no es de seguros», «otra consulta», «no se entiende» y «contratar»; «contratar» no es un tipo de consulta de la base y existe solo en el código, y con un cliente identificado deriva, porque ya es cliente y no hay alta que hacer. La acción la decide el sistema según esa intención, no el texto que genere el modelo. El asistente contesta lo que no implica riesgo, deriva lo que se entiende pero no puede responder, repregunta lo que no entiende y, a lo que no es una consulta para la agencia, le contesta con un texto fijo que no tiene que ver con Seguros Castaño.
+El sistema SHALL hacer con cada mensaje de un cliente identificado una sola de estas cosas, según la intención que el proveedor de IA elige de una lista cerrada: responder, contestar con un texto fijo que la consulta no tiene que ver con la agencia, repreguntar, derivar o mandar a aprobar (RF-ATE-01). La lista tiene los tipos de consulta de la agencia, incluida «información de la agencia», más «no es de seguros», «otra consulta», «no se entiende», «contratar», «mis datos» y «mis pólizas»; «contratar», «mis datos» y «mis pólizas» no son tipos de consulta de la base y existen solo en el código, el primero para saber quién quiere iniciar el alta, el segundo para contestar los datos registrados de un cliente identificado y el tercero para el listado de sus pólizas, y con un cliente identificado «contratar» deriva, porque ya es cliente y no hay alta que hacer. La acción la decide el sistema según esa intención, no el texto que genere el modelo. El asistente contesta lo que no implica riesgo, deriva lo que se entiende pero no puede responder, repregunta lo que no entiende y, a lo que no es una consulta para la agencia, le contesta con un texto fijo que no tiene que ver con Seguros Castaño.
 
 #### Scenario: Consulta de vencimiento o de estado
 - **WHEN** la intención elegida es vencimiento o estado de póliza
@@ -444,6 +444,54 @@ El sistema SHALL responder la consulta de información de la agencia con los ram
 #### Scenario: Conversación en silencio
 - **WHEN** la conversación está en silencio porque tiene un caso derivado sin cerrar y la persona pregunta qué seguros tienen
 - **THEN** el asistente no le responde ni le envía el mensaje al proveedor de IA, y el mensaje queda guardado en el caso derivado
+
+### Requirement: Datos del cliente
+
+El sistema SHALL responder la consulta de los datos registrados de un cliente identificado con su nombre y apellido, su DNI y sus teléfonos vinculados, uno por línea, en un solo mensaje y con una plantilla que no pasa por la redacción del proveedor de IA, sin derivar ni mandar a aprobar (RF-ATE-01). La opción «cambio de teléfono» queda reservada para pedir el cambio, no para consultar los datos o los teléfonos ya registrados (RF-CAR-05). Quien pregunta por sus datos antes de identificarse SHALL recibe el aviso de que todavía no se identificó, junto en el mismo mensaje con la pregunta de identificación pendiente, sin cambiar la etapa ni contar un intento de DNI. Quien pregunta por sus datos después de presentarse como cliente nuevo, todavía sin dar sus datos, SHALL recibe el aviso de que no tiene datos registrados junto con la oferta de consultar o contratar, en un solo mensaje, sin avanzar en el alta (RF-ATE-05).
+
+#### Scenario: Cliente identificado pregunta por sus teléfonos vinculados
+- **WHEN** un cliente identificado escribe «¿qué números tengo vinculados?» y la intención elegida es «mis datos»
+- **THEN** el asistente le contesta en un solo mensaje con su nombre y apellido, su DNI y sus teléfonos vinculados, uno por línea, sin redacción del proveedor de IA, sin derivar y sin pedirle que escriba desde otro número
+
+#### Scenario: Sin teléfonos registrados
+- **WHEN** un cliente identificado pregunta por sus datos y no tiene teléfonos vinculados registrados
+- **THEN** el asistente le contesta con su nombre y su DNI y le dice que no tiene teléfonos vinculados
+
+#### Scenario: El pedido de cambio de teléfono no es una consulta de datos
+- **WHEN** un cliente identificado escribe «cambié de número»
+- **THEN** la intención elegida es «cambio de teléfono» y el asistente le pide que escriba desde el nuevo número, sin mostrarle los datos
+
+#### Scenario: Antes de identificarse
+- **WHEN** una persona que todavía no se identificó, en el primer mensaje, mientras se le pregunta si ya es cliente o mientras se le pide el DNI, pregunta por sus datos o por sus teléfonos
+- **THEN** el asistente le avisa en un solo mensaje que todavía no se identificó y que no le puede mostrar sus datos, seguido de la pregunta de identificación pendiente, sin derivar, sin cambiar la etapa y sin contar un intento de DNI
+
+#### Scenario: Cliente nuevo en la oferta
+- **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, pregunta por sus datos o por sus teléfonos
+- **THEN** el asistente le avisa en un solo mensaje que, como todavía no es cliente, no tiene datos registrados, junto con la oferta de resolver consultas o contratar, sin avanzar en el alta
+
+### Requirement: Pólizas del cliente
+
+El sistema SHALL responder la consulta del listado de las pólizas de un cliente identificado con una línea por póliza, con su número, su ramo, su estado y su fecha de vencimiento, en un solo mensaje y con una plantilla que no pasa por la redacción del proveedor de IA, sin derivar ni mandar a aprobar (RF-ATE-01). Sin ninguna póliza registrada SHALL le avise que no tiene pólizas en la empresa, en vez de derivar por dato faltante (RF-ATE-02). El estado, el vencimiento y el saldo de una póliza siguen siendo consultas propias, con su redacción y con sus derivaciones (RF-ATE-02). Quien pregunta por sus pólizas antes de identificarse SHALL recibe el aviso de que todavía no se identificó, junto en el mismo mensaje con la pregunta de identificación pendiente, sin cambiar la etapa ni contar un intento de DNI. Quien pregunta por sus pólizas después de presentarse como cliente nuevo, todavía sin dar sus datos, SHALL reciba el aviso de que no tiene pólizas registradas junto con la oferta de consultar o contratar, en un solo mensaje, sin avanzar en el alta (RF-ATE-05).
+
+#### Scenario: Cliente identificado pregunta por sus pólizas
+- **WHEN** un cliente identificado escribe «¿cuáles son mis pólizas?» y la intención elegida es «mis pólizas»
+- **THEN** el asistente le contesta en un solo mensaje con una línea por póliza, con número, ramo, estado y vencimiento, sin redacción del proveedor de IA, sin derivar y sin pedirle que escriba desde otro número
+
+#### Scenario: Cliente identificado sin ninguna póliza
+- **WHEN** un cliente identificado pregunta por sus pólizas y la cartera no tiene ninguna póliza suya
+- **THEN** el asistente le contesta que no tiene pólizas registradas en la empresa, sin derivar por dato faltante
+
+#### Scenario: El estado, el vencimiento o el saldo de una póliza siguen siendo consultas propias
+- **WHEN** un cliente identificado escribe «¿en qué estado está mi póliza?», «¿cuándo vence mi póliza?» o «¿cuánto debo?»
+- **THEN** la intención elegida es «estado de póliza», «vencimiento» o «saldo» y el asistente responde con su plantilla y su redacción, sin usar el listado de «mis pólizas»
+
+#### Scenario: Antes de identificarse
+- **WHEN** una persona que todavía no se identificó pregunta por sus pólizas
+- **THEN** el asistente le avisa en un solo mensaje que todavía no se identificó y que no le puede mostrar sus pólizas, seguido de la pregunta de identificación pendiente, sin derivar, sin cambiar la etapa y sin contar un intento de DNI
+
+#### Scenario: Cliente nuevo en la oferta
+- **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, pregunta por sus pólizas
+- **THEN** el asistente le avisa en un solo mensaje que, como todavía no es cliente, no tiene pólizas ni datos registrados, junto con la oferta de resolver consultas o contratar, sin avanzar en el alta
 
 ### Requirement: La intención se elige con el contexto de la conversación
 

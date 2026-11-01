@@ -30,16 +30,21 @@ import {
   customerStatusQuestion,
   customerStatusRetryQuestion,
   courtesyTemplate,
+  customerDataTemplate,
+  customerPoliciesTemplate,
   existingCustomerDniRequest,
   expirationsTemplate,
   firstDniRequest,
   handoffMessage,
   newCustomerDniRequest,
   newCustomerNameRequest,
+  newCustomerNoDataAndOffer,
   newCustomerNoDataNotice,
   newCustomerPhotoRequest,
   newCustomerPhotoRetryRequest,
   newCustomerQueryOffer,
+  notIdentifiedDataNotice,
+  notIdentifiedPoliciesNotice,
   notInsuranceAndNewCustomerOffer,
   notInsuranceMessage,
   phoneChangePendingMessage,
@@ -89,6 +94,10 @@ export type ProcessResult =
   | { status: 'PROSPECT_HANDED_OFF'; responseSent: true }
   | { status: 'PHONE_CHANGE_PENDING'; answer: ProcessResult['status']; responseSent: true }
   | { status: 'NEW_PHONE_REQUESTED'; intent: Intent; responseSent: true }
+  | { status: 'CUSTOMER_DATA_SENT'; intent: Intent; responseSent: true }
+  | { status: 'CUSTOMER_POLICIES_SENT'; intent: Intent; responseSent: true }
+  | { status: 'NEW_CUSTOMER_NO_DATA'; responseSent: true }
+  | { status: 'IDENTIFICATION_REQUIRED'; responseSent: true }
   | { status: 'WELCOME_SENT'; responseSent: true }
   | { status: 'ANSWER_SENT'; intent: Intent; responseSent: true }
   | { status: 'CLARIFICATION_REQUESTED'; responseSent: true }
@@ -279,7 +288,7 @@ export class ProcessIncomingMessage {
     if (linkedIds.length > 1) {
       const identification: Identification = { linkedIds, pending, unrecognizedDnis: 0 }
       if (findDni(text)) return this.identifyByDni(turn, identification, text, settings)
-      const info = await this.agencyInfoBeforeIdentifying(
+      const info = await this.replyBeforeIdentifying(
         turn,
         text,
         repeatedDniRequest,
@@ -294,7 +303,7 @@ export class ProcessIncomingMessage {
     }
 
     const identification: Identification = { linkedIds: [], pending, unrecognizedDnis: 0 }
-    const info = await this.agencyInfoBeforeIdentifying(
+    const info = await this.replyBeforeIdentifying(
       turn,
       text,
       customerStatusQuestion,
@@ -308,7 +317,7 @@ export class ProcessIncomingMessage {
 
   private async classifyCustomerStatus(turn: Turn, stage: Identification, reply: string): Promise<ProcessResult> {
     const identification = identificationOf(stage)
-    const info = await this.agencyInfoBeforeIdentifying(
+    const info = await this.replyBeforeIdentifying(
       turn,
       reply,
       customerStatusQuestion,
@@ -383,6 +392,13 @@ export class ProcessIncomingMessage {
         this.replyIdentifying(turn, newCustomerQueryOffer)
         turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
         return { status: 'NEW_CUSTOMER_OFFER_SENT', responseSent: true }
+      case 'mis datos':
+      case 'mis pólizas':
+        // Todavía no es cliente: no tiene datos ni pólizas que mostrar, y se vuelve a
+        // ofrecer en el mismo mensaje, sin mandar dos envíos seguidos.
+        this.replyIdentifying(turn, newCustomerNoDataAndOffer)
+        turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
+        return { status: 'NEW_CUSTOMER_NO_DATA', responseSent: true }
       case 'no se entiende':
         return this.clarifyNewCustomer(turn, stage, { kind: 'not-understood' })
       default:
@@ -418,7 +434,7 @@ export class ProcessIncomingMessage {
     const identification = identificationOf(stage)
     const dni = findDni(text)
     if (!dni) {
-      const info = await this.agencyInfoBeforeIdentifying(
+      const info = await this.replyBeforeIdentifying(
         turn,
         text,
         repeatedDniRequest,
@@ -599,6 +615,20 @@ export class ProcessIncomingMessage {
       case 'register':
         // Un cliente identificado que pide contratar: ya es cliente, no hay alta que hacer.
         return this.handoffIn(turn, ref, { kind: 'intent', intent }, query.answers, { intent, urgency })
+      case 'my-data': {
+        // Los datos personales salen de la cartera y no pasan por la redacción del
+        // proveedor de IA: tienen que llegar tal cual.
+        const detail = await this.customers.findCustomerDetail(customer.id)
+        const phones = detail?.phones.map((phone) => phone.number) ?? []
+        turn.reply(ref, customerDataTemplate(customer, phones), query.answers)
+        return { status: 'CUSTOMER_DATA_SENT', intent, responseSent: true }
+      }
+      case 'my-policies': {
+        // El listado de pólizas tampoco pasa por la redacción del proveedor de IA, y sin
+        // pólizas se le avisa en vez de derivar por dato faltante.
+        turn.reply(ref, customerPoliciesTemplate(customer, this.clock()), query.answers)
+        return { status: 'CUSTOMER_POLICIES_SENT', intent, responseSent: true }
+      }
       case 'clarify': {
         // La repregunta no pasa por la redacción del proveedor de IA, y cada intento usa una
         // redacción distinta para no repetir el mismo mensaje.
@@ -690,11 +720,13 @@ export class ProcessIncomingMessage {
     }
   }
 
-  // Antes de identificarse, un mensaje sin DNI puede pedir la información de la agencia,
-  // que no es de ningún cliente (RF-ATE-06): se responde en el caso de la identificación y se
-  // repite la pregunta pendiente, sin cambiar la etapa ni contar un intento de DNI. Con otra
-  // intención, o si el proveedor de IA falla, devuelve null y la identificación sigue igual.
-  private async agencyInfoBeforeIdentifying(turn: Turn, text: string, followUp: string, stay: Stage): Promise<ProcessResult | null> {
+  // Antes de identificarse, un mensaje sin DNI puede pedir la información de la agencia, que
+  // no es de ningún cliente (RF-ATE-06), o sus propios datos o sus pólizas, de los que todavía
+  // no hay ningunos porque no se identificó: en el primer caso se responde la información y
+  // en los otros dos se avisa que no se identificó, siempre junto con la pregunta pendiente en
+  // el mismo mensaje, sin cambiar la etapa ni contar un intento de DNI. Con otra intención, o si
+  // el proveedor de IA falla, devuelve null y la identificación sigue igual.
+  private async replyBeforeIdentifying(turn: Turn, text: string, followUp: string, stay: Stage): Promise<ProcessResult | null> {
     if (findDni(text)) return null
     const question = maskDni(text)
     let intent: Intent
@@ -703,6 +735,14 @@ export class ProcessIncomingMessage {
       intent = (await this.ai.classifyIntent(question, intentContext(turn.conversation))).intent
     } catch {
       return null
+    }
+    if (intent === 'mis datos' || intent === 'mis pólizas') {
+      const ref = turn.caseFor({ kind: 'identifying' })
+      turn.receiveIn(ref)
+      const notice = intent === 'mis pólizas' ? notIdentifiedPoliciesNotice : notIdentifiedDataNotice
+      turn.reply(ref, `${notice} ${followUp}`)
+      turn.nextStage = () => stay
+      return { status: 'IDENTIFICATION_REQUIRED', responseSent: true }
     }
     if (intent !== 'información de la agencia') return null
 

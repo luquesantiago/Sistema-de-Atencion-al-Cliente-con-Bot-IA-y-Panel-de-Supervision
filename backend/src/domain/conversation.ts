@@ -6,13 +6,18 @@ import type { RiskLevel } from './risk-level.js'
 // Conversación por WhatsApp guardada en la base (design.md, decisiones 3, 6 y 7). Son
 // tipos y funciones puras: la base y el envío quedan en el ConversationStore.
 
-// Intenciones que son un valor del catálogo tipo_consulta: todas menos cuatro.
-export type QueryType = Exclude<Intent, 'no es de seguros' | 'contratar' | 'otra consulta' | 'no se entiende'>
+// Intenciones que son un valor del catálogo tipo_consulta: todas menos seis.
+export type QueryType = Exclude<
+  Intent,
+  'no es de seguros' | 'contratar' | 'mis datos' | 'mis pólizas' | 'otra consulta' | 'no se entiende'
+>
 
 export function isQueryType(intent: Intent): intent is QueryType {
   return (
     intent !== 'no es de seguros' &&
     intent !== 'contratar' &&
+    intent !== 'mis datos' &&
+    intent !== 'mis pólizas' &&
     intent !== 'otra consulta' &&
     intent !== 'no se entiende'
   )

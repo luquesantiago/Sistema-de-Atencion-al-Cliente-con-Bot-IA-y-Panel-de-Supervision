@@ -29,7 +29,12 @@ const intentDescriptions: Record<Intent, string> = {
   saludo: 'solo un saludo, un agradecimiento o una despedida, sin otra consulta',
   contratar:
     'quiere ser cliente o contratar un seguro, o pide iniciar el alta (por ejemplo, «quiero contratar», «me quiero dar de alta», «quiero un seguro»)',
-  'cambio de teléfono': 'registrar o cambiar su número de teléfono de contacto',
+  'mis datos':
+    'consulta sus datos registrados: su nombre, su DNI o los teléfonos que tiene vinculados (por ejemplo, «¿qué datos tengo?», «¿cuál es mi DNI?», «¿qué números tengo vinculados?», «¿a qué nombre está este número?»); no es para consultar las pólizas que tiene',
+  'mis pólizas':
+    'consulta el listado de las pólizas que tiene a su nombre, cuáles son las suyas o qué seguros tiene contratados (por ejemplo, «¿cuáles son mis pólizas?», «¿qué pólizas tengo?», «mostrame mis pólizas»); no es para ver solo el estado, el vencimiento o el saldo de una póliza',
+  'cambio de teléfono':
+    'registrar o cambiar su número de teléfono de contacto (por ejemplo, «cambié de número», «quiero actualizar mi teléfono», «este es mi nuevo número»); no es para consultar los teléfonos o los datos que ya tiene registrados',
   'información de la agencia':
     'qué tipos de seguro o qué planes ofrece la agencia, o dónde está (su dirección), su teléfono o su horario de atención',
   'no es de seguros':

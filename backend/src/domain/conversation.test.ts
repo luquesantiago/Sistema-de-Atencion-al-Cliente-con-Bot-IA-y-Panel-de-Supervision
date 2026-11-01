@@ -90,9 +90,12 @@ describe('el caso de cada mensaje', () => {
     expect(caseForMessage(typed, { kind: 'untyped-handoff' })).toEqual({ kind: 'new', type: null })
   })
 
-  it('«no es de seguros», «otra consulta» y «no se entiende» no son tipos de consulta', () => {
+  it('«no es de seguros», «contratar», «mis datos», «mis pólizas», «otra consulta» y «no se entiende» no son tipos de consulta', () => {
     expect(isQueryType('vencimiento')).toBe(true)
     expect(isQueryType('no es de seguros')).toBe(false)
+    expect(isQueryType('contratar')).toBe(false)
+    expect(isQueryType('mis datos')).toBe(false)
+    expect(isQueryType('mis pólizas')).toBe(false)
     expect(isQueryType('otra consulta')).toBe(false)
     expect(isQueryType('no se entiende')).toBe(false)
   })

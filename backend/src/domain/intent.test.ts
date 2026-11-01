@@ -27,6 +27,16 @@ describe('actionForIntent', () => {
     expect(isIntent('contratar')).toBe(true)
   })
 
+  it('«mis datos» contesta los datos registrados, sin derivar ni mandar a aprobar', () => {
+    expect(actionForIntent('mis datos')).toEqual({ kind: 'my-data' })
+    expect(isIntent('mis datos')).toBe(true)
+  })
+
+  it('«mis pólizas» contesta el listado de pólizas, sin derivar ni mandar a aprobar', () => {
+    expect(actionForIntent('mis pólizas')).toEqual({ kind: 'my-policies' })
+    expect(isIntent('mis pólizas')).toBe(true)
+  })
+
   it('repregunta lo que no se entiende', () => {
     expect(actionForIntent('no se entiende')).toEqual({ kind: 'clarify' })
   })
