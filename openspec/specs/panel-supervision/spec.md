@@ -33,9 +33,11 @@ El sistema SHALL guardar cada mensaje de las conversaciones por WhatsApp que el 
 - **WHEN** el asistente o un empleado guarda un mensaje nuevo
 - **THEN** no borra ni modifica ningún mensaje ni respuesta guardados antes
 
-### Requirement: Bandeja de atención priorizada por gravedad
+### Requirement: Bandeja de atención de casos abiertos
 
-El sistema SHALL mostrar en la Bandeja de Atención del panel los casos sin cerrar que están derivados o que tienen pendiente la decisión de un prospecto o de una solicitud de cambio de teléfono, ordenados primero por gravedad, después los que no tienen responsable y después por mayor tiempo de espera, con la gravedad escrita y no solo en color, el cliente, el tipo de consulta, el motivo de la derivación, el último mensaje, el responsable y el tiempo de espera de cada uno, y actualizándose sola cada pocos segundos mientras está abierta (RF-SUP-02, RF-DER-02). La gravedad de un caso es la más grave entre el nivel de riesgo del caso, el de sus alertas sin atender y el que corresponde a su tipo de consulta según la regla de derivación; un caso sin ninguno de los tres se muestra «Sin nivel», después de los de nivel bajo. La espera se cuenta desde la derivación o, si el caso no se derivó, desde la solicitud pendiente. Las fechas se muestran en hora argentina. Desde la bandeja, un empleado puede tomar, contestar y cerrar casos según los requirements de `derivacion-seguimiento`; mirar la bandeja no modifica nada.
+El sistema SHALL mostrar en la Bandeja de Atención del panel todos los casos sin cerrar (`fecha_cierre IS NULL`), incluidos los casos atendidos por el asistente que no están derivados ni tienen un pendiente operativo, ordenados primero por gravedad, después los que no tienen responsable y después por mayor tiempo de espera, con la gravedad escrita y no solo en color, el cliente, el tipo de consulta, el motivo de la derivación cuando exista, el último mensaje, el responsable y el estado de derivación, y actualizándose sola cada pocos segundos mientras está abierta (RF-SUP-02). La gravedad de un caso es la más grave entre el nivel de riesgo del caso, el de sus alertas sin atender y el que corresponde a su tipo de consulta según la regla de derivación; un caso sin ninguno de los tres se muestra «Sin nivel», después de los de nivel bajo. La espera se cuenta desde la derivación o, si el caso no se derivó, desde la solicitud pendiente. Las fechas se muestran en hora argentina. Desde la bandeja, un empleado puede tomar, contestar y cerrar casos según los requirements de `derivacion-seguimiento`; los casos no derivados se muestran en modo de solo lectura.
+
+El sistema SHALL calcular `handedOff` como verdadero únicamente cuando `caso.fecha_derivacion IS NOT NULL`, y como falso cuando `caso.fecha_derivacion IS NULL` (RF-SUP-01, RF-SUP-02).
 
 #### Scenario: Orden por gravedad
 - **WHEN** hay un caso derivado de reclamo, uno de siniestro grave y uno de consulta no entendida, todos sin tomar
@@ -81,9 +83,29 @@ El sistema SHALL mostrar en la Bandeja de Atención del panel los casos sin cerr
 - **WHEN** un caso sin cerrar y sin derivar tiene una solicitud de cambio de teléfono pendiente
 - **THEN** la bandeja lo muestra con la etiqueta «Cambio de teléfono pendiente · se decide en Trámites», con nivel bajo y la espera contada desde la solicitud
 
-#### Scenario: Casos que no entran
-- **WHEN** un caso está cerrado, o está abierto sin derivar y sin nada pendiente de decisión
-- **THEN** la bandeja no lo muestra
+#### Scenario: Todos incluye casos derivados y no derivados
+- **WHEN** hay un caso abierto derivado y otro caso abierto atendido por el asistente sin derivación ni pendiente operativo
+- **THEN** la pestaña «Todos» muestra ambos casos
+
+#### Scenario: Derivados solo incluye casos derivados
+- **WHEN** hay casos abiertos con y sin fecha de derivación
+- **THEN** la pestaña «Derivados» muestra únicamente los casos cuyo `handedOff` es verdadero
+
+#### Scenario: Un caso cerrado no aparece
+- **WHEN** un caso tiene `fecha_cierre` no nula
+- **THEN** no aparece en ninguna pestaña de la Bandeja
+
+#### Scenario: El motivo no determina la derivación
+- **WHEN** un caso tiene `fecha_derivacion` nula y un motivo nulo, o tiene `fecha_derivacion` no nula y el motivo es nulo
+- **THEN** `handedOff` es falso en el primer caso y verdadero en el segundo
+
+#### Scenario: La búsqueda se combina con la pestaña
+- **WHEN** el usuario escribe un teléfono, nombre o patente y elige una pestaña
+- **THEN** la lista conserva solo los casos que cumplen simultáneamente el filtro de la pestaña y la búsqueda, sin descartar casos cuyo cliente sea nulo
+
+#### Scenario: El detalle conserva la conversación abierta
+- **WHEN** el usuario elige un caso abierto no derivado desde «Todos»
+- **THEN** el panel muestra la conversación completa y conserva `handedOff` en falso sin crear una derivación
 
 #### Scenario: Caso que se cierra
 - **WHEN** un empleado cierra un caso desde la bandeja

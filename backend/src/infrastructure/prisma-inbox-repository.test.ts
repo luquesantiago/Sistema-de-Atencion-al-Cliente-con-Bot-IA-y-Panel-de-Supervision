@@ -64,7 +64,10 @@ describe('consultas de la bandeja', () => {
     const query = inboxOrderQuery({ limit: 25, offset: 0 })
     expect(query.sql).toContain('WHERE a.fecha_atencion IS NULL')
     expect(query.sql).toContain('WHERE c.fecha_cierre IS NULL')
+    expect(query.sql).not.toContain('c.fecha_derivacion IS NOT NULL')
+    expect(query.sql).not.toContain('sol.id_caso IS NOT NULL')
     expect(inboxCountQuery().sql).toContain('WHERE c.fecha_cierre IS NULL')
+    expect(inboxCountQuery().sql).not.toContain('c.fecha_derivacion IS NOT NULL')
   })
 
   it('el detalle restringe la consulta a un caso', () => {

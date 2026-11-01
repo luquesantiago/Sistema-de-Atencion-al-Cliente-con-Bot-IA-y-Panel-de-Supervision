@@ -844,7 +844,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
               <h2 className="conversacion__nombre">{caso ? nombreDelCaso(caso) : `Caso ${seleccionado}`}</h2>
               {caso ? <p className="conversacion__sub">{subtituloDelCaso(caso)}</p> : null}
             </div>
-            {caso && !fueraDeBandeja ? accionesDelCaso(caso) : null}
+            {caso && caso.handedOff && !fueraDeBandeja ? accionesDelCaso(caso) : null}
           </div>
 
           {alerta ? (
