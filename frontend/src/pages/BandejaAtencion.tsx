@@ -468,7 +468,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
   const [fallaActualizacion, setFallaActualizacion] = useState(false)
   const [actualizado, setActualizado] = useState<Date | null>(null)
   const [busqueda, setBusqueda] = useState('')
-  const [filtroActivo, setFiltroActivo] = useState<'todos'>('todos')
+  const [filtroPestana, setFiltroPestana] = useState<'todos' | 'derivados'>('todos')
   const [seleccionado, setSeleccionado] = useState<number | null>(bandejaInicial?.caseId ?? null)
   const [filtroCliente, setFiltroCliente] = useState<{ id: number; nombre: string | null } | null>(
     bandejaInicial?.customerId === undefined
@@ -584,10 +584,11 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
   const casosOrdenados = casos !== null && filtroCliente !== null
     ? [...casos].sort((a, b) => fechaDeActividad(b) - fechaDeActividad(a))
     : casos
-  const casosFiltrados =
-    casosOrdenados === null || consulta === ''
-      ? casosOrdenados
-      : casosOrdenados.filter((caso) => textoDelCaso(caso).includes(consulta))
+  const casosFiltrados = casosOrdenados?.filter((caso) => {
+    const cumplePestana = filtroPestana === 'todos' || caso.handedOff === true
+    const cumpleBusqueda = consulta === '' || textoDelCaso(caso).includes(consulta)
+    return cumplePestana && cumpleBusqueda
+  }) ?? null
   const detalleActual = detalle !== null && detalle.case.caseId === seleccionado ? detalle : null
   const casoDeLista = seleccionado === null ? null : casos?.find((caso) => caso.caseId === seleccionado) ?? null
   const casoDelDetalle = detalleActual?.case ?? casoDeLista
@@ -932,10 +933,19 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
               type="button"
               className="bandeja__pestana"
               role="tab"
-              aria-selected={filtroActivo === 'todos'}
-              onClick={() => setFiltroActivo('todos')}
+              aria-selected={filtroPestana === 'todos'}
+              onClick={() => setFiltroPestana('todos')}
             >
               Todos
+            </button>
+            <button
+              type="button"
+              className="bandeja__pestana"
+              role="tab"
+              aria-selected={filtroPestana === 'derivados'}
+              onClick={() => setFiltroPestana('derivados')}
+            >
+              Derivados
             </button>
           </div>
         </header>
