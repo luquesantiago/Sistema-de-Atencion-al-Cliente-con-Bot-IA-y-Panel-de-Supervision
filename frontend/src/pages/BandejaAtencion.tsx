@@ -128,7 +128,7 @@ function prioridadDelCaso(caso: CasoBandeja): { prioridad: Prioridad; texto: str
 function BadgePrioridad({ caso }: { caso: CasoBandeja }) {
   const { prioridad, texto } = prioridadDelCaso(caso)
   const { clase, Icono } = BADGES_PRIORIDAD[prioridad]
-  const textoVisible = caso.handedOff ? texto : 'Atendido por Bot'
+  const textoVisible = caso.handedOff ? texto : 'Resuelto'
   return (
     <span className={clase}>
       <Icono className="badge-prioridad__icono" />
