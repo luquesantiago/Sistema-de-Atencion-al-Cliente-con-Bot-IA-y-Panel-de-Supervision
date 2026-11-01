@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import type { Modulo, ModuloPanel, OpcionesNavegacion } from '../navigation'
 import PageHeader from '../components/PageHeader'
 import EstadoPanel from '../components/EstadoPanel'
@@ -38,6 +39,15 @@ import { listarBandeja } from '../api/bandeja'
 
 const LIMITE_PAGINA = 25
 const RETRASO_BUSQUEDA_MS = 300
+const NOMBRE_TRANSICION_FICHA = 'ficha-cliente'
+
+// La ficha se desprende de la fila solo donde el gesto se ve completo: en
+// pantallas anchas, sin movimiento reducido y con View Transitions nativas.
+function admiteTransicionDeFicha(): boolean {
+  return typeof document.startViewTransition === 'function'
+    && window.matchMedia('(min-width: 1024px)').matches
+    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
 
 function identificacion(cliente: ClienteLista | ClienteDetalle): string {
   if (cliente.cuit) return `CUIT ${cliente.cuit}`
@@ -103,7 +113,8 @@ function badgeDePoliza(poliza: { status: string; expirationDate: string }): Reac
 }
 
 function mensajeDeError(error: unknown, textoPorDefecto: string): string {
-  return error instanceof Error ? error.message : textoPorDefecto
+  const mensaje = error instanceof Error ? error.message.trim() : ''
+  return mensaje !== '' ? mensaje : textoPorDefecto
 }
 
 // Una línea por póliza en la lista: número y estado. Nunca un conteo
@@ -212,6 +223,10 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
   const [errorDetalle, setErrorDetalle] = useState<string | null>(null)
   const numeroDeConsulta = useRef(0)
   const numeroDeFicha = useRef(0)
+  const cargandoMasRef = useRef(false)
+  const clienteEnChatRef = useRef<string | null>(null)
+  const guardandoRef = useRef(false)
+  const transicionDeFichaRef = useRef(false)
 
   // Ediciones de cartera.
   const [catalogos, setCatalogos] = useState<Catalogos | null>(null)
@@ -225,8 +240,10 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
   const [errorConfirmacion, setErrorConfirmacion] = useState<string | null>(null)
   const [exito, setExito] = useState<string | null>(null)
   const [nuevoTelefono, setNuevoTelefono] = useState('')
+  const [errorTelefono, setErrorTelefono] = useState<string | null>(null)
   const [clienteEnChat, setClienteEnChat] = useState<string | null>(null)
   const [avisoChat, setAvisoChat] = useState<{ tono: 'info' | 'riesgo'; texto: string } | null>(null)
+  const [fichaConTransicion, setFichaConTransicion] = useState(false)
 
   const cargar = useCallback(async (busqueda: string, silencioso = false) => {
     const numero = ++numeroDeConsulta.current
@@ -258,24 +275,32 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
   }, [texto, cargar])
 
   const mostrarMas = useCallback(async () => {
+    if (cargandoMasRef.current) return
+    const numero = numeroDeConsulta.current
+    cargandoMasRef.current = true
     setCargandoMas(true)
     setError(null)
     try {
       const pagina = await listarClientes({ buscar: texto, limit: LIMITE_PAGINA, offset: items.length })
+      if (numero !== numeroDeConsulta.current) return
       setItems((previos) => [...previos, ...pagina.items])
       setTotal(pagina.total)
     } catch (errorDeConsulta) {
+      if (numero !== numeroDeConsulta.current) return
       setError(mensajeDeError(errorDeConsulta, 'No se pudo cargar la siguiente página.'))
     } finally {
+      cargandoMasRef.current = false
       setCargandoMas(false)
     }
   }, [texto, items.length])
 
-  const abrirDetalle = useCallback(async (cliente: ClienteLista) => {
+  const abrirDetalle = useCallback(async (cliente: Pick<ClienteLista, 'id'>) => {
     const numero = ++numeroDeFicha.current
     setSeleccionado(cliente.id)
     setDetalle(null)
     setErrorDetalle(null)
+    setNuevoTelefono('')
+    setErrorTelefono(null)
     setCargandoDetalle(true)
     try {
       const ficha = await obtenerCliente(cliente.id)
@@ -294,12 +319,89 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
     setSeleccionado(null)
     setDetalle(null)
     setErrorDetalle(null)
+    setNuevoTelefono('')
+    setErrorTelefono(null)
     setCargandoDetalle(false)
+    setFichaConTransicion(false)
   }, [])
+
+  // El nombre viaja de la fila al título de la ficha. La clase apaga la
+  // animación CSS mientras la View Transition toma las snapshots.
+  const abrirDetalleDesdeFila = useCallback((cliente: ClienteLista, fila: HTMLTableRowElement | null) => {
+    const celdaNombre = fila?.querySelector<HTMLElement>('.tabla__nombre') ?? null
+    if (
+      seleccionado !== null
+      || celdaNombre === null
+      || transicionDeFichaRef.current
+      || !admiteTransicionDeFicha()
+    ) {
+      void abrirDetalle(cliente)
+      return
+    }
+
+    transicionDeFichaRef.current = true
+    celdaNombre.classList.add('tabla__nombre--vt')
+    celdaNombre.style.setProperty('view-transition-name', NOMBRE_TRANSICION_FICHA)
+
+    const transicion = document.startViewTransition(() => {
+      flushSync(() => {
+        setFichaConTransicion(true)
+        void abrirDetalle(cliente)
+      })
+      celdaNombre.style.removeProperty('view-transition-name')
+      celdaNombre.classList.remove('tabla__nombre--vt')
+    })
+
+    void transicion.finished.finally(() => {
+      transicionDeFichaRef.current = false
+    })
+  }, [abrirDetalle, seleccionado])
+
+  const cerrarDetalleDesdeBoton = useCallback(() => {
+    const id = seleccionado
+    if (id === null) {
+      cerrarDetalle()
+      return
+    }
+    const fila = document.querySelector<HTMLTableRowElement>(
+      `tr[data-cliente-id="${CSS.escape(id)}"]`,
+    )
+    const celdaNombre = fila?.querySelector<HTMLElement>('.tabla__nombre') ?? null
+    // Cerrar quita el botón del foco: el teclado vuelve a la fila de origen.
+    const devolverFocoALaFila = () => {
+      fila?.querySelector<HTMLButtonElement>('.tabla__ver')?.focus()
+    }
+    if (
+      celdaNombre === null
+      || !fichaConTransicion
+      || transicionDeFichaRef.current
+      || !admiteTransicionDeFicha()
+    ) {
+      cerrarDetalle()
+      devolverFocoALaFila()
+      return
+    }
+
+    transicionDeFichaRef.current = true
+    const transicion = document.startViewTransition(() => {
+      flushSync(() => cerrarDetalle())
+      celdaNombre.classList.add('tabla__nombre--vt')
+      celdaNombre.style.setProperty('view-transition-name', NOMBRE_TRANSICION_FICHA)
+      devolverFocoALaFila()
+    })
+
+    void transicion.finished.finally(() => {
+      celdaNombre.style.removeProperty('view-transition-name')
+      celdaNombre.classList.remove('tabla__nombre--vt')
+      transicionDeFichaRef.current = false
+    })
+  }, [seleccionado, fichaConTransicion, cerrarDetalle])
 
   // «Ir al chat»: busca los casos abiertos del cliente en la Bandeja de Atención. Si hay
   // uno, abre esa conversación; si hay varios, llega a la bandeja filtrada por el cliente.
   const irAlChat = useCallback(async (cliente: ClienteLista) => {
+    if (clienteEnChatRef.current !== null) return
+    clienteEnChatRef.current = cliente.id
     setClienteEnChat(cliente.id)
     setAvisoChat(null)
     try {
@@ -325,6 +427,7 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
         texto: mensajeDeError(errorDeChat, 'No se pudieron buscar los chats del cliente.'),
       })
     } finally {
+      clienteEnChatRef.current = null
       setClienteEnChat(null)
     }
   }, [onNavegar])
@@ -349,7 +452,8 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
   }, [catalogos])
 
   const aplicarConfirmacion = useCallback(async () => {
-    if (confirmacion === null) return
+    if (confirmacion === null || guardandoRef.current) return
+    guardandoRef.current = true
     setGuardando(true)
     setErrorConfirmacion(null)
     try {
@@ -382,6 +486,7 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
         case 'vincular-telefono': {
           const conTelefono = await vincularTelefono(detalle.id, confirmacion.phone)
           setNuevoTelefono('')
+          setErrorTelefono(null)
           setConfirmacion(null)
           recargarTrasEdicion(conTelefono, `Se vinculó el teléfono ${confirmacion.phone}.`)
           return
@@ -413,6 +518,7 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
     } catch (errorDeGuardado) {
       setErrorConfirmacion(mensajeDeError(errorDeGuardado, 'No se pudo aplicar el cambio.'))
     } finally {
+      guardandoRef.current = false
       setGuardando(false)
     }
   }, [confirmacion, detalle, recargarTrasEdicion, cerrarDetalle])
@@ -482,6 +588,12 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
   function confirmarVinculoTelefono(numero: string) {
     const limpio = numero.trim()
     if (!limpio) return
+    const digitos = limpio.replace(/\D/g, '')
+    if (!/^\d{10,15}$/.test(digitos)) {
+      setErrorTelefono('El teléfono debe tener entre 10 y 15 dígitos.')
+      return
+    }
+    setErrorTelefono(null)
     setErrorFormulario(null)
     setConfirmacion({
       tipo: 'vincular-telefono',
@@ -653,7 +765,7 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
           descripcion={
             hayBusqueda
               ? 'Probá con otro nombre, DNI o teléfono.'
-              : 'Cargá un cliente nuevo con el botón de arriba, o migrate la planilla histórica.'
+              : 'Cargá un cliente nuevo con el botón de arriba, o migrá la planilla histórica.'
           }
         />
       )
@@ -674,14 +786,16 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
             </tr>
           </thead>
           <tbody>
-            {items.map((cliente) => {
+            {items.map((cliente, indice) => {
               const activo = seleccionado === cliente.id
               return (
                 <tr
                   key={cliente.id}
                   className="tabla__fila"
+                  data-cliente-id={cliente.id}
                   aria-current={activo ? 'true' : undefined}
-                  onClick={() => void abrirDetalle(cliente)}
+                  style={{ animationDelay: `${Math.min(indice, 6) * 18}ms` }}
+                  onClick={(evento) => abrirDetalleDesdeFila(cliente, evento.currentTarget)}
                 >
                   <td className="tabla__identificacion">{identificacion(cliente)}</td>
                   <td className="tabla__nombre">{nombreCompleto(cliente)}</td>
@@ -713,10 +827,10 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
                           // «Viendo» alterna: tocarlo cierra la ficha, igual que el
                           // botón Cerrar del panel, y vuelve la lista completa.
                           if (activo) {
-                            cerrarDetalle()
+                            cerrarDetalleDesdeBoton()
                             return
                           }
-                          void abrirDetalle(cliente)
+                          abrirDetalleDesdeFila(cliente, evento.currentTarget.closest('tr'))
                         }}
                       >
                         {activo ? 'Viendo' : 'Ver detalle'}
@@ -763,7 +877,7 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
 
       {avisoChat !== null ? (
         <p
-          className={avisoChat.tono === 'riesgo' ? 'aviso-accion aviso-accion--riesgo' : 'aviso-exito'}
+          className={`cartera__aviso cartera__aviso--${avisoChat.tono}`}
           role={avisoChat.tono === 'riesgo' ? 'alert' : 'status'}
         >
           {avisoChat.texto}
@@ -779,22 +893,28 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
           className="busqueda__campo"
           type="search"
           autoComplete="off"
+          maxLength={60}
           placeholder="Buscar por nombre, apellido o razón social; DNI, CUIT o teléfono (con o sin puntos)"
           value={texto}
           onChange={(evento) => setTexto(evento.target.value)}
+          aria-controls="cartera-lista"
         />
       </div>
 
       <div className={`cartera${seleccionado !== null ? ' cartera--con-detalle' : ''}`}>
-        <div className="cartera__lista" aria-busy={cargando}>
+        <div className="cartera__lista" id="cartera-lista" aria-busy={cargando}>
           {contenidoDeLaLista()}
         </div>
 
         {seleccionado !== null ? (
-          <aside className="detalle-panel" aria-label="Detalle del cliente">
+          <aside
+            className={`detalle-panel${fichaConTransicion ? ' detalle-panel--vt' : ''}`}
+            aria-label="Detalle del cliente"
+            aria-busy={cargandoDetalle || undefined}
+          >
             <div className="detalle-panel__encabezado">
               <h2 className="detalle-panel__titulo">{tituloFicha}</h2>
-              <button type="button" className="detalle-panel__cerrar" onClick={cerrarDetalle}>
+              <button type="button" className="detalle-panel__cerrar" onClick={cerrarDetalleDesdeBoton}>
                 Cerrar
               </button>
             </div>
@@ -804,9 +924,12 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
                 Cargando la ficha…
               </p>
             ) : errorDetalle !== null ? (
-              <p className="detalle-panel__aviso detalle-panel__aviso--riesgo" role="alert">
-                {errorDetalle}
-              </p>
+              <div className="detalle-panel__error" role="alert">
+                <p className="detalle-panel__aviso detalle-panel__aviso--riesgo">{errorDetalle}</p>
+                <button type="button" className="boton" onClick={() => void abrirDetalle({ id: seleccionado })}>
+                  Reintentar
+                </button>
+              </div>
             ) : detalle !== null ? (
               <>
                 <div className="detalle-panel__acciones">
@@ -870,14 +993,25 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
                       id="nuevo-telefono"
                       type="tel"
                       autoComplete="off"
+                      maxLength={20}
                       placeholder="5491155551234"
                       value={nuevoTelefono}
-                      onChange={(evento) => setNuevoTelefono(evento.target.value)}
+                      onChange={(evento) => {
+                        setNuevoTelefono(evento.target.value)
+                        setErrorTelefono(null)
+                      }}
+                      aria-invalid={errorTelefono !== null || undefined}
+                      aria-describedby={errorTelefono !== null ? 'nuevo-telefono-error' : undefined}
                     />
                     <button type="submit" className="boton" disabled={nuevoTelefono.trim() === ''}>
                       Vincular
                     </button>
                   </div>
+                  {errorTelefono !== null ? (
+                    <p className="detalle-panel__aviso detalle-panel__aviso--riesgo" id="nuevo-telefono-error" role="alert">
+                      {errorTelefono}
+                    </p>
+                  ) : null}
                 </form>
 
                 <section className="detalle-panel__polizas">
@@ -1053,27 +1187,26 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
       ) : null}
 
       {confirmacion !== null ? (
-        <div className="modal-superpuesto">
-          <ConfirmarCambio
-            titulo={tituloDeConfirmacion(confirmacion, detalle)}
-            descripcion={descripcionDeConfirmacion(confirmacion)}
-            lineas={confirmacion.lineas}
-            etiquetaConfirmar={
-              confirmacion.tipo === 'baja-cliente' ? 'Confirmar baja'
-                : confirmacion.tipo === 'desvincular-telefono' ? 'Confirmar desvinculación'
-                  : 'Confirmar cambio'
-            }
-            peligro={esPeligroso(confirmacion)}
-            ocupado={guardando}
-            error={errorConfirmacion}
-            onConfirmar={() => void aplicarConfirmacion()}
-            onCancelar={() => {
-              if (guardando) return
-              setConfirmacion(null)
-              setErrorConfirmacion(null)
-            }}
-          />
-        </div>
+        <ConfirmarCambio
+          titulo={tituloDeConfirmacion(confirmacion, detalle)}
+          descripcion={descripcionDeConfirmacion(confirmacion)}
+          lineas={confirmacion.lineas}
+          etiquetaConfirmar={
+            confirmacion.tipo === 'baja-cliente' ? 'Confirmar baja'
+              : confirmacion.tipo === 'desvincular-telefono' ? 'Confirmar desvinculación'
+                : 'Confirmar cambio'
+          }
+          peligro={esPeligroso(confirmacion)}
+          ocupado={guardando}
+          error={errorConfirmacion}
+          superpuesto
+          onConfirmar={() => void aplicarConfirmacion()}
+          onCancelar={() => {
+            if (guardando) return
+            setConfirmacion(null)
+            setErrorConfirmacion(null)
+          }}
+        />
       ) : null}
     </div>
   )
