@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Customer } from './customer.js'
 import {
+  anotherQueryQuestion,
   approvalNotice,
   argentinaToday,
   clarificationRequestFor,
@@ -76,6 +77,10 @@ describe('statusesTemplate', () => {
 })
 
 describe('textos fijos', () => {
+  it('la pregunta por otra consulta, al final de los datos y las pólizas, es fija', () => {
+    expect(anotherQueryQuestion).toBe('¿Tiene alguna otra consulta?')
+  })
+
   it('usa el mensaje de derivación de AGENTS.md', () => {
     expect(handoffMessage).toBe(
       'Su pregunta será derivada a un miembro de nuestro equipo especializado, quien podrá ayudarlo con mayor detalle.',

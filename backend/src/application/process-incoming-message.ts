@@ -6,6 +6,7 @@ import {
   isQueryType,
   endByInactivity,
   endByRestart,
+  freshGreeting,
   intentContext,
   type CaseChoice,
   type CaseRef,
@@ -26,6 +27,7 @@ import { checkRewrite } from '../domain/rewrite-check.js'
 import { handoffRiskLevel, queryTypeRiskLevel, type RiskLevel, type Urgency } from '../domain/risk-level.js'
 import {
   approvalNotice,
+  anotherQueryQuestion,
   clarificationRequestFor,
   customerStatusQuestion,
   customerStatusRetryQuestion,
@@ -125,6 +127,8 @@ class Turn {
     at: Date,
     text: string,
     closePrevious: ConversationChanges['closePrevious'],
+    // Si con lo que se está charlando todavía corresponde saludar con «Hola» (freshGreeting).
+    public readonly greetingFresh: boolean = true,
   ) {
     this.changes = {
       phone,
@@ -207,9 +211,12 @@ export class ProcessIncomingMessage {
   private async process(message: IncomingWhatsAppMessage): Promise<ProcessResult> {
     const at = this.clock()
     const open = await this.conversations.findOpen(message.phone)
+    // El «Hola» se decide con la conversación abierta o, si esta termina por inactividad o
+    // reinicio, con la que terminó: la charla reciente no vuelve a saludar.
+    const greetingFresh = freshGreeting(open, at)
 
     if (open?.suspended) {
-      const turn = new Turn(open, message.phone, at, messageTextForCase(message), undefined)
+      const turn = new Turn(open, message.phone, at, messageTextForCase(message), undefined, greetingFresh)
       turn.keepImageRef(message)
       turn.receiveIn(turn.caseFor({ kind: 'suspended' }))
       await this.conversations.save(turn.changes, async () => {})
@@ -236,7 +243,7 @@ export class ProcessIncomingMessage {
     }
 
     const text = message.media === 'image' ? prospectPhotoText : message.text
-    const turn = new Turn(conversation, message.phone, at, text, closePrevious)
+    const turn = new Turn(conversation, message.phone, at, text, closePrevious, greetingFresh)
     turn.keepImageRef(message)
     const result = await this.decide(turn, stage, message, settings)
     if (!turn.hasIncomingCase) turn.receiveIn(turn.caseFor({ kind: 'identifying' }))
@@ -493,7 +500,7 @@ export class ProcessIncomingMessage {
   ): Promise<ProcessResult> {
     turn.nextStage = () => ({ stage: 'identified', customerId: customer.id, notUnderstood: 0 })
     if (!pending) {
-      turn.reply(welcomeCase ?? turn.caseFor({ kind: 'identifying' }), welcomeMessage(customer))
+      turn.reply(welcomeCase ?? turn.caseFor({ kind: 'identifying' }), welcomeMessage(customer, turn.greetingFresh))
       return { status: 'WELCOME_SENT', responseSent: true }
     }
     const caseId = pending.answers === 'incoming' ? undefined : turn.caseOfMessage(pending.answers.existing)
@@ -605,7 +612,7 @@ export class ProcessIncomingMessage {
         // La consulta guardada antes de identificarse recibe la bienvenida; un mensaje del
         // cliente identificado, el texto fijo, sin redacción ni derivación.
         if (welcomeIfUnrelated) {
-          turn.reply(ref, welcomeMessage(customer), query.answers)
+          turn.reply(ref, welcomeMessage(customer, turn.greetingFresh), query.answers)
           return { status: 'WELCOME_SENT', responseSent: true }
         }
         turn.reply(ref, notInsuranceMessage, query.answers)
@@ -617,16 +624,18 @@ export class ProcessIncomingMessage {
         return this.handoffIn(turn, ref, { kind: 'intent', intent }, query.answers, { intent, urgency })
       case 'my-data': {
         // Los datos personales salen de la cartera y no pasan por la redacción del
-        // proveedor de IA: tienen que llegar tal cual.
+        // proveedor de IA: tienen que llegar tal cual. Al final, en el mismo mensaje, se
+        // le pregunta si tiene alguna otra consulta.
         const detail = await this.customers.findCustomerDetail(customer.id)
         const phones = detail?.phones.map((phone) => phone.number) ?? []
-        turn.reply(ref, customerDataTemplate(customer, phones), query.answers)
+        turn.reply(ref, `${customerDataTemplate(customer, phones)}\n\n${anotherQueryQuestion}`, query.answers)
         return { status: 'CUSTOMER_DATA_SENT', intent, responseSent: true }
       }
       case 'my-policies': {
         // El listado de pólizas tampoco pasa por la redacción del proveedor de IA, y sin
-        // pólizas se le avisa en vez de derivar por dato faltante.
-        turn.reply(ref, customerPoliciesTemplate(customer, this.clock()), query.answers)
+        // pólizas se le avisa en vez de derivar por dato faltante. Al final, en el mismo
+        // mensaje, se le pregunta si tiene alguna otra consulta.
+        turn.reply(ref, `${customerPoliciesTemplate(customer, this.clock())}\n\n${anotherQueryQuestion}`, query.answers)
         return { status: 'CUSTOMER_POLICIES_SENT', intent, responseSent: true }
       }
       case 'clarify': {
@@ -672,7 +681,7 @@ export class ProcessIncomingMessage {
       if (!template) return this.handoffIn(turn, ref, { kind: 'missing-data', data: 'installments' }, answers, { intent })
       return this.sendRewritten(turn, ref, { template, literals: [] }, question, answers, intent, true)
     }
-    const template = this.fillTemplate(customer, templateKind)
+    const template = this.fillTemplate(turn, customer, templateKind)
     return this.sendRewritten(turn, ref, { template, literals: [] }, question, answers, intent)
   }
 
@@ -709,14 +718,14 @@ export class ProcessIncomingMessage {
     return { status: 'ANSWER_SENT', intent, responseSent: true }
   }
 
-  private fillTemplate(customer: Customer, templateKind: Exclude<AnswerTemplate, 'agency' | 'balance'>): string {
+  private fillTemplate(turn: Turn, customer: Customer, templateKind: Exclude<AnswerTemplate, 'agency' | 'balance'>): string {
     switch (templateKind) {
       case 'expirations':
         return expirationsTemplate(customer, this.clock())
       case 'statuses':
         return statusesTemplate(customer, this.clock())
       case 'courtesy':
-        return courtesyTemplate(customer)
+        return courtesyTemplate(customer, turn.greetingFresh)
     }
   }
 

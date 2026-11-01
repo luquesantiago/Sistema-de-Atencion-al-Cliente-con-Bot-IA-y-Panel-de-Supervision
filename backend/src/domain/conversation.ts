@@ -197,6 +197,19 @@ export type ConversationEnd = {
   caseIds: number[]
 }
 
+// El «Hola» vuelve a corresponder recién con el cliente de 15 horas o más en silencio:
+// antes de eso, en el mismo chat la charla se retoma sin volver a saludar (decisión de
+// Valentina del 01/11/2026). Se mira el último mensaje del cliente de la conversación,
+// abierta o la que acaba de terminar por inactividad.
+export const greetingIdleMs = 15 * 60 * 60_000
+
+export function freshGreeting(conversation: OpenConversation | null, now: Date): boolean {
+  if (!conversation) return true
+  const lastClient = conversation.messages.findLast((message) => message.origin === 'cliente')
+  const lastAt = lastClient?.sentAt ?? conversation.startedAt
+  return now.getTime() - lastAt.getTime() >= greetingIdleMs
+}
+
 function lastActivity(conversation: OpenConversation): Date {
   return conversation.messages.at(-1)?.sentAt ?? conversation.startedAt
 }

@@ -6,6 +6,7 @@ import type { Intent } from '../domain/intent.js'
 import type { Urgency } from '../domain/risk-level.js'
 import {
   approvalNotice,
+  anotherQueryQuestion,
   clarificationRequestFor,
   clarificationRequests,
   customerStatusQuestion,
@@ -378,12 +379,14 @@ describe('cambio de teléfono (RF-CAR-05)', () => {
     await expect(send('gracias')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
   })
 
-  it('sin consulta guardada manda el aviso y la bienvenida', async () => {
+  it('sin consulta guardada manda el aviso y la bienvenida, sin repetir el Hola de la charla', async () => {
     ai.customerStatuses.set('sí', 'EXISTING_CUSTOMER')
     await send('123')
     await send('sí')
     await expect(send(ana.dni)).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING', answer: 'WELCOME_SENT' })
-    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([phoneChangePendingMessage, welcomeMessage(ana)])
+    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([phoneChangePendingMessage, welcomeMessage(ana, false)])
+    expect(lastText()).toContain('Gracias, Ana')
+    expect(lastText()).not.toContain('Hola')
   })
 
   it('si ya hay una solicitud pendiente, no se crea otra', async () => {
@@ -412,18 +415,21 @@ describe('datos del cliente', () => {
     ai.intents.set('¿qué números tengo vinculados?', 'mis datos')
     await expect(send('¿qué números tengo vinculados?')).resolves.toMatchObject({ status: 'CUSTOMER_DATA_SENT', intent: 'mis datos' })
     expect(whatsapp.textsTo(phone)).toEqual([
-      `Sus datos registrados:\nNombre y apellido: ${ana.firstName} ${ana.lastName}\nDNI: ${ana.dni}\nTeléfonos vinculados:\n${phone}`,
+      `Sus datos registrados:\nNombre y apellido: ${ana.firstName} ${ana.lastName}\nDNI: ${ana.dni}\nTeléfonos vinculados:\n${phone}\n\n${anotherQueryQuestion}`,
     ])
     expect(ai.rewritten).toEqual([])
     expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
   })
 
-  it('los datos sin teléfonos registrados los anuncia como ninguno', async () => {
+  it('los datos sin teléfonos registrados los anuncia como ninguno y al final pregunta si tiene otra consulta', async () => {
     link(phone, ana)
     ai.intents.set('¿qué datos tengo?', 'mis datos')
     await expect(send('¿qué datos tengo?')).resolves.toMatchObject({ status: 'CUSTOMER_DATA_SENT' })
     expect(lastText()).toContain('Teléfonos vinculados: ninguno')
     expect(lastText()).toContain(`DNI: ${ana.dni}`)
+    expect(lastText()).toBe(
+      `Sus datos registrados:\nNombre y apellido: ${ana.firstName} ${ana.lastName}\nDNI: ${ana.dni}\nTeléfonos vinculados: ninguno\n\n${anotherQueryQuestion}`,
+    )
   })
 
   it('antes de identificarse, pedir los datos avisa que no se identificó y sigue con la pregunta pendiente en el mismo mensaje', async () => {
@@ -451,17 +457,17 @@ describe('pólizas del cliente', () => {
     ai.intents.set('¿cuáles son mis pólizas?', 'mis pólizas')
     await expect(send('¿cuáles son mis pólizas?')).resolves.toMatchObject({ status: 'CUSTOMER_POLICIES_SENT', intent: 'mis pólizas' })
     expect(whatsapp.textsTo(phone)).toEqual([
-      'Sus pólizas:\n- POL-90001 (auto): activa, vence el 15/03/2027.\n- POL-90002 (hogar): vencida, venció el 01/09/2026.',
+      `Sus pólizas:\n- POL-90001 (auto): activa, vence el 15/03/2027.\n- POL-90002 (hogar): vencida, venció el 01/09/2026.\n\n${anotherQueryQuestion}`,
     ])
     expect(ai.rewritten).toEqual([])
     expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
   })
 
-  it('un cliente identificado sin ninguna póliza le avisa que no tiene registradas, sin derivar', async () => {
+  it('un cliente identificado sin ninguna póliza le avisa que no tiene registradas y al final pregunta si tiene otra consulta', async () => {
     link(phone, carla)
     ai.intents.set('¿qué pólizas tengo?', 'mis pólizas')
     await expect(send('¿qué pólizas tengo?')).resolves.toMatchObject({ status: 'CUSTOMER_POLICIES_SENT' })
-    expect(lastText()).toBe(noPoliciesMessage)
+    expect(lastText()).toBe(`${noPoliciesMessage}\n\n${anotherQueryQuestion}`)
     expect(ai.rewritten).toEqual([])
     expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
   })
@@ -759,6 +765,48 @@ describe('reinicio del backend', () => {
     const ended = store.snapshot().conversations.find((item) => item.id === previous.id)
     expect(ended?.endedAt).toEqual(start)
     expect(casesOf(previous.id).every((item) => item.closedAt !== null)).toBe(true)
+  })
+})
+
+describe('no repetir el Hola', () => {
+  it('el saludo en medio de la charla contesta «¿En qué más puedo ayudarle?», sin volver a empezar con Hola', async () => {
+    link(phone, ana)
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await send('¿qué datos tengo?')
+    ai.intents.set('gracias', 'saludo')
+    await expect(send('gracias')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
+    expect(lastText()).toBe('¿En qué más puedo ayudarle?')
+    expect(lastText()).not.toContain('Hola')
+  })
+
+  it('al identificarse en la misma charla se agradece en vez de volver a saludar', async () => {
+    link(phone, ana, bruno)
+    await expect(send('123')).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'WELCOME_SENT' })
+    expect(lastText()).toBe(welcomeMessage(ana, false))
+    expect(lastText()).toContain('Gracias, Ana')
+    expect(lastText()).not.toContain('Hola')
+  })
+
+  it('con el cliente de 15 horas o más en silencio, el saludo vuelve a empezar con Hola', async () => {
+    link(phone, ana)
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await send('¿qué datos tengo?')
+    later(15 * 60)
+    ai.intents.set('gracias', 'saludo')
+    await expect(send('gracias')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
+    expect(lastText()).toBe(welcomeMessage(ana))
+    expect(lastText()).toContain('Hola, Ana')
+  })
+
+  it('con la conversación terminada por inactividad y menos de 15 horas, el hola no vuelve a saludar', async () => {
+    link(phone, ana)
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await send('¿qué datos tengo?')
+    later(31)
+    ai.intents.set('hola', 'saludo')
+    await expect(send('hola')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
+    expect(lastText()).toBe('¿En qué más puedo ayudarle?')
   })
 })
 

@@ -4,6 +4,7 @@ import {
   casesClosedWithConversation,
   endByInactivity,
   endByRestart,
+  freshGreeting,
   intentContext,
   isQueryType,
   parseSettings,
@@ -98,6 +99,25 @@ describe('el caso de cada mensaje', () => {
     expect(isQueryType('mis pólizas')).toBe(false)
     expect(isQueryType('otra consulta')).toBe(false)
     expect(isQueryType('no se entiende')).toBe(false)
+  })
+
+  it('el Hola corresponde sin conversación, con el cliente reciente no, y con el de 15 horas en silencio sí', () => {
+    const at = new Date('2026-11-01T15:00:00Z')
+    expect(freshGreeting(null, at)).toBe(true)
+    expect(freshGreeting(withLastMessage(new Date('2026-11-01T14:30:00Z')), at)).toBe(false)
+    expect(freshGreeting(withLastMessage(new Date('2026-11-01T00:00:00Z')), at)).toBe(true)
+  })
+
+  it('con solo mensajes del asistente cuenta desde el inicio de la conversación', () => {
+    const at = new Date('2026-11-01T15:00:00Z')
+    const started = new Date('2026-11-01T14:30:00Z')
+    const assistantOnly: OpenConversation = {
+      ...withLastMessage(started),
+      startedAt: started,
+      messages: [{ id: 100, caseId: 10, origin: 'asistente', text: 'Hola', sentAt: started }],
+    }
+    expect(freshGreeting(assistantOnly, at)).toBe(false)
+    expect(freshGreeting({ ...assistantOnly, startedAt: new Date('2026-10-31T00:00:00Z') }, at)).toBe(true)
   })
 
   it('«no es de seguros» va al caso actual sin cambiarlo', () => {

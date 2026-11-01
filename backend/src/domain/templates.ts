@@ -51,6 +51,10 @@ export const notIdentifiedPoliciesNotice = 'Todavía no se identificó, por lo q
 // Cliente identificado sin ninguna póliza en la cartera: no hay listado que mostrar.
 export const noPoliciesMessage = 'No tiene pólizas registradas en la empresa.'
 
+// Después de contestar los datos o las pólizas que pidió un cliente identificado, se le
+// pregunta si sigue con algo más, en el mismo mensaje, para no dejar la respuesta colgada.
+export const anotherQueryQuestion = '¿Tiene alguna otra consulta?'
+
 // El listado de pólizas del cliente identificado, una línea por póliza con su número, su
 // ramo, su estado y su vencimiento. Como los datos personales, no pasa por la redacción
 // del proveedor de IA: son datos de la cartera y tienen que salir tal cual.
@@ -140,12 +144,13 @@ function displayStatus(policy: CustomerPolicy, now: Date): string {
   return policy.status === 'activa' && isExpired(policy, now) ? 'vencida' : policy.status
 }
 
-export function welcomeMessage(customer: Customer): string {
-  return `Hola, ${customer.firstName}. ¿En qué lo puedo ayudar?`
+export function welcomeMessage(customer: Customer, fresh = true): string {
+  const greeting = fresh ? `Hola, ${customer.firstName}` : `Gracias, ${customer.firstName}`
+  return `${greeting}. ¿En qué lo puedo ayudar?`
 }
 
-export function courtesyTemplate(customer: Customer): string {
-  return `Hola, ${customer.firstName}. ¿En qué lo puedo ayudar?`
+export function courtesyTemplate(customer: Customer, fresh = true): string {
+  return fresh ? `Hola, ${customer.firstName}. ¿En qué lo puedo ayudar?` : '¿En qué más puedo ayudarle?'
 }
 
 export function expirationsTemplate(customer: Customer, now: Date): string {

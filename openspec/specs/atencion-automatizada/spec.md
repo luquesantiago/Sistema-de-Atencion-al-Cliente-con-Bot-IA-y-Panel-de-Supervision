@@ -373,6 +373,26 @@ El sistema SHALL dar por terminada la conversación de un número cuando ese nú
 - **WHEN** una conversación termina por inactividad o porque se reinició el backend
 - **THEN** se cierran sus casos no derivados que no tienen una alerta sin atender ni una solicitud sin decidir, y quedan sin responsable; los demás casos siguen como estaban
 
+### Requirement: El «Hola» no se repite en la misma charla
+
+El sistema SHALL empezar con «Hola, {nombre}» la bienvenida y la cortesía de un saludo solo cuando el cliente hace 15 horas o más que no escribe (o es su primer mensaje en esa charla); con menos de 15 horas de silencio, la bienvenida agradece en vez de saludar («Gracias, {nombre}. ¿En qué lo puedo ayudar?») y la cortesía le pregunta en qué más puede ayudarle («¿En qué más puedo ayudarle?»), para que la conversación no vuelva a empezar cada vez que el cliente escribe un mensaje más.
+
+#### Scenario: Identificarse en la misma charla
+- **WHEN** una persona se identifica con su DNI en la charla donde ya venía hablando con el asistente
+- **THEN** el asistente le agradece por su nombre y le pregunta en qué lo puede ayudar, sin saludar de nuevo con «Hola»
+
+#### Scenario: Un saludo en medio de la charla
+- **WHEN** un cliente identificado que escribió hace menos de 15 horas manda un saludo o un agradecimiento
+- **THEN** el asistente le pregunta en qué más puede ayudarle, sin volver a empezar con «Hola»
+
+#### Scenario: Consulta guardada que no es de seguros
+- **WHEN** la consulta guardada antes del DNI resulta no ser de seguros y el cliente escribió hace menos de 15 horas
+- **THEN** el asistente le pregunta en qué lo puede ayudar, agradeciendo en vez de saludar de nuevo con «Hola»
+
+#### Scenario: El cliente vuelve después de 15 horas
+- **WHEN** un cliente identificado vuelve a escribir15 horas o más después de su último mensaje
+- **THEN** el asistente vuelve a empezar con «Hola»
+
 ### Requirement: El cliente nuevo queda como prospecto
 
 El sistema SHALL registrar como prospecto pendiente de confirmación a la persona que dice ser cliente nueva y pide contratar un seguro, con el nombre y el DNI que declaró, después de recibir la foto de su DNI, sin guardar una copia de la foto ni darla de alta como cliente: el alta la confirma un operador, que puede ver la foto desde el panel obtenida de WhatsApp en el momento; si el operador rechaza el alta, el caso queda abierto y en silencio, a su cargo, para que le explique el rechazo al cliente antes de cerrarlo (RF-ATE-05).
@@ -447,15 +467,19 @@ El sistema SHALL responder la consulta de información de la agencia con los ram
 
 ### Requirement: Datos del cliente
 
-El sistema SHALL responder la consulta de los datos registrados de un cliente identificado con su nombre y apellido, su DNI y sus teléfonos vinculados, uno por línea, en un solo mensaje y con una plantilla que no pasa por la redacción del proveedor de IA, sin derivar ni mandar a aprobar (RF-ATE-01). La opción «cambio de teléfono» queda reservada para pedir el cambio, no para consultar los datos o los teléfonos ya registrados (RF-CAR-05). Quien pregunta por sus datos antes de identificarse SHALL recibe el aviso de que todavía no se identificó, junto en el mismo mensaje con la pregunta de identificación pendiente, sin cambiar la etapa ni contar un intento de DNI. Quien pregunta por sus datos después de presentarse como cliente nuevo, todavía sin dar sus datos, SHALL recibe el aviso de que no tiene datos registrados junto con la oferta de consultar o contratar, en un solo mensaje, sin avanzar en el alta (RF-ATE-05).
+El sistema SHALL responder la consulta de los datos registrados de un cliente identificado con su nombre y apellido, su DNI y sus teléfonos vinculados, uno por línea, en un solo mensaje y con una plantilla que no pasa por la redacción del proveedor de IA, sin derivar ni mandar a aprobar (RF-ATE-01), y al final de ese mismo mensaje SHALL le pregunte si tiene alguna otra consulta. La opción «cambio de teléfono» queda reservada para pedir el cambio, no para consultar los datos o los teléfonos ya registrados (RF-CAR-05). Quien pregunta por sus datos antes de identificarse SHALL recibe el aviso de que todavía no se identificó, junto en el mismo mensaje con la pregunta de identificación pendiente, sin cambiar la etapa ni contar un intento de DNI. Quien pregunta por sus datos después de presentarse como cliente nuevo, todavía sin dar sus datos, SHALL recibe el aviso de que no tiene datos registrados junto con la oferta de consultar o contratar, en un solo mensaje, sin avanzar en el alta (RF-ATE-05).
 
 #### Scenario: Cliente identificado pregunta por sus teléfonos vinculados
 - **WHEN** un cliente identificado escribe «¿qué números tengo vinculados?» y la intención elegida es «mis datos»
 - **THEN** el asistente le contesta en un solo mensaje con su nombre y apellido, su DNI y sus teléfonos vinculados, uno por línea, sin redacción del proveedor de IA, sin derivar y sin pedirle que escriba desde otro número
 
+#### Scenario: Después de los datos, le pregunta si tiene alguna otra consulta
+- **WHEN** un cliente identificado pregunta por sus datos o por sus teléfonos vinculados y recibe la respuesta
+- **THEN** el asistente le agrega al final de ese mismo mensaje la pregunta de si tiene alguna otra consulta, sin mandar otro envío y sin derivar
+
 #### Scenario: Sin teléfonos registrados
 - **WHEN** un cliente identificado pregunta por sus datos y no tiene teléfonos vinculados registrados
-- **THEN** el asistente le contesta con su nombre y su DNI y le dice que no tiene teléfonos vinculados
+- **THEN** el asistente le contesta con su nombre y su DNI, le dice que no tiene teléfonos vinculados y, en el mismo mensaje, le pregunta si tiene alguna otra consulta
 
 #### Scenario: El pedido de cambio de teléfono no es una consulta de datos
 - **WHEN** un cliente identificado escribe «cambié de número»
@@ -471,15 +495,19 @@ El sistema SHALL responder la consulta de los datos registrados de un cliente id
 
 ### Requirement: Pólizas del cliente
 
-El sistema SHALL responder la consulta del listado de las pólizas de un cliente identificado con una línea por póliza, con su número, su ramo, su estado y su fecha de vencimiento, en un solo mensaje y con una plantilla que no pasa por la redacción del proveedor de IA, sin derivar ni mandar a aprobar (RF-ATE-01). Sin ninguna póliza registrada SHALL le avise que no tiene pólizas en la empresa, en vez de derivar por dato faltante (RF-ATE-02). El estado, el vencimiento y el saldo de una póliza siguen siendo consultas propias, con su redacción y con sus derivaciones (RF-ATE-02). Quien pregunta por sus pólizas antes de identificarse SHALL recibe el aviso de que todavía no se identificó, junto en el mismo mensaje con la pregunta de identificación pendiente, sin cambiar la etapa ni contar un intento de DNI. Quien pregunta por sus pólizas después de presentarse como cliente nuevo, todavía sin dar sus datos, SHALL reciba el aviso de que no tiene pólizas registradas junto con la oferta de consultar o contratar, en un solo mensaje, sin avanzar en el alta (RF-ATE-05).
+El sistema SHALL responder la consulta del listado de las pólizas de un cliente identificado con una línea por póliza, con su número, su ramo, su estado y su fecha de vencimiento, en un solo mensaje y con una plantilla que no pasa por la redacción del proveedor de IA, sin derivar ni mandar a aprobar (RF-ATE-01), y al final de ese mismo mensaje SHALL le pregunte si tiene alguna otra consulta. Sin ninguna póliza registrada SHALL le avise que no tiene pólizas en la empresa, en vez de derivar por dato faltante (RF-ATE-02). El estado, el vencimiento y el saldo de una póliza siguen siendo consultas propias, con su redacción y con sus derivaciones (RF-ATE-02). Quien pregunta por sus pólizas antes de identificarse SHALL recibe el aviso de que todavía no se identificó, junto en el mismo mensaje con la pregunta de identificación pendiente, sin cambiar la etapa ni contar un intento de DNI. Quien pregunta por sus pólizas después de presentarse como cliente nuevo, todavía sin dar sus datos, SHALL reciba el aviso de que no tiene pólizas registradas junto con la oferta de consultar o contratar, en un solo mensaje, sin avanzar en el alta (RF-ATE-05).
 
 #### Scenario: Cliente identificado pregunta por sus pólizas
 - **WHEN** un cliente identificado escribe «¿cuáles son mis pólizas?» y la intención elegida es «mis pólizas»
 - **THEN** el asistente le contesta en un solo mensaje con una línea por póliza, con número, ramo, estado y vencimiento, sin redacción del proveedor de IA, sin derivar y sin pedirle que escriba desde otro número
 
+#### Scenario: Después del listado, le pregunta si tiene alguna otra consulta
+- **WHEN** un cliente identificado pregunta por sus pólizas y recibe la respuesta
+- **THEN** el asistente le agrega al final de ese mismo mensaje la pregunta de si tiene alguna otra consulta, sin mandar otro envío y sin derivar
+
 #### Scenario: Cliente identificado sin ninguna póliza
 - **WHEN** un cliente identificado pregunta por sus pólizas y la cartera no tiene ninguna póliza suya
-- **THEN** el asistente le contesta que no tiene pólizas registradas en la empresa, sin derivar por dato faltante
+- **THEN** el asistente le contesta que no tiene pólizas registradas en la empresa, con la pregunta de si tiene alguna otra consulta en el mismo mensaje, sin derivar por dato faltante
 
 #### Scenario: El estado, el vencimiento o el saldo de una póliza siguen siendo consultas propias
 - **WHEN** un cliente identificado escribe «¿en qué estado está mi póliza?», «¿cuándo vence mi póliza?» o «¿cuánto debo?»
