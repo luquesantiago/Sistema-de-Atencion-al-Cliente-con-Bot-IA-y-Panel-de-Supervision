@@ -97,6 +97,27 @@ describe('classifyIntent', () => {
     expect(line).toContain('iniciar el alta')
   })
 
+  it('separa «mis datos» de «cambio de teléfono»: consultar los teléfonos no pide el cambio', async () => {
+    const requests: RecordedRequest[] = []
+    await clientWith(fakeFetch(200, completion({ intencion: 'mis datos' }), requests)).classifyIntent('¿qué números tengo vinculados?', [])
+    const body = requests[0]?.body as { response_format: { json_schema: { schema: { properties: { intencion: { enum: string[] } } } } } }
+    expect(body.response_format.json_schema.schema.properties.intencion.enum).toContain('mis datos')
+    const line = (intent: string) => intentInstructions.split('\n').find((item) => item.startsWith(`- ${intent}:`)) ?? ''
+    expect(line('mis datos')).toContain('los teléfonos que tiene vinculados')
+    expect(line('cambio de teléfono')).toContain('no es para consultar')
+  })
+
+  it('separa «mis pólizas» del estado, el vencimiento y el saldo de una póliza', async () => {
+    const requests: RecordedRequest[] = []
+    await clientWith(fakeFetch(200, completion({ intencion: 'mis pólizas' }), requests)).classifyIntent('¿cuáles son mis pólizas?', [])
+    const body = requests[0]?.body as { response_format: { json_schema: { schema: { properties: { intencion: { enum: string[] } } } } } }
+    expect(body.response_format.json_schema.schema.properties.intencion.enum).toContain('mis pólizas')
+    const line = (intent: string) => intentInstructions.split('\n').find((item) => item.startsWith(`- ${intent}:`)) ?? ''
+    expect(line('mis pólizas')).toContain('«¿cuáles son mis pólizas?»')
+    expect(line('mis pólizas')).toContain('no es para ver solo el estado')
+    expect(line('mis datos')).toContain('no es para consultar las pólizas')
+  })
+
   it('tiene «información de la agencia» y le da prioridad a lo que se deriva', async () => {
     const requests: RecordedRequest[] = []
     await clientWith(fakeFetch(200, completion({ intencion: 'información de la agencia' }), requests)).classifyIntent('¿dónde están?', [])

@@ -6,13 +6,18 @@ import type { RiskLevel } from './risk-level.js'
 // Conversación por WhatsApp guardada en la base (design.md, decisiones 3, 6 y 7). Son
 // tipos y funciones puras: la base y el envío quedan en el ConversationStore.
 
-// Intenciones que son un valor del catálogo tipo_consulta: todas menos cuatro.
-export type QueryType = Exclude<Intent, 'no es de seguros' | 'contratar' | 'otra consulta' | 'no se entiende'>
+// Intenciones que son un valor del catálogo tipo_consulta: todas menos seis.
+export type QueryType = Exclude<
+  Intent,
+  'no es de seguros' | 'contratar' | 'mis datos' | 'mis pólizas' | 'otra consulta' | 'no se entiende'
+>
 
 export function isQueryType(intent: Intent): intent is QueryType {
   return (
     intent !== 'no es de seguros' &&
     intent !== 'contratar' &&
+    intent !== 'mis datos' &&
+    intent !== 'mis pólizas' &&
     intent !== 'otra consulta' &&
     intent !== 'no se entiende'
   )
@@ -190,6 +195,19 @@ export type ConversationEnd = {
   endedAt: Date
   // Los casos que se cierran con la conversación, sin responsable.
   caseIds: number[]
+}
+
+// El «Hola» vuelve a corresponder recién con el cliente de 15 horas o más en silencio:
+// antes de eso, en el mismo chat la charla se retoma sin volver a saludar (decisión de
+// Valentina del 01/11/2026). Se mira el último mensaje del cliente de la conversación,
+// abierta o la que acaba de terminar por inactividad.
+export const greetingIdleMs = 15 * 60 * 60_000
+
+export function freshGreeting(conversation: OpenConversation | null, now: Date): boolean {
+  if (!conversation) return true
+  const lastClient = conversation.messages.findLast((message) => message.origin === 'cliente')
+  const lastAt = lastClient?.sentAt ?? conversation.startedAt
+  return now.getTime() - lastAt.getTime() >= greetingIdleMs
 }
 
 function lastActivity(conversation: OpenConversation): Date {

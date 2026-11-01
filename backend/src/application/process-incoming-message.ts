@@ -6,6 +6,7 @@ import {
   isQueryType,
   endByInactivity,
   endByRestart,
+  freshGreeting,
   intentContext,
   type CaseChoice,
   type CaseRef,
@@ -26,20 +27,27 @@ import { checkRewrite } from '../domain/rewrite-check.js'
 import { handoffRiskLevel, queryTypeRiskLevel, type RiskLevel, type Urgency } from '../domain/risk-level.js'
 import {
   approvalNotice,
+  anotherQueryQuestion,
   clarificationRequestFor,
   customerStatusQuestion,
   customerStatusRetryQuestion,
   courtesyTemplate,
+  customerDataTemplate,
+  customerPoliciesTemplate,
   existingCustomerDniRequest,
   expirationsTemplate,
   firstDniRequest,
   handoffMessage,
   newCustomerDniRequest,
   newCustomerNameRequest,
+  newCustomerNoDataAndOffer,
   newCustomerNoDataNotice,
   newCustomerPhotoRequest,
   newCustomerPhotoRetryRequest,
   newCustomerQueryOffer,
+  notIdentifiedDataNotice,
+  notIdentifiedPoliciesNotice,
+  notInsuranceAndNewCustomerOffer,
   notInsuranceMessage,
   phoneChangePendingMessage,
   prospectHandoffMessage,
@@ -88,6 +96,10 @@ export type ProcessResult =
   | { status: 'PROSPECT_HANDED_OFF'; responseSent: true }
   | { status: 'PHONE_CHANGE_PENDING'; answer: ProcessResult['status']; responseSent: true }
   | { status: 'NEW_PHONE_REQUESTED'; intent: Intent; responseSent: true }
+  | { status: 'CUSTOMER_DATA_SENT'; intent: Intent; responseSent: true }
+  | { status: 'CUSTOMER_POLICIES_SENT'; intent: Intent; responseSent: true }
+  | { status: 'NEW_CUSTOMER_NO_DATA'; responseSent: true }
+  | { status: 'IDENTIFICATION_REQUIRED'; responseSent: true }
   | { status: 'WELCOME_SENT'; responseSent: true }
   | { status: 'ANSWER_SENT'; intent: Intent; responseSent: true }
   | { status: 'CLARIFICATION_REQUESTED'; responseSent: true }
@@ -115,6 +127,8 @@ class Turn {
     at: Date,
     text: string,
     closePrevious: ConversationChanges['closePrevious'],
+    // Si con lo que se está charlando todavía corresponde saludar con «Hola» (freshGreeting).
+    public readonly greetingFresh: boolean = true,
   ) {
     this.changes = {
       phone,
@@ -197,9 +211,12 @@ export class ProcessIncomingMessage {
   private async process(message: IncomingWhatsAppMessage): Promise<ProcessResult> {
     const at = this.clock()
     const open = await this.conversations.findOpen(message.phone)
+    // El «Hola» se decide con la conversación abierta o, si esta termina por inactividad o
+    // reinicio, con la que terminó: la charla reciente no vuelve a saludar.
+    const greetingFresh = freshGreeting(open, at)
 
     if (open?.suspended) {
-      const turn = new Turn(open, message.phone, at, messageTextForCase(message), undefined)
+      const turn = new Turn(open, message.phone, at, messageTextForCase(message), undefined, greetingFresh)
       turn.keepImageRef(message)
       turn.receiveIn(turn.caseFor({ kind: 'suspended' }))
       await this.conversations.save(turn.changes, async () => {})
@@ -226,7 +243,7 @@ export class ProcessIncomingMessage {
     }
 
     const text = message.media === 'image' ? prospectPhotoText : message.text
-    const turn = new Turn(conversation, message.phone, at, text, closePrevious)
+    const turn = new Turn(conversation, message.phone, at, text, closePrevious, greetingFresh)
     turn.keepImageRef(message)
     const result = await this.decide(turn, stage, message, settings)
     if (!turn.hasIncomingCase) turn.receiveIn(turn.caseFor({ kind: 'identifying' }))
@@ -278,7 +295,7 @@ export class ProcessIncomingMessage {
     if (linkedIds.length > 1) {
       const identification: Identification = { linkedIds, pending, unrecognizedDnis: 0 }
       if (findDni(text)) return this.identifyByDni(turn, identification, text, settings)
-      const info = await this.agencyInfoBeforeIdentifying(
+      const info = await this.replyBeforeIdentifying(
         turn,
         text,
         repeatedDniRequest,
@@ -293,7 +310,7 @@ export class ProcessIncomingMessage {
     }
 
     const identification: Identification = { linkedIds: [], pending, unrecognizedDnis: 0 }
-    const info = await this.agencyInfoBeforeIdentifying(
+    const info = await this.replyBeforeIdentifying(
       turn,
       text,
       customerStatusQuestion,
@@ -307,7 +324,7 @@ export class ProcessIncomingMessage {
 
   private async classifyCustomerStatus(turn: Turn, stage: Identification, reply: string): Promise<ProcessResult> {
     const identification = identificationOf(stage)
-    const info = await this.agencyInfoBeforeIdentifying(
+    const info = await this.replyBeforeIdentifying(
       turn,
       reply,
       customerStatusQuestion,
@@ -354,7 +371,7 @@ export class ProcessIncomingMessage {
     try {
       ;({ intent } = await this.ai.classifyIntent(question, intentContext(turn.conversation)))
     } catch {
-      return this.handoffIdentifying(turn, { kind: 'provider-failure', step: 'intent' })
+      return this.clarifyNewCustomer(turn, stage, { kind: 'provider-failure', step: 'intent' })
     }
 
     switch (intent) {
@@ -375,25 +392,22 @@ export class ProcessIncomingMessage {
         return { status: 'AGENCY_INFO_SENT', responseSent: true }
       }
       case 'no es de seguros':
-        this.replyIdentifying(turn, notInsuranceMessage)
-        this.replyIdentifying(turn, newCustomerQueryOffer)
+        this.replyIdentifying(turn, notInsuranceAndNewCustomerOffer)
         turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
         return { status: 'NOT_INSURANCE_REPLIED', responseSent: true }
       case 'saludo':
         this.replyIdentifying(turn, newCustomerQueryOffer)
         turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
         return { status: 'NEW_CUSTOMER_OFFER_SENT', responseSent: true }
-      case 'no se entiende': {
-        const step = clarificationStep(stage.notUnderstood)
-        if (step.kind === 'handoff') return this.handoffIdentifying(turn, { kind: 'not-understood' })
-        this.replyIdentifying(turn, clarificationRequestFor(step.notUnderstood))
-        turn.nextStage = () => ({
-          stage: 'awaiting_new_customer_query',
-          notUnderstood: step.notUnderstood,
-          ...identification,
-        })
-        return { status: 'CLARIFICATION_REQUESTED', responseSent: true }
-      }
+      case 'mis datos':
+      case 'mis pólizas':
+        // Todavía no es cliente: no tiene datos ni pólizas que mostrar, y se vuelve a
+        // ofrecer en el mismo mensaje, sin mandar dos envíos seguidos.
+        this.replyIdentifying(turn, newCustomerNoDataAndOffer)
+        turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
+        return { status: 'NEW_CUSTOMER_NO_DATA', responseSent: true }
+      case 'no se entiende':
+        return this.clarifyNewCustomer(turn, stage, { kind: 'not-understood' })
       default:
         // Una consulta que necesita un cliente identificado: al no ser cliente, no tiene
         // pólizas ni datos. Se vuelve a preguntar si ya es cliente.
@@ -404,11 +418,30 @@ export class ProcessIncomingMessage {
     }
   }
 
+  // No se pudo decidir el mensaje (no se entendió o falló el proveedor de IA): se repregunta con
+  // una redacción distinta por intento, sin derivar de entrada. Recién con las repreguntas
+  // agotadas se deriva con `reason`.
+  private clarifyNewCustomer(
+    turn: Turn,
+    stage: Identification & { notUnderstood: number },
+    reason: HandoffReason,
+  ): ProcessResult {
+    const step = clarificationStep(stage.notUnderstood)
+    if (step.kind === 'handoff') return this.handoffIdentifying(turn, reason)
+    this.replyIdentifying(turn, clarificationRequestFor(step.notUnderstood))
+    turn.nextStage = () => ({
+      stage: 'awaiting_new_customer_query',
+      notUnderstood: step.notUnderstood,
+      ...identificationOf(stage),
+    })
+    return { status: 'CLARIFICATION_REQUESTED', responseSent: true }
+  }
+
   private async identifyByDni(turn: Turn, stage: Identification, text: string, settings: Settings): Promise<ProcessResult> {
     const identification = identificationOf(stage)
     const dni = findDni(text)
     if (!dni) {
-      const info = await this.agencyInfoBeforeIdentifying(
+      const info = await this.replyBeforeIdentifying(
         turn,
         text,
         repeatedDniRequest,
@@ -467,7 +500,7 @@ export class ProcessIncomingMessage {
   ): Promise<ProcessResult> {
     turn.nextStage = () => ({ stage: 'identified', customerId: customer.id, notUnderstood: 0 })
     if (!pending) {
-      turn.reply(welcomeCase ?? turn.caseFor({ kind: 'identifying' }), welcomeMessage(customer))
+      turn.reply(welcomeCase ?? turn.caseFor({ kind: 'identifying' }), welcomeMessage(customer, turn.greetingFresh))
       return { status: 'WELCOME_SENT', responseSent: true }
     }
     const caseId = pending.answers === 'incoming' ? undefined : turn.caseOfMessage(pending.answers.existing)
@@ -562,7 +595,14 @@ export class ProcessIncomingMessage {
     try {
       ({ intent, urgency } = await this.ai.classifyIntent(question, context))
     } catch {
-      return this.handoffIn(turn, caseFor('otra consulta'), { kind: 'provider-failure', step: 'intent' })
+      // No se pudo decidir la intención: se repregunta como si no se entendiera, sin derivar de
+      // entrada. Recién con las repreguntas agotadas se deriva por falla del proveedor.
+      const step = clarificationStep(notUnderstood)
+      const ref = caseFor('otra consulta')
+      if (step.kind === 'handoff') return this.handoffIn(turn, ref, { kind: 'provider-failure', step: 'intent' }, query.answers)
+      turn.reply(ref, clarificationRequestFor(step.notUnderstood), query.answers)
+      turn.nextStage = () => ({ stage: 'identified', customerId: customer.id, notUnderstood: step.notUnderstood })
+      return { status: 'CLARIFICATION_REQUESTED', responseSent: true }
     }
 
     const action = actionForIntent(intent)
@@ -572,7 +612,7 @@ export class ProcessIncomingMessage {
         // La consulta guardada antes de identificarse recibe la bienvenida; un mensaje del
         // cliente identificado, el texto fijo, sin redacción ni derivación.
         if (welcomeIfUnrelated) {
-          turn.reply(ref, welcomeMessage(customer), query.answers)
+          turn.reply(ref, welcomeMessage(customer, turn.greetingFresh), query.answers)
           return { status: 'WELCOME_SENT', responseSent: true }
         }
         turn.reply(ref, notInsuranceMessage, query.answers)
@@ -582,6 +622,22 @@ export class ProcessIncomingMessage {
       case 'register':
         // Un cliente identificado que pide contratar: ya es cliente, no hay alta que hacer.
         return this.handoffIn(turn, ref, { kind: 'intent', intent }, query.answers, { intent, urgency })
+      case 'my-data': {
+        // Los datos personales salen de la cartera y no pasan por la redacción del
+        // proveedor de IA: tienen que llegar tal cual. Al final, en el mismo mensaje, se
+        // le pregunta si tiene alguna otra consulta.
+        const detail = await this.customers.findCustomerDetail(customer.id)
+        const phones = detail?.phones.map((phone) => phone.number) ?? []
+        turn.reply(ref, `${customerDataTemplate(customer, phones)}\n\n${anotherQueryQuestion}`, query.answers)
+        return { status: 'CUSTOMER_DATA_SENT', intent, responseSent: true }
+      }
+      case 'my-policies': {
+        // El listado de pólizas tampoco pasa por la redacción del proveedor de IA, y sin
+        // pólizas se le avisa en vez de derivar por dato faltante. Al final, en el mismo
+        // mensaje, se le pregunta si tiene alguna otra consulta.
+        turn.reply(ref, `${customerPoliciesTemplate(customer, this.clock())}\n\n${anotherQueryQuestion}`, query.answers)
+        return { status: 'CUSTOMER_POLICIES_SENT', intent, responseSent: true }
+      }
       case 'clarify': {
         // La repregunta no pasa por la redacción del proveedor de IA, y cada intento usa una
         // redacción distinta para no repetir el mismo mensaje.
@@ -625,7 +681,7 @@ export class ProcessIncomingMessage {
       if (!template) return this.handoffIn(turn, ref, { kind: 'missing-data', data: 'installments' }, answers, { intent })
       return this.sendRewritten(turn, ref, { template, literals: [] }, question, answers, intent, true)
     }
-    const template = this.fillTemplate(customer, templateKind)
+    const template = this.fillTemplate(turn, customer, templateKind)
     return this.sendRewritten(turn, ref, { template, literals: [] }, question, answers, intent)
   }
 
@@ -662,22 +718,24 @@ export class ProcessIncomingMessage {
     return { status: 'ANSWER_SENT', intent, responseSent: true }
   }
 
-  private fillTemplate(customer: Customer, templateKind: Exclude<AnswerTemplate, 'agency' | 'balance'>): string {
+  private fillTemplate(turn: Turn, customer: Customer, templateKind: Exclude<AnswerTemplate, 'agency' | 'balance'>): string {
     switch (templateKind) {
       case 'expirations':
         return expirationsTemplate(customer, this.clock())
       case 'statuses':
         return statusesTemplate(customer, this.clock())
       case 'courtesy':
-        return courtesyTemplate(customer)
+        return courtesyTemplate(customer, turn.greetingFresh)
     }
   }
 
-  // Antes de identificarse, un mensaje sin DNI puede pedir la información de la agencia,
-  // que no es de ningún cliente (RF-ATE-06): se responde en el caso de la identificación y se
-  // repite la pregunta pendiente, sin cambiar la etapa ni contar un intento de DNI. Con otra
-  // intención, o si el proveedor de IA falla, devuelve null y la identificación sigue igual.
-  private async agencyInfoBeforeIdentifying(turn: Turn, text: string, followUp: string, stay: Stage): Promise<ProcessResult | null> {
+  // Antes de identificarse, un mensaje sin DNI puede pedir la información de la agencia, que
+  // no es de ningún cliente (RF-ATE-06), o sus propios datos o sus pólizas, de los que todavía
+  // no hay ningunos porque no se identificó: en el primer caso se responde la información y
+  // en los otros dos se avisa que no se identificó, siempre junto con la pregunta pendiente en
+  // el mismo mensaje, sin cambiar la etapa ni contar un intento de DNI. Con otra intención, o si
+  // el proveedor de IA falla, devuelve null y la identificación sigue igual.
+  private async replyBeforeIdentifying(turn: Turn, text: string, followUp: string, stay: Stage): Promise<ProcessResult | null> {
     if (findDni(text)) return null
     const question = maskDni(text)
     let intent: Intent
@@ -686,6 +744,14 @@ export class ProcessIncomingMessage {
       intent = (await this.ai.classifyIntent(question, intentContext(turn.conversation))).intent
     } catch {
       return null
+    }
+    if (intent === 'mis datos' || intent === 'mis pólizas') {
+      const ref = turn.caseFor({ kind: 'identifying' })
+      turn.receiveIn(ref)
+      const notice = intent === 'mis pólizas' ? notIdentifiedPoliciesNotice : notIdentifiedDataNotice
+      turn.reply(ref, `${notice} ${followUp}`)
+      turn.nextStage = () => stay
+      return { status: 'IDENTIFICATION_REQUIRED', responseSent: true }
     }
     if (intent !== 'información de la agencia') return null
 

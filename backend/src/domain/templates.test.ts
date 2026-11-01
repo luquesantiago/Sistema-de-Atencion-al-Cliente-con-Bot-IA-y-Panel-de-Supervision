@@ -1,14 +1,23 @@
 import { describe, expect, it } from 'vitest'
 import type { Customer } from './customer.js'
 import {
+  anotherQueryQuestion,
   approvalNotice,
   argentinaToday,
+  clarificationRequestFor,
   clarificationRequests,
   courtesyTemplate,
+  customerDataTemplate,
+  customerPoliciesTemplate,
   expirationsTemplate,
   handoffMessage,
+  newCustomerNoDataAndOffer,
   newCustomerNoDataNotice,
   newCustomerQueryOffer,
+  noPoliciesMessage,
+  notIdentifiedDataNotice,
+  notIdentifiedPoliciesNotice,
+  notInsuranceAndNewCustomerOffer,
   notInsuranceMessage,
   statusesTemplate,
   welcomeMessage,
@@ -68,6 +77,10 @@ describe('statusesTemplate', () => {
 })
 
 describe('textos fijos', () => {
+  it('la pregunta por otra consulta, al final de los datos y las pólizas, es fija', () => {
+    expect(anotherQueryQuestion).toBe('¿Tiene alguna otra consulta?')
+  })
+
   it('usa el mensaje de derivación de AGENTS.md', () => {
     expect(handoffMessage).toBe(
       'Su pregunta será derivada a un miembro de nuestro equipo especializado, quien podrá ayudarlo con mayor detalle.',
@@ -89,6 +102,15 @@ describe('textos fijos', () => {
       expect(text).not.toMatch(/\b(auto|moto|vida|hogar|embarcaciones|comercio)\b/)
     }
   })
+
+  it('cada repregunta usa una redacción distinta, para no repetir el mismo mensaje', () => {
+    expect(new Set(clarificationRequests).size).toBe(clarificationRequests.length)
+    expect(clarificationRequestFor(1)).toBe(clarificationRequests[0])
+    expect(clarificationRequestFor(2)).toBe(clarificationRequests[1])
+    expect(clarificationRequestFor(1)).not.toBe(clarificationRequestFor(2))
+    // Un paso fuera del catálogo cae en el último texto.
+    expect(clarificationRequestFor(99)).toBe(clarificationRequests.at(-1))
+  })
 })
 
 describe('bienvenida y cortesía', () => {
@@ -104,8 +126,62 @@ describe('oferta de consulta al cliente nuevo', () => {
     expect(newCustomerQueryOffer).toContain('contratar')
   })
 
+  it('lo que no es de seguros responde el texto fijo y vuelve a ofrecer en un solo mensaje', () => {
+    expect(notInsuranceAndNewCustomerOffer).toContain('no tiene que ver con Seguros Castaño')
+    expect(notInsuranceAndNewCustomerOffer).toContain('consulta')
+    expect(notInsuranceAndNewCustomerOffer).toContain('contratar')
+    expect(notInsuranceAndNewCustomerOffer).not.toMatch(/\bbots?\b|inteligencia artificial|modelo|instrucciones|\bsoy\b|\d/i)
+  })
+
   it('al que todavía no es cliente le avisa que no tiene pólizas ni datos', () => {
     expect(newCustomerNoDataNotice).toContain('no tiene pólizas ni datos')
     expect(newCustomerNoDataNotice).not.toMatch(/\d|POL-/)
+  })
+
+  it('la consulta por sus datos de un cliente nuevo avisa y vuelve a ofrecer en un solo mensaje', () => {
+    expect(newCustomerNoDataAndOffer).toContain('no tiene pólizas ni datos')
+    expect(newCustomerNoDataAndOffer).toContain('consulta')
+    expect(newCustomerNoDataAndOffer).toContain('contratar')
+  })
+})
+
+describe('datos del cliente', () => {
+  it('muestra nombre, DNI y teléfonos, una línea por dato, sin pasar por la redacción de la IA', () => {
+    expect(customerDataTemplate(customer, ['549115555555', '5491166666666'])).toBe(
+      'Sus datos registrados:\nNombre y apellido: Ana Prueba\nDNI: 99000099\nTeléfonos vinculados:\n549115555555\n5491166666666',
+    )
+  })
+
+  it('con ningún teléfono vinculado lo anuncia como ninguno', () => {
+    expect(customerDataTemplate(customer, [])).toBe(
+      'Sus datos registrados:\nNombre y apellido: Ana Prueba\nDNI: 99000099\nTeléfonos vinculados: ninguno',
+    )
+  })
+
+  it('avisa a quien pregunta por sus datos sin haberse identificado', () => {
+    expect(notIdentifiedDataNotice).toContain('no se identificó')
+    expect(notIdentifiedDataNotice).toContain('no le puedo mostrar sus datos')
+  })
+})
+
+describe('pólizas del cliente', () => {
+  it('da una línea por póliza con número, ramo, estado y vencimiento, sin pasar por la redacción de la IA', () => {
+    expect(customerPoliciesTemplate(customer, lateNight)).toBe(
+      [
+        'Sus pólizas:',
+        '- POL-90001 (auto): activa, vence el 04/10/2026.',
+        '- POL-90002 (hogar): vencida, venció el 03/10/2026.',
+      ].join('\n'),
+    )
+  })
+
+  it('con ninguna póliza avisa que no tiene registradas', () => {
+    expect(customerPoliciesTemplate({ ...customer, policies: [] }, lateNight)).toBe(noPoliciesMessage)
+    expect(noPoliciesMessage).toBe('No tiene pólizas registradas en la empresa.')
+  })
+
+  it('avisa a quien pregunta por sus pólizas sin haberse identificado', () => {
+    expect(notIdentifiedPoliciesNotice).toContain('no se identificó')
+    expect(notIdentifiedPoliciesNotice).toContain('sus pólizas')
   })
 })

@@ -6,6 +6,7 @@ import type { Intent } from '../domain/intent.js'
 import type { Urgency } from '../domain/risk-level.js'
 import {
   approvalNotice,
+  anotherQueryQuestion,
   clarificationRequestFor,
   clarificationRequests,
   customerStatusQuestion,
@@ -14,10 +15,15 @@ import {
   firstDniRequest,
   handoffMessage,
   newCustomerNameRequest,
+  newCustomerNoDataAndOffer,
   newCustomerNoDataNotice,
   newCustomerPhotoRequest,
   newCustomerPhotoRetryRequest,
   newCustomerQueryOffer,
+  noPoliciesMessage,
+  notIdentifiedDataNotice,
+  notIdentifiedPoliciesNotice,
+  notInsuranceAndNewCustomerOffer,
   notInsuranceMessage,
   phoneChangePendingMessage,
   prospectHandoffMessage,
@@ -373,12 +379,14 @@ describe('cambio de teléfono (RF-CAR-05)', () => {
     await expect(send('gracias')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
   })
 
-  it('sin consulta guardada manda el aviso y la bienvenida', async () => {
+  it('sin consulta guardada manda el aviso y la bienvenida, sin repetir el Hola de la charla', async () => {
     ai.customerStatuses.set('sí', 'EXISTING_CUSTOMER')
     await send('123')
     await send('sí')
     await expect(send(ana.dni)).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING', answer: 'WELCOME_SENT' })
-    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([phoneChangePendingMessage, welcomeMessage(ana)])
+    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([phoneChangePendingMessage, welcomeMessage(ana, false)])
+    expect(lastText()).toContain('Gracias, Ana')
+    expect(lastText()).not.toContain('Hola')
   })
 
   it('si ya hay una solicitud pendiente, no se crea otra', async () => {
@@ -398,6 +406,88 @@ describe('cambio de teléfono (RF-CAR-05)', () => {
     expect((await openConversation()).suspended).toBe(false)
     ai.intents.set('¿cuándo vence?', 'vencimiento')
     await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'ANSWER_SENT' })
+  })
+})
+
+describe('datos del cliente', () => {
+  it('la consulta por los teléfonos vinculados muestra los datos, sin derivar ni pedir el cambio de teléfono', async () => {
+    customers.addPhoneLink(ana.id, 1, phone)
+    ai.intents.set('¿qué números tengo vinculados?', 'mis datos')
+    await expect(send('¿qué números tengo vinculados?')).resolves.toMatchObject({ status: 'CUSTOMER_DATA_SENT', intent: 'mis datos' })
+    expect(whatsapp.textsTo(phone)).toEqual([
+      `Sus datos registrados:\nNombre y apellido: ${ana.firstName} ${ana.lastName}\nDNI: ${ana.dni}\nTeléfonos vinculados:\n${phone}\n\n${anotherQueryQuestion}`,
+    ])
+    expect(ai.rewritten).toEqual([])
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
+  })
+
+  it('los datos sin teléfonos registrados los anuncia como ninguno y al final pregunta si tiene otra consulta', async () => {
+    link(phone, ana)
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await expect(send('¿qué datos tengo?')).resolves.toMatchObject({ status: 'CUSTOMER_DATA_SENT' })
+    expect(lastText()).toContain('Teléfonos vinculados: ninguno')
+    expect(lastText()).toContain(`DNI: ${ana.dni}`)
+    expect(lastText()).toBe(
+      `Sus datos registrados:\nNombre y apellido: ${ana.firstName} ${ana.lastName}\nDNI: ${ana.dni}\nTeléfonos vinculados: ninguno\n\n${anotherQueryQuestion}`,
+    )
+  })
+
+  it('antes de identificarse, pedir los datos avisa que no se identificó y sigue con la pregunta pendiente en el mismo mensaje', async () => {
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await expect(send('¿qué datos tengo?')).resolves.toMatchObject({ status: 'IDENTIFICATION_REQUIRED' })
+    expect(lastText()).toBe(`${notIdentifiedDataNotice} ${customerStatusQuestion}`)
+    expect((await openConversation()).suspended).toBe(false)
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
+  })
+
+  it('mientras espera el DNI de un número con varios vinculados, avisa que no se identificó y vuelve a pedir el DNI', async () => {
+    link(phone, ana, bruno)
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await expect(send('¿qué datos tengo?')).resolves.toMatchObject({ status: 'IDENTIFICATION_REQUIRED' })
+    expect(lastText()).toBe(`${notIdentifiedDataNotice} ${repeatedDniRequest}`)
+    ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
+    await expect(send('ya soy cliente')).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'WELCOME_SENT' })
+  })
+})
+
+describe('pólizas del cliente', () => {
+  it('la consulta por sus pólizas muestra el listado con número, ramo, estado y vencimiento, sin derivar', async () => {
+    link(phone, ana)
+    ai.intents.set('¿cuáles son mis pólizas?', 'mis pólizas')
+    await expect(send('¿cuáles son mis pólizas?')).resolves.toMatchObject({ status: 'CUSTOMER_POLICIES_SENT', intent: 'mis pólizas' })
+    expect(whatsapp.textsTo(phone)).toEqual([
+      `Sus pólizas:\n- POL-90001 (auto): activa, vence el 15/03/2027.\n- POL-90002 (hogar): vencida, venció el 01/09/2026.\n\n${anotherQueryQuestion}`,
+    ])
+    expect(ai.rewritten).toEqual([])
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
+  })
+
+  it('un cliente identificado sin ninguna póliza le avisa que no tiene registradas y al final pregunta si tiene otra consulta', async () => {
+    link(phone, carla)
+    ai.intents.set('¿qué pólizas tengo?', 'mis pólizas')
+    await expect(send('¿qué pólizas tengo?')).resolves.toMatchObject({ status: 'CUSTOMER_POLICIES_SENT' })
+    expect(lastText()).toBe(`${noPoliciesMessage}\n\n${anotherQueryQuestion}`)
+    expect(ai.rewritten).toEqual([])
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
+  })
+
+  it('antes de identificarse, pedir las pólizas avisa que no se identificó y sigue con la pregunta pendiente en el mismo mensaje', async () => {
+    ai.intents.set('¿cuáles son mis pólizas?', 'mis pólizas')
+    await expect(send('¿cuáles son mis pólizas?')).resolves.toMatchObject({ status: 'IDENTIFICATION_REQUIRED' })
+    expect(lastText()).toBe(`${notIdentifiedPoliciesNotice} ${customerStatusQuestion}`)
+    expect((await openConversation()).suspended).toBe(false)
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
+  })
+
+  it('mientras espera el DNI de un número con varios vinculados, avisa y vuelve a pedir el DNI', async () => {
+    link(phone, ana, bruno)
+    ai.intents.set('¿qué pólizas tengo?', 'mis pólizas')
+    await expect(send('¿qué pólizas tengo?')).resolves.toMatchObject({ status: 'IDENTIFICATION_REQUIRED' })
+    expect(lastText()).toBe(`${notIdentifiedPoliciesNotice} ${repeatedDniRequest}`)
+    ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
+    await expect(send('ya soy cliente')).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'WELCOME_SENT' })
   })
 })
 
@@ -500,11 +590,31 @@ describe('cliente nuevo (RF-ATE-05)', () => {
     expect(lastText()).toBe(newCustomerNameRequest)
   })
 
-  it('«no es de seguros» en la oferta responde el texto fijo y vuelve a ofrecer', async () => {
+  it('«no es de seguros» en la oferta responde el texto fijo y vuelve a ofrecer en un solo mensaje', async () => {
     await upToOffer()
     ai.intents.set('¿me vendés zapatillas?', 'no es de seguros')
     await expect(send('¿me vendés zapatillas?')).resolves.toMatchObject({ status: 'NOT_INSURANCE_REPLIED' })
-    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([notInsuranceMessage, newCustomerQueryOffer])
+    expect(whatsapp.textsTo(phone).slice(-1)).toEqual([notInsuranceAndNewCustomerOffer])
+    expect(notInsuranceAndNewCustomerOffer).toContain('no tiene que ver con Seguros Castaño')
+    expect(notInsuranceAndNewCustomerOffer).toContain('contratar')
+  })
+
+  it('quien todavía no es cliente pregunta por sus datos: avisa que no tiene datos y vuelve a ofrecer en un solo mensaje', async () => {
+    await upToOffer()
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await expect(send('¿qué datos tengo?')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_NO_DATA' })
+    expect(whatsapp.textsTo(phone).slice(-1)).toEqual([newCustomerNoDataAndOffer])
+    expect(whatsapp.textsTo(phone).filter((text) => text === newCustomerNoDataAndOffer)).toHaveLength(1)
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
+  })
+
+  it('quien todavía no es cliente pregunta por sus pólizas: avisa que no tiene y vuelve a ofrecer en un solo mensaje', async () => {
+    await upToOffer()
+    ai.intents.set('¿cuáles son mis pólizas?', 'mis pólizas')
+    await expect(send('¿cuáles son mis pólizas?')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_NO_DATA' })
+    expect(whatsapp.textsTo(phone).slice(-1)).toEqual([newCustomerNoDataAndOffer])
+    expect(whatsapp.textsTo(phone).filter((text) => text === newCustomerNoDataAndOffer)).toHaveLength(1)
+    expect((await openConversation()).cases.some((item) => item.handedOff)).toBe(false)
   })
 
   it('un saludo en la oferta vuelve a ofrecer, sin alta', async () => {
@@ -521,6 +631,18 @@ describe('cliente nuevo (RF-ATE-05)', () => {
     expect(whatsapp.textsTo(phone).slice(-2)).toEqual([newCustomerNoDataNotice, customerStatusQuestion])
   })
 
+  it('con «no se entiende» en la oferta manda solo la repregunta, sin la oferta, y con redacción distinta por intento', async () => {
+    await upToOffer()
+    ai.intents.set('asdfgh', 'no se entiende')
+    await expect(send('asdfgh')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    expect(whatsapp.textsTo(phone).slice(-1)).toEqual([clarificationRequestFor(1)])
+    await expect(send('asdfgh')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    expect(whatsapp.textsTo(phone).slice(-1)).toEqual([clarificationRequestFor(2)])
+    expect(clarificationRequestFor(1)).not.toBe(clarificationRequestFor(2))
+    // Solo la oferta inicial de upToOffer: la repregunta no la vuelve a mandar.
+    expect(whatsapp.textsTo(phone).filter((text) => text === newCustomerQueryOffer)).toHaveLength(1)
+  })
+
   it('con tres «no se entiende» seguidos en la oferta se deriva', async () => {
     await upToOffer()
     ai.intents.set('asdfgh', 'no se entiende')
@@ -529,10 +651,16 @@ describe('cliente nuevo (RF-ATE-05)', () => {
     await expect(send('asdfgh')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'no se entendió la consulta' })
   })
 
-  it('una falla del proveedor al decidir en la oferta deriva', async () => {
+  it('una falla del proveedor al decidir en la oferta repregunta antes de derivar', async () => {
     await upToOffer()
     ai.classifyError = new Error('HTTP 429')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    expect(lastText()).toBe(clarificationRequestFor(1))
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    expect(lastText()).toBe(clarificationRequestFor(2))
+    expect(clarificationRequestFor(1)).not.toBe(clarificationRequestFor(2))
     await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla del proveedor al decidir' })
+    expect(lastText()).toBe(handoffMessage)
   })
 })
 
@@ -640,6 +768,48 @@ describe('reinicio del backend', () => {
   })
 })
 
+describe('no repetir el Hola', () => {
+  it('el saludo en medio de la charla contesta «¿En qué más puedo ayudarle?», sin volver a empezar con Hola', async () => {
+    link(phone, ana)
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await send('¿qué datos tengo?')
+    ai.intents.set('gracias', 'saludo')
+    await expect(send('gracias')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
+    expect(lastText()).toBe('¿En qué más puedo ayudarle?')
+    expect(lastText()).not.toContain('Hola')
+  })
+
+  it('al identificarse en la misma charla se agradece en vez de volver a saludar', async () => {
+    link(phone, ana, bruno)
+    await expect(send('123')).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'WELCOME_SENT' })
+    expect(lastText()).toBe(welcomeMessage(ana, false))
+    expect(lastText()).toContain('Gracias, Ana')
+    expect(lastText()).not.toContain('Hola')
+  })
+
+  it('con el cliente de 15 horas o más en silencio, el saludo vuelve a empezar con Hola', async () => {
+    link(phone, ana)
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await send('¿qué datos tengo?')
+    later(15 * 60)
+    ai.intents.set('gracias', 'saludo')
+    await expect(send('gracias')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
+    expect(lastText()).toBe(welcomeMessage(ana))
+    expect(lastText()).toContain('Hola, Ana')
+  })
+
+  it('con la conversación terminada por inactividad y menos de 15 horas, el hola no vuelve a saludar', async () => {
+    link(phone, ana)
+    ai.intents.set('¿qué datos tengo?', 'mis datos')
+    await send('¿qué datos tengo?')
+    later(31)
+    ai.intents.set('hola', 'saludo')
+    await expect(send('hola')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
+    expect(lastText()).toBe('¿En qué más puedo ayudarle?')
+  })
+})
+
 describe('inactividad', () => {
   it('a los 31 minutos, la identificación empieza en una conversación nueva y se cierran los casos sin nada pendiente', async () => {
     ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
@@ -743,18 +913,21 @@ describe('casos por intención', () => {
     expect((await openConversation()).cases.map((item) => item.type)).toEqual([null])
   })
 
-  it('una falla del proveedor al decidir deriva en un caso sin tipo', async () => {
+  it('una falla del proveedor al decidir repregunta antes de derivar en un caso sin tipo', async () => {
     await identifyShared()
     ai.classifyError = new Error('HTTP 429')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    expect(lastText()).toBe(clarificationRequestFor(1))
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    expect(lastText()).toBe(clarificationRequestFor(2))
     await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla del proveedor al decidir' })
     expect(lastText()).toBe(handoffMessage)
-    expect(whatsapp.textsTo(phone).filter((text) => clarificationRequests.includes(text))).toEqual([])
     expect((await openConversation()).cases.find((item) => item.handedOff)?.type).toBeNull()
   })
 })
 
 describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
-  it('recibe la repregunta fija, sin redacción; con el caso actual con tipo, va a un caso nuevo sin tipo', async () => {
+  it('recibe una repregunta con redacción distinta por intento, sin redacción de la IA; con el caso actual con tipo, va a un caso nuevo sin tipo', async () => {
     link(phone, ana)
     ai.intents.set('¿cuándo vence?', 'vencimiento')
     ai.intents.set('eso que te dije', 'no se entiende')
@@ -762,9 +935,10 @@ describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
     await send('¿cuándo vence?')
     ai.rewritten.length = 0
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
-    expect(clarificationRequests).toContain(lastText())
+    expect(lastText()).toBe(clarificationRequestFor(1))
     await expect(send('lo otro')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
-    expect(clarificationRequests).toContain(lastText())
+    expect(lastText()).toBe(clarificationRequestFor(2))
+    expect(clarificationRequestFor(1)).not.toBe(clarificationRequestFor(2))
     expect(ai.rewritten).toEqual([])
 
     const conversation = await openConversation()
@@ -813,7 +987,7 @@ describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
     ai.intents.set('eso que te dije', 'no se entiende')
     await send('eso que te dije')
     await expect(send(ana.dni)).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
-    expect(clarificationRequests).toContain(lastText())
+    expect(lastText()).toBe(clarificationRequestFor(1))
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'no se entendió la consulta' })
   })
@@ -1410,6 +1584,8 @@ describe('nivel de riesgo al derivar (RF-DER-01)', () => {
   it('una falla del proveedor al decidir queda baja', async () => {
     link(phone, ana)
     ai.classifyError = new Error('Groq no respondió')
+    await send('¿cuándo vence?')
+    await send('¿cuándo vence?')
     await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla del proveedor al decidir' })
     expect(derivedCase()?.riskLevel).toBe('bajo')
   })

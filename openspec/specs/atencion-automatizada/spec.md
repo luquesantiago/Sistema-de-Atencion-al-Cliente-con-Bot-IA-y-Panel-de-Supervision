@@ -59,7 +59,7 @@ El sistema MUST rechazar todo aviso de mensaje entrante que no traiga el secreto
 
 ### Requirement: La acción sale de la intención
 
-El sistema SHALL hacer con cada mensaje de un cliente identificado una sola de estas cosas, según la intención que el proveedor de IA elige de una lista cerrada: responder, contestar con un texto fijo que la consulta no tiene que ver con la agencia, repreguntar, derivar o mandar a aprobar (RF-ATE-01). La lista tiene los tipos de consulta de la agencia, incluida «información de la agencia», más «no es de seguros», «otra consulta», «no se entiende» y «contratar»; «contratar» no es un tipo de consulta de la base y existe solo en el código, y con un cliente identificado deriva, porque ya es cliente y no hay alta que hacer. La acción la decide el sistema según esa intención, no el texto que genere el modelo. El asistente contesta lo que no implica riesgo, deriva lo que se entiende pero no puede responder, repregunta lo que no entiende y, a lo que no es una consulta para la agencia, le contesta con un texto fijo que no tiene que ver con Seguros Castaño.
+El sistema SHALL hacer con cada mensaje de un cliente identificado una sola de estas cosas, según la intención que el proveedor de IA elige de una lista cerrada: responder, contestar con un texto fijo que la consulta no tiene que ver con la agencia, repreguntar, derivar o mandar a aprobar (RF-ATE-01). La lista tiene los tipos de consulta de la agencia, incluida «información de la agencia», más «no es de seguros», «otra consulta», «no se entiende», «contratar», «mis datos» y «mis pólizas»; «contratar», «mis datos» y «mis pólizas» no son tipos de consulta de la base y existen solo en el código, el primero para saber quién quiere iniciar el alta, el segundo para contestar los datos registrados de un cliente identificado y el tercero para el listado de sus pólizas, y con un cliente identificado «contratar» deriva, porque ya es cliente y no hay alta que hacer. La acción la decide el sistema según esa intención, no el texto que genere el modelo. El asistente contesta lo que no implica riesgo, deriva lo que se entiende pero no puede responder, repregunta lo que no entiende y, a lo que no es una consulta para la agencia, le contesta con un texto fijo que no tiene que ver con Seguros Castaño.
 
 #### Scenario: Consulta de vencimiento o de estado
 - **WHEN** la intención elegida es vencimiento o estado de póliza
@@ -115,11 +115,15 @@ El sistema SHALL hacer con cada mensaje de un cliente identificado una sola de e
 
 #### Scenario: Consulta que no se entiende
 - **WHEN** la intención elegida es «no se entiende»
-- **THEN** el asistente le repregunta con el texto fijo, sin derivar mientras no sea el tercer mensaje seguido que no se entiende
+- **THEN** el asistente le repregunta con una redacción propia que no pasa por la IA, sin derivar mientras no sea el tercer mensaje seguido que no se entiende
 
-#### Scenario: Falla del proveedor de IA al decidir
-- **WHEN** el proveedor de IA no responde, responde con error o devuelve algo que no es una de las opciones de la lista, al clasificar si la persona ya es cliente o al elegir la intención del mensaje de un cliente identificado
+#### Scenario: Falla del proveedor de IA al clasificar si la persona ya es cliente
+- **WHEN** el proveedor de IA no responde, responde con error o devuelve algo que no es una de las opciones de la lista, al clasificar si la persona ya es cliente o es nueva
 - **THEN** el asistente le manda el mensaje de derivación, sin mencionar la falla, bots ni inteligencia artificial, y deja de responder en esa conversación
+
+#### Scenario: Falla del proveedor de IA al elegir la intención
+- **WHEN** el proveedor de IA no responde, responde con error o devuelve algo que no es una de las opciones de la lista, al elegir la intención del mensaje de un cliente identificado o de un cliente nuevo que todavía no pidió el alta
+- **THEN** el asistente le repregunta con la misma repregunta que si no se entendiera, sin mencionar la falla ni reenviar la oferta, y sin derivar mientras no sea el tercer mensaje seguido; con el tercer mensaje seguido, le manda el mensaje de derivación sin mencionar la falla y deja de responder en esa conversación
 
 ### Requirement: Vencimiento y estado de todas las pólizas
 
@@ -333,6 +337,18 @@ El sistema SHALL volver a preguntar si la persona ya es cliente o si es nueva ca
 - **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, pregunta por un dato que solo un cliente identificado tiene (por ejemplo, cuánto debe)
 - **THEN** el asistente le avisa que, como todavía no es cliente, no tiene pólizas ni datos registrados, y vuelve a preguntarle si ya es cliente o es nuevo
 
+#### Scenario: El cliente nuevo pide algo que no es de seguros
+- **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, escribe algo que la intención clasifica como «no es de seguros», por ejemplo «quiero un café»
+- **THEN** el asistente le contesta en un solo mensaje, primero que esa consulta no tiene que ver con Seguros Castaño y después la oferta de resolver consultas o contratar, sin pedirle una redacción al proveedor de IA, sin derivar y sin mandar los dos textos en dos envíos seguidos
+
+#### Scenario: El cliente nuevo escribe algo que no se entiende
+- **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, escribe algo que la intención clasifica como «no se entiende»
+- **THEN** el asistente solo le repregunta, con una redacción propia distinta en cada intento y sin volver a mandar la oferta, hasta 2 veces seguidas; al tercer mensaje seguido que no se entiende, deriva
+
+#### Scenario: Falla del proveedor de IA con el cliente nuevo en la oferta
+- **WHEN** con quien se presentó como cliente nuevo, todavía sin dar sus datos, el proveedor de IA falla al elegir la intención de un mensaje
+- **THEN** el asistente solo le repregunta, con la misma redacción propia distinta por intento y sin reenviar la oferta, hasta 2 veces seguidas; al tercer mensaje seguido, le manda el mensaje de derivación sin mencionar la falla
+
 #### Scenario: Base sin la cartera migrada
 - **WHEN** la base no tiene cargada la planilla histórica y una persona escribe su DNI
 - **THEN** el DNI no se reconoce y el asistente sigue el flujo de DNI no reconocido
@@ -356,6 +372,26 @@ El sistema SHALL dar por terminada la conversación de un número cuando ese nú
 #### Scenario: Casos que se cierran con la conversación
 - **WHEN** una conversación termina por inactividad o porque se reinició el backend
 - **THEN** se cierran sus casos no derivados que no tienen una alerta sin atender ni una solicitud sin decidir, y quedan sin responsable; los demás casos siguen como estaban
+
+### Requirement: El «Hola» no se repite en la misma charla
+
+El sistema SHALL empezar con «Hola, {nombre}» la bienvenida y la cortesía de un saludo solo cuando el cliente hace 15 horas o más que no escribe (o es su primer mensaje en esa charla); con menos de 15 horas de silencio, la bienvenida agradece en vez de saludar («Gracias, {nombre}. ¿En qué lo puedo ayudar?») y la cortesía le pregunta en qué más puede ayudarle («¿En qué más puedo ayudarle?»), para que la conversación no vuelva a empezar cada vez que el cliente escribe un mensaje más.
+
+#### Scenario: Identificarse en la misma charla
+- **WHEN** una persona se identifica con su DNI en la charla donde ya venía hablando con el asistente
+- **THEN** el asistente le agradece por su nombre y le pregunta en qué lo puede ayudar, sin saludar de nuevo con «Hola»
+
+#### Scenario: Un saludo en medio de la charla
+- **WHEN** un cliente identificado que escribió hace menos de 15 horas manda un saludo o un agradecimiento
+- **THEN** el asistente le pregunta en qué más puede ayudarle, sin volver a empezar con «Hola»
+
+#### Scenario: Consulta guardada que no es de seguros
+- **WHEN** la consulta guardada antes del DNI resulta no ser de seguros y el cliente escribió hace menos de 15 horas
+- **THEN** el asistente le pregunta en qué lo puede ayudar, agradeciendo en vez de saludar de nuevo con «Hola»
+
+#### Scenario: El cliente vuelve después de 15 horas
+- **WHEN** un cliente identificado vuelve a escribir15 horas o más después de su último mensaje
+- **THEN** el asistente vuelve a empezar con «Hola»
 
 ### Requirement: El cliente nuevo queda como prospecto
 
@@ -429,6 +465,62 @@ El sistema SHALL responder la consulta de información de la agencia con los ram
 - **WHEN** la conversación está en silencio porque tiene un caso derivado sin cerrar y la persona pregunta qué seguros tienen
 - **THEN** el asistente no le responde ni le envía el mensaje al proveedor de IA, y el mensaje queda guardado en el caso derivado
 
+### Requirement: Datos del cliente
+
+El sistema SHALL responder la consulta de los datos registrados de un cliente identificado con su nombre y apellido, su DNI y sus teléfonos vinculados, uno por línea, en un solo mensaje y con una plantilla que no pasa por la redacción del proveedor de IA, sin derivar ni mandar a aprobar (RF-ATE-01), y al final de ese mismo mensaje SHALL le pregunte si tiene alguna otra consulta. La opción «cambio de teléfono» queda reservada para pedir el cambio, no para consultar los datos o los teléfonos ya registrados (RF-CAR-05). Quien pregunta por sus datos antes de identificarse SHALL recibe el aviso de que todavía no se identificó, junto en el mismo mensaje con la pregunta de identificación pendiente, sin cambiar la etapa ni contar un intento de DNI. Quien pregunta por sus datos después de presentarse como cliente nuevo, todavía sin dar sus datos, SHALL recibe el aviso de que no tiene datos registrados junto con la oferta de consultar o contratar, en un solo mensaje, sin avanzar en el alta (RF-ATE-05).
+
+#### Scenario: Cliente identificado pregunta por sus teléfonos vinculados
+- **WHEN** un cliente identificado escribe «¿qué números tengo vinculados?» y la intención elegida es «mis datos»
+- **THEN** el asistente le contesta en un solo mensaje con su nombre y apellido, su DNI y sus teléfonos vinculados, uno por línea, sin redacción del proveedor de IA, sin derivar y sin pedirle que escriba desde otro número
+
+#### Scenario: Después de los datos, le pregunta si tiene alguna otra consulta
+- **WHEN** un cliente identificado pregunta por sus datos o por sus teléfonos vinculados y recibe la respuesta
+- **THEN** el asistente le agrega al final de ese mismo mensaje la pregunta de si tiene alguna otra consulta, sin mandar otro envío y sin derivar
+
+#### Scenario: Sin teléfonos registrados
+- **WHEN** un cliente identificado pregunta por sus datos y no tiene teléfonos vinculados registrados
+- **THEN** el asistente le contesta con su nombre y su DNI, le dice que no tiene teléfonos vinculados y, en el mismo mensaje, le pregunta si tiene alguna otra consulta
+
+#### Scenario: El pedido de cambio de teléfono no es una consulta de datos
+- **WHEN** un cliente identificado escribe «cambié de número»
+- **THEN** la intención elegida es «cambio de teléfono» y el asistente le pide que escriba desde el nuevo número, sin mostrarle los datos
+
+#### Scenario: Antes de identificarse
+- **WHEN** una persona que todavía no se identificó, en el primer mensaje, mientras se le pregunta si ya es cliente o mientras se le pide el DNI, pregunta por sus datos o por sus teléfonos
+- **THEN** el asistente le avisa en un solo mensaje que todavía no se identificó y que no le puede mostrar sus datos, seguido de la pregunta de identificación pendiente, sin derivar, sin cambiar la etapa y sin contar un intento de DNI
+
+#### Scenario: Cliente nuevo en la oferta
+- **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, pregunta por sus datos o por sus teléfonos
+- **THEN** el asistente le avisa en un solo mensaje que, como todavía no es cliente, no tiene datos registrados, junto con la oferta de resolver consultas o contratar, sin avanzar en el alta
+
+### Requirement: Pólizas del cliente
+
+El sistema SHALL responder la consulta del listado de las pólizas de un cliente identificado con una línea por póliza, con su número, su ramo, su estado y su fecha de vencimiento, en un solo mensaje y con una plantilla que no pasa por la redacción del proveedor de IA, sin derivar ni mandar a aprobar (RF-ATE-01), y al final de ese mismo mensaje SHALL le pregunte si tiene alguna otra consulta. Sin ninguna póliza registrada SHALL le avise que no tiene pólizas en la empresa, en vez de derivar por dato faltante (RF-ATE-02). El estado, el vencimiento y el saldo de una póliza siguen siendo consultas propias, con su redacción y con sus derivaciones (RF-ATE-02). Quien pregunta por sus pólizas antes de identificarse SHALL recibe el aviso de que todavía no se identificó, junto en el mismo mensaje con la pregunta de identificación pendiente, sin cambiar la etapa ni contar un intento de DNI. Quien pregunta por sus pólizas después de presentarse como cliente nuevo, todavía sin dar sus datos, SHALL reciba el aviso de que no tiene pólizas registradas junto con la oferta de consultar o contratar, en un solo mensaje, sin avanzar en el alta (RF-ATE-05).
+
+#### Scenario: Cliente identificado pregunta por sus pólizas
+- **WHEN** un cliente identificado escribe «¿cuáles son mis pólizas?» y la intención elegida es «mis pólizas»
+- **THEN** el asistente le contesta en un solo mensaje con una línea por póliza, con número, ramo, estado y vencimiento, sin redacción del proveedor de IA, sin derivar y sin pedirle que escriba desde otro número
+
+#### Scenario: Después del listado, le pregunta si tiene alguna otra consulta
+- **WHEN** un cliente identificado pregunta por sus pólizas y recibe la respuesta
+- **THEN** el asistente le agrega al final de ese mismo mensaje la pregunta de si tiene alguna otra consulta, sin mandar otro envío y sin derivar
+
+#### Scenario: Cliente identificado sin ninguna póliza
+- **WHEN** un cliente identificado pregunta por sus pólizas y la cartera no tiene ninguna póliza suya
+- **THEN** el asistente le contesta que no tiene pólizas registradas en la empresa, con la pregunta de si tiene alguna otra consulta en el mismo mensaje, sin derivar por dato faltante
+
+#### Scenario: El estado, el vencimiento o el saldo de una póliza siguen siendo consultas propias
+- **WHEN** un cliente identificado escribe «¿en qué estado está mi póliza?», «¿cuándo vence mi póliza?» o «¿cuánto debo?»
+- **THEN** la intención elegida es «estado de póliza», «vencimiento» o «saldo» y el asistente responde con su plantilla y su redacción, sin usar el listado de «mis pólizas»
+
+#### Scenario: Antes de identificarse
+- **WHEN** una persona que todavía no se identificó pregunta por sus pólizas
+- **THEN** el asistente le avisa en un solo mensaje que todavía no se identificó y que no le puede mostrar sus pólizas, seguido de la pregunta de identificación pendiente, sin derivar, sin cambiar la etapa y sin contar un intento de DNI
+
+#### Scenario: Cliente nuevo en la oferta
+- **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, pregunta por sus pólizas
+- **THEN** el asistente le avisa en un solo mensaje que, como todavía no es cliente, no tiene pólizas ni datos registrados, junto con la oferta de resolver consultas o contratar, sin avanzar en el alta
+
 ### Requirement: La intención se elige con el contexto de la conversación
 
 El sistema SHALL enviarle al proveedor de IA, junto con el mensaje cuya intención tiene que elegir, los últimos 4 mensajes anteriores del cliente y del asistente de la conversación abierta, en orden, marcados como contexto, con el DNI tapado y como dato que no cambia la lista cerrada de intenciones ni la acción que el sistema decide para cada una (RF-ATE-01).
@@ -455,11 +547,11 @@ El sistema SHALL enviarle al proveedor de IA, junto con el mensaje cuya intenci�
 
 ### Requirement: Repregunta cuando no se entiende la consulta
 
-El sistema SHALL repreguntar con un texto fijo, que no pasa por la redacción del proveedor de IA y no lista datos de las pólizas, cuando la intención elegida para el mensaje de un cliente identificado es «no se entiende», hasta 2 veces seguidas, y derivar con el motivo «no se entendió la consulta» cuando el tercer mensaje seguido tampoco se entiende (RF-ATE-01).
+El sistema SHALL repreguntar con una redacción propia, distinta en cada intento para no repetir el mismo mensaje, que no pasa por la redacción del proveedor de IA y no lista datos de las pólizas, cuando la intención elegida para el mensaje de un cliente identificado es «no se entiende», hasta 2 veces seguidas, y derivar con el motivo «no se entendió la consulta» cuando el tercer mensaje seguido tampoco se entiende (RF-ATE-01). El sistema SHALL repreguntar de la misma manera y con las mismas redacciones cuando el proveedor de IA falla al elegir la intención, tanto de un cliente identificado como de un cliente nuevo que todavía no pidió el alta, sin derivar de entrada por esa falla, y SHALL derivar recién con el tercer mensaje seguido, con el motivo «falla del proveedor al decidir» (RF-ATE-01).
 
 #### Scenario: Primer mensaje que no se entiende
 - **WHEN** un cliente identificado escribe «eso que te dije» y la intención elegida, aun con el contexto, es «no se entiende»
-- **THEN** el asistente le pide que aclare su consulta con la repregunta fija, sin derivar, y el mensaje y la repregunta quedan en el caso actual si no tiene tipo o, si lo tiene, en un caso nuevo sin tipo
+- **THEN** el asistente le pide que aclare su consulta con la repregunta del primer intento, sin derivar, y el mensaje y la repregunta quedan en el caso actual si no tiene tipo o, si lo tiene, en un caso nuevo sin tipo
 
 #### Scenario: El caso actual tiene tipo
 - **WHEN** el caso actual de la conversación tiene tipo, por ejemplo el de una consulta de vencimiento ya respondida o el de un pedido de cambio de teléfono, y el cliente escribe tres mensajes seguidos que no se entienden
@@ -467,7 +559,7 @@ El sistema SHALL repreguntar con un texto fijo, que no pasa por la redacción de
 
 #### Scenario: Segundo mensaje seguido que no se entiende
 - **WHEN** después de una repregunta el siguiente mensaje del cliente tampoco se entiende
-- **THEN** el asistente le vuelve a repreguntar, sin derivar
+- **THEN** el asistente le vuelve a repreguntar con una redacción distinta a la del primer intento, sin derivar
 
 #### Scenario: Tercer mensaje seguido que no se entiende
 - **WHEN** después de dos repreguntas seguidas el siguiente mensaje del cliente tampoco se entiende
@@ -479,7 +571,7 @@ El sistema SHALL repreguntar con un texto fijo, que no pasa por la redacción de
 
 #### Scenario: Falla del proveedor de IA
 - **WHEN** el proveedor de IA no responde o responde con error al elegir la intención del mensaje de un cliente identificado
-- **THEN** el asistente le manda el mensaje de derivación, sin repreguntar, y deja de responder en esa conversación
+- **THEN** el asistente le repregunta con la repregunta del intento que le tocaría si no se entendiera, sin mencionar la falla, y sin derivar mientras no sea el tercer mensaje seguido; con el tercer mensaje seguido falla, deriva con el motivo «falla del proveedor al decidir» y deja de responder en esa conversación
 
 #### Scenario: Antes de identificarse
 - **WHEN** la persona todavía no se identificó y la intención elegida para su mensaje es «no se entiende»
