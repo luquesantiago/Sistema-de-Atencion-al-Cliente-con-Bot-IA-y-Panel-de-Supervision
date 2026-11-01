@@ -468,6 +468,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
   const [fallaActualizacion, setFallaActualizacion] = useState(false)
   const [actualizado, setActualizado] = useState<Date | null>(null)
   const [busqueda, setBusqueda] = useState('')
+  const [filtroActivo, setFiltroActivo] = useState<'todos'>('todos')
   const [seleccionado, setSeleccionado] = useState<number | null>(bandejaInicial?.caseId ?? null)
   const [filtroCliente, setFiltroCliente] = useState<{ id: number; nombre: string | null } | null>(
     bandejaInicial?.customerId === undefined
@@ -925,6 +926,17 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
               value={busqueda}
               onChange={(evento) => setBusqueda(evento.target.value)}
             />
+          </div>
+          <div className="bandeja__pestanas" role="tablist" aria-label="Filtros de conversaciones">
+            <button
+              type="button"
+              className="bandeja__pestana"
+              role="tab"
+              aria-selected={filtroActivo === 'todos'}
+              onClick={() => setFiltroActivo('todos')}
+            >
+              Todos
+            </button>
           </div>
         </header>
 

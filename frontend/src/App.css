@@ -1698,6 +1698,47 @@
   color: var(--color-text-muted);
 }
 
+.bandeja__pestanas {
+  display: flex;
+  margin-top: 10px;
+  padding: 3px;
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+}
+
+.bandeja__pestana {
+  flex: 1;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-md) - 3px);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.bandeja__pestana:hover {
+  border-color: var(--color-secondary);
+  color: var(--color-primary);
+}
+
+.bandeja__pestana[aria-selected='true'] {
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-soft);
+}
+
+.bandeja__pestana:focus-visible {
+  outline: 3px solid var(--color-secondary);
+  outline-offset: 1px;
+}
+
 .bandeja__estado {
   padding: 16px;
 }
