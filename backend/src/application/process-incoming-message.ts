@@ -40,6 +40,7 @@ import {
   newCustomerPhotoRequest,
   newCustomerPhotoRetryRequest,
   newCustomerQueryOffer,
+  notInsuranceAndNewCustomerOffer,
   notInsuranceMessage,
   phoneChangePendingMessage,
   prospectHandoffMessage,
@@ -354,7 +355,7 @@ export class ProcessIncomingMessage {
     try {
       ;({ intent } = await this.ai.classifyIntent(question, intentContext(turn.conversation)))
     } catch {
-      return this.handoffIdentifying(turn, { kind: 'provider-failure', step: 'intent' })
+      return this.clarifyNewCustomer(turn, stage, { kind: 'provider-failure', step: 'intent' })
     }
 
     switch (intent) {
@@ -375,25 +376,15 @@ export class ProcessIncomingMessage {
         return { status: 'AGENCY_INFO_SENT', responseSent: true }
       }
       case 'no es de seguros':
-        this.replyIdentifying(turn, notInsuranceMessage)
-        this.replyIdentifying(turn, newCustomerQueryOffer)
+        this.replyIdentifying(turn, notInsuranceAndNewCustomerOffer)
         turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
         return { status: 'NOT_INSURANCE_REPLIED', responseSent: true }
       case 'saludo':
         this.replyIdentifying(turn, newCustomerQueryOffer)
         turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
         return { status: 'NEW_CUSTOMER_OFFER_SENT', responseSent: true }
-      case 'no se entiende': {
-        const step = clarificationStep(stage.notUnderstood)
-        if (step.kind === 'handoff') return this.handoffIdentifying(turn, { kind: 'not-understood' })
-        this.replyIdentifying(turn, clarificationRequestFor(step.notUnderstood))
-        turn.nextStage = () => ({
-          stage: 'awaiting_new_customer_query',
-          notUnderstood: step.notUnderstood,
-          ...identification,
-        })
-        return { status: 'CLARIFICATION_REQUESTED', responseSent: true }
-      }
+      case 'no se entiende':
+        return this.clarifyNewCustomer(turn, stage, { kind: 'not-understood' })
       default:
         // Una consulta que necesita un cliente identificado: al no ser cliente, no tiene
         // pólizas ni datos. Se vuelve a preguntar si ya es cliente.
@@ -402,6 +393,25 @@ export class ProcessIncomingMessage {
         turn.nextStage = () => ({ stage: 'awaiting_customer_status', ...identification })
         return { status: 'CUSTOMER_STATUS_REQUESTED', responseSent: true }
     }
+  }
+
+  // No se pudo decidir el mensaje (no se entendió o falló el proveedor de IA): se repregunta con
+  // una redacción distinta por intento, sin derivar de entrada. Recién con las repreguntas
+  // agotadas se deriva con `reason`.
+  private clarifyNewCustomer(
+    turn: Turn,
+    stage: Identification & { notUnderstood: number },
+    reason: HandoffReason,
+  ): ProcessResult {
+    const step = clarificationStep(stage.notUnderstood)
+    if (step.kind === 'handoff') return this.handoffIdentifying(turn, reason)
+    this.replyIdentifying(turn, clarificationRequestFor(step.notUnderstood))
+    turn.nextStage = () => ({
+      stage: 'awaiting_new_customer_query',
+      notUnderstood: step.notUnderstood,
+      ...identificationOf(stage),
+    })
+    return { status: 'CLARIFICATION_REQUESTED', responseSent: true }
   }
 
   private async identifyByDni(turn: Turn, stage: Identification, text: string, settings: Settings): Promise<ProcessResult> {
@@ -562,7 +572,14 @@ export class ProcessIncomingMessage {
     try {
       ({ intent, urgency } = await this.ai.classifyIntent(question, context))
     } catch {
-      return this.handoffIn(turn, caseFor('otra consulta'), { kind: 'provider-failure', step: 'intent' })
+      // No se pudo decidir la intención: se repregunta como si no se entendiera, sin derivar de
+      // entrada. Recién con las repreguntas agotadas se deriva por falla del proveedor.
+      const step = clarificationStep(notUnderstood)
+      const ref = caseFor('otra consulta')
+      if (step.kind === 'handoff') return this.handoffIn(turn, ref, { kind: 'provider-failure', step: 'intent' }, query.answers)
+      turn.reply(ref, clarificationRequestFor(step.notUnderstood), query.answers)
+      turn.nextStage = () => ({ stage: 'identified', customerId: customer.id, notUnderstood: step.notUnderstood })
+      return { status: 'CLARIFICATION_REQUESTED', responseSent: true }
     }
 
     const action = actionForIntent(intent)

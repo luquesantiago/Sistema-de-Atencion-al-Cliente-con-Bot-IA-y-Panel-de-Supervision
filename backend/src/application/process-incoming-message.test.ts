@@ -18,6 +18,7 @@ import {
   newCustomerPhotoRequest,
   newCustomerPhotoRetryRequest,
   newCustomerQueryOffer,
+  notInsuranceAndNewCustomerOffer,
   notInsuranceMessage,
   phoneChangePendingMessage,
   prospectHandoffMessage,
@@ -500,11 +501,13 @@ describe('cliente nuevo (RF-ATE-05)', () => {
     expect(lastText()).toBe(newCustomerNameRequest)
   })
 
-  it('«no es de seguros» en la oferta responde el texto fijo y vuelve a ofrecer', async () => {
+  it('«no es de seguros» en la oferta responde el texto fijo y vuelve a ofrecer en un solo mensaje', async () => {
     await upToOffer()
     ai.intents.set('¿me vendés zapatillas?', 'no es de seguros')
     await expect(send('¿me vendés zapatillas?')).resolves.toMatchObject({ status: 'NOT_INSURANCE_REPLIED' })
-    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([notInsuranceMessage, newCustomerQueryOffer])
+    expect(whatsapp.textsTo(phone).slice(-1)).toEqual([notInsuranceAndNewCustomerOffer])
+    expect(notInsuranceAndNewCustomerOffer).toContain('no tiene que ver con Seguros Castaño')
+    expect(notInsuranceAndNewCustomerOffer).toContain('contratar')
   })
 
   it('un saludo en la oferta vuelve a ofrecer, sin alta', async () => {
@@ -521,6 +524,18 @@ describe('cliente nuevo (RF-ATE-05)', () => {
     expect(whatsapp.textsTo(phone).slice(-2)).toEqual([newCustomerNoDataNotice, customerStatusQuestion])
   })
 
+  it('con «no se entiende» en la oferta manda solo la repregunta, sin la oferta, y con redacción distinta por intento', async () => {
+    await upToOffer()
+    ai.intents.set('asdfgh', 'no se entiende')
+    await expect(send('asdfgh')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    expect(whatsapp.textsTo(phone).slice(-1)).toEqual([clarificationRequestFor(1)])
+    await expect(send('asdfgh')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    expect(whatsapp.textsTo(phone).slice(-1)).toEqual([clarificationRequestFor(2)])
+    expect(clarificationRequestFor(1)).not.toBe(clarificationRequestFor(2))
+    // Solo la oferta inicial de upToOffer: la repregunta no la vuelve a mandar.
+    expect(whatsapp.textsTo(phone).filter((text) => text === newCustomerQueryOffer)).toHaveLength(1)
+  })
+
   it('con tres «no se entiende» seguidos en la oferta se deriva', async () => {
     await upToOffer()
     ai.intents.set('asdfgh', 'no se entiende')
@@ -529,10 +544,16 @@ describe('cliente nuevo (RF-ATE-05)', () => {
     await expect(send('asdfgh')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'no se entendió la consulta' })
   })
 
-  it('una falla del proveedor al decidir en la oferta deriva', async () => {
+  it('una falla del proveedor al decidir en la oferta repregunta antes de derivar', async () => {
     await upToOffer()
     ai.classifyError = new Error('HTTP 429')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    expect(lastText()).toBe(clarificationRequestFor(1))
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    expect(lastText()).toBe(clarificationRequestFor(2))
+    expect(clarificationRequestFor(1)).not.toBe(clarificationRequestFor(2))
     await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla del proveedor al decidir' })
+    expect(lastText()).toBe(handoffMessage)
   })
 })
 
@@ -743,18 +764,21 @@ describe('casos por intención', () => {
     expect((await openConversation()).cases.map((item) => item.type)).toEqual([null])
   })
 
-  it('una falla del proveedor al decidir deriva en un caso sin tipo', async () => {
+  it('una falla del proveedor al decidir repregunta antes de derivar en un caso sin tipo', async () => {
     await identifyShared()
     ai.classifyError = new Error('HTTP 429')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    expect(lastText()).toBe(clarificationRequestFor(1))
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    expect(lastText()).toBe(clarificationRequestFor(2))
     await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla del proveedor al decidir' })
     expect(lastText()).toBe(handoffMessage)
-    expect(whatsapp.textsTo(phone).filter((text) => clarificationRequests.includes(text))).toEqual([])
     expect((await openConversation()).cases.find((item) => item.handedOff)?.type).toBeNull()
   })
 })
 
 describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
-  it('recibe la repregunta fija, sin redacción; con el caso actual con tipo, va a un caso nuevo sin tipo', async () => {
+  it('recibe una repregunta con redacción distinta por intento, sin redacción de la IA; con el caso actual con tipo, va a un caso nuevo sin tipo', async () => {
     link(phone, ana)
     ai.intents.set('¿cuándo vence?', 'vencimiento')
     ai.intents.set('eso que te dije', 'no se entiende')
@@ -762,9 +786,10 @@ describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
     await send('¿cuándo vence?')
     ai.rewritten.length = 0
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
-    expect(clarificationRequests).toContain(lastText())
+    expect(lastText()).toBe(clarificationRequestFor(1))
     await expect(send('lo otro')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
-    expect(clarificationRequests).toContain(lastText())
+    expect(lastText()).toBe(clarificationRequestFor(2))
+    expect(clarificationRequestFor(1)).not.toBe(clarificationRequestFor(2))
     expect(ai.rewritten).toEqual([])
 
     const conversation = await openConversation()
@@ -813,7 +838,7 @@ describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
     ai.intents.set('eso que te dije', 'no se entiende')
     await send('eso que te dije')
     await expect(send(ana.dni)).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
-    expect(clarificationRequests).toContain(lastText())
+    expect(lastText()).toBe(clarificationRequestFor(1))
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'no se entendió la consulta' })
   })
@@ -1410,6 +1435,8 @@ describe('nivel de riesgo al derivar (RF-DER-01)', () => {
   it('una falla del proveedor al decidir queda baja', async () => {
     link(phone, ana)
     ai.classifyError = new Error('Groq no respondió')
+    await send('¿cuándo vence?')
+    await send('¿cuándo vence?')
     await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla del proveedor al decidir' })
     expect(derivedCase()?.riskLevel).toBe('bajo')
   })

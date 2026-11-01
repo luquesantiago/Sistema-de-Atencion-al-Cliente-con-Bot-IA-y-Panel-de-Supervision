@@ -115,11 +115,15 @@ El sistema SHALL hacer con cada mensaje de un cliente identificado una sola de e
 
 #### Scenario: Consulta que no se entiende
 - **WHEN** la intención elegida es «no se entiende»
-- **THEN** el asistente le repregunta con el texto fijo, sin derivar mientras no sea el tercer mensaje seguido que no se entiende
+- **THEN** el asistente le repregunta con una redacción propia que no pasa por la IA, sin derivar mientras no sea el tercer mensaje seguido que no se entiende
 
-#### Scenario: Falla del proveedor de IA al decidir
-- **WHEN** el proveedor de IA no responde, responde con error o devuelve algo que no es una de las opciones de la lista, al clasificar si la persona ya es cliente o al elegir la intención del mensaje de un cliente identificado
+#### Scenario: Falla del proveedor de IA al clasificar si la persona ya es cliente
+- **WHEN** el proveedor de IA no responde, responde con error o devuelve algo que no es una de las opciones de la lista, al clasificar si la persona ya es cliente o es nueva
 - **THEN** el asistente le manda el mensaje de derivación, sin mencionar la falla, bots ni inteligencia artificial, y deja de responder en esa conversación
+
+#### Scenario: Falla del proveedor de IA al elegir la intención
+- **WHEN** el proveedor de IA no responde, responde con error o devuelve algo que no es una de las opciones de la lista, al elegir la intención del mensaje de un cliente identificado o de un cliente nuevo que todavía no pidió el alta
+- **THEN** el asistente le repregunta con la misma repregunta que si no se entendiera, sin mencionar la falla ni reenviar la oferta, y sin derivar mientras no sea el tercer mensaje seguido; con el tercer mensaje seguido, le manda el mensaje de derivación sin mencionar la falla y deja de responder en esa conversación
 
 ### Requirement: Vencimiento y estado de todas las pólizas
 
@@ -333,6 +337,18 @@ El sistema SHALL volver a preguntar si la persona ya es cliente o si es nueva ca
 - **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, pregunta por un dato que solo un cliente identificado tiene (por ejemplo, cuánto debe)
 - **THEN** el asistente le avisa que, como todavía no es cliente, no tiene pólizas ni datos registrados, y vuelve a preguntarle si ya es cliente o es nuevo
 
+#### Scenario: El cliente nuevo pide algo que no es de seguros
+- **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, escribe algo que la intención clasifica como «no es de seguros», por ejemplo «quiero un café»
+- **THEN** el asistente le contesta en un solo mensaje, primero que esa consulta no tiene que ver con Seguros Castaño y después la oferta de resolver consultas o contratar, sin pedirle una redacción al proveedor de IA, sin derivar y sin mandar los dos textos en dos envíos seguidos
+
+#### Scenario: El cliente nuevo escribe algo que no se entiende
+- **WHEN** quien se presentó como cliente nuevo, todavía sin dar sus datos, escribe algo que la intención clasifica como «no se entiende»
+- **THEN** el asistente solo le repregunta, con una redacción propia distinta en cada intento y sin volver a mandar la oferta, hasta 2 veces seguidas; al tercer mensaje seguido que no se entiende, deriva
+
+#### Scenario: Falla del proveedor de IA con el cliente nuevo en la oferta
+- **WHEN** con quien se presentó como cliente nuevo, todavía sin dar sus datos, el proveedor de IA falla al elegir la intención de un mensaje
+- **THEN** el asistente solo le repregunta, con la misma redacción propia distinta por intento y sin reenviar la oferta, hasta 2 veces seguidas; al tercer mensaje seguido, le manda el mensaje de derivación sin mencionar la falla
+
 #### Scenario: Base sin la cartera migrada
 - **WHEN** la base no tiene cargada la planilla histórica y una persona escribe su DNI
 - **THEN** el DNI no se reconoce y el asistente sigue el flujo de DNI no reconocido
@@ -455,11 +471,11 @@ El sistema SHALL enviarle al proveedor de IA, junto con el mensaje cuya intenci�
 
 ### Requirement: Repregunta cuando no se entiende la consulta
 
-El sistema SHALL repreguntar con un texto fijo, que no pasa por la redacción del proveedor de IA y no lista datos de las pólizas, cuando la intención elegida para el mensaje de un cliente identificado es «no se entiende», hasta 2 veces seguidas, y derivar con el motivo «no se entendió la consulta» cuando el tercer mensaje seguido tampoco se entiende (RF-ATE-01).
+El sistema SHALL repreguntar con una redacción propia, distinta en cada intento para no repetir el mismo mensaje, que no pasa por la redacción del proveedor de IA y no lista datos de las pólizas, cuando la intención elegida para el mensaje de un cliente identificado es «no se entiende», hasta 2 veces seguidas, y derivar con el motivo «no se entendió la consulta» cuando el tercer mensaje seguido tampoco se entiende (RF-ATE-01). El sistema SHALL repreguntar de la misma manera y con las mismas redacciones cuando el proveedor de IA falla al elegir la intención, tanto de un cliente identificado como de un cliente nuevo que todavía no pidió el alta, sin derivar de entrada por esa falla, y SHALL derivar recién con el tercer mensaje seguido, con el motivo «falla del proveedor al decidir» (RF-ATE-01).
 
 #### Scenario: Primer mensaje que no se entiende
 - **WHEN** un cliente identificado escribe «eso que te dije» y la intención elegida, aun con el contexto, es «no se entiende»
-- **THEN** el asistente le pide que aclare su consulta con la repregunta fija, sin derivar, y el mensaje y la repregunta quedan en el caso actual si no tiene tipo o, si lo tiene, en un caso nuevo sin tipo
+- **THEN** el asistente le pide que aclare su consulta con la repregunta del primer intento, sin derivar, y el mensaje y la repregunta quedan en el caso actual si no tiene tipo o, si lo tiene, en un caso nuevo sin tipo
 
 #### Scenario: El caso actual tiene tipo
 - **WHEN** el caso actual de la conversación tiene tipo, por ejemplo el de una consulta de vencimiento ya respondida o el de un pedido de cambio de teléfono, y el cliente escribe tres mensajes seguidos que no se entienden
@@ -467,7 +483,7 @@ El sistema SHALL repreguntar con un texto fijo, que no pasa por la redacción de
 
 #### Scenario: Segundo mensaje seguido que no se entiende
 - **WHEN** después de una repregunta el siguiente mensaje del cliente tampoco se entiende
-- **THEN** el asistente le vuelve a repreguntar, sin derivar
+- **THEN** el asistente le vuelve a repreguntar con una redacción distinta a la del primer intento, sin derivar
 
 #### Scenario: Tercer mensaje seguido que no se entiende
 - **WHEN** después de dos repreguntas seguidas el siguiente mensaje del cliente tampoco se entiende
@@ -479,7 +495,7 @@ El sistema SHALL repreguntar con un texto fijo, que no pasa por la redacción de
 
 #### Scenario: Falla del proveedor de IA
 - **WHEN** el proveedor de IA no responde o responde con error al elegir la intención del mensaje de un cliente identificado
-- **THEN** el asistente le manda el mensaje de derivación, sin repreguntar, y deja de responder en esa conversación
+- **THEN** el asistente le repregunta con la repregunta del intento que le tocaría si no se entendiera, sin mencionar la falla, y sin derivar mientras no sea el tercer mensaje seguido; con el tercer mensaje seguido falla, deriva con el motivo «falla del proveedor al decidir» y deja de responder en esa conversación
 
 #### Scenario: Antes de identificarse
 - **WHEN** la persona todavía no se identificó y la intención elegida para su mensaje es «no se entiende»

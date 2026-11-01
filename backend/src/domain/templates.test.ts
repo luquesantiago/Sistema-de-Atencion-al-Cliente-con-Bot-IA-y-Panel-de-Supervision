@@ -3,12 +3,14 @@ import type { Customer } from './customer.js'
 import {
   approvalNotice,
   argentinaToday,
+  clarificationRequestFor,
   clarificationRequests,
   courtesyTemplate,
   expirationsTemplate,
   handoffMessage,
   newCustomerNoDataNotice,
   newCustomerQueryOffer,
+  notInsuranceAndNewCustomerOffer,
   notInsuranceMessage,
   statusesTemplate,
   welcomeMessage,
@@ -89,6 +91,15 @@ describe('textos fijos', () => {
       expect(text).not.toMatch(/\b(auto|moto|vida|hogar|embarcaciones|comercio)\b/)
     }
   })
+
+  it('cada repregunta usa una redacción distinta, para no repetir el mismo mensaje', () => {
+    expect(new Set(clarificationRequests).size).toBe(clarificationRequests.length)
+    expect(clarificationRequestFor(1)).toBe(clarificationRequests[0])
+    expect(clarificationRequestFor(2)).toBe(clarificationRequests[1])
+    expect(clarificationRequestFor(1)).not.toBe(clarificationRequestFor(2))
+    // Un paso fuera del catálogo cae en el último texto.
+    expect(clarificationRequestFor(99)).toBe(clarificationRequests.at(-1))
+  })
 })
 
 describe('bienvenida y cortesía', () => {
@@ -102,6 +113,13 @@ describe('oferta de consulta al cliente nuevo', () => {
   it('ofrece resolver consultas o dar datos de la empresa, y pide contratar para el alta', () => {
     expect(newCustomerQueryOffer).toContain('consulta')
     expect(newCustomerQueryOffer).toContain('contratar')
+  })
+
+  it('lo que no es de seguros responde el texto fijo y vuelve a ofrecer en un solo mensaje', () => {
+    expect(notInsuranceAndNewCustomerOffer).toContain('no tiene que ver con Seguros Castaño')
+    expect(notInsuranceAndNewCustomerOffer).toContain('consulta')
+    expect(notInsuranceAndNewCustomerOffer).toContain('contratar')
+    expect(notInsuranceAndNewCustomerOffer).not.toMatch(/\bbots?\b|inteligencia artificial|modelo|instrucciones|\bsoy\b|\d/i)
   })
 
   it('al que todavía no es cliente le avisa que no tiene pólizas ni datos', () => {

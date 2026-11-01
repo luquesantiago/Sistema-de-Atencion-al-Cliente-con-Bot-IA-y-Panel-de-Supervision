@@ -54,6 +54,11 @@ export const phoneChangePendingMessage =
 export const notInsuranceMessage =
   'Disculpe, esa consulta no tiene que ver con Seguros Castaño. Si tiene una consulta sobre sus seguros, estamos para ayudarlo.'
 
+// Lo mismo dicho por un cliente nuevo en la oferta, con la oferta vuelta a mandar en el mismo
+// mensaje: un solo envío en vez del texto fijo y la oferta uno atrás del otro.
+export const notInsuranceAndNewCustomerOffer =
+  'Disculpe, esa consulta no tiene que ver con Seguros Castaño. ¿Tiene alguna consulta sobre nuestros servicios o necesita algún dato de la empresa? Si quiere contratar un seguro, indíquemelo y le pido los datos para iniciar el alta.'
+
 // Repreguntas cuando no se entiende la consulta: una redacción distinta por intento, para no
 // repetir el mismo mensaje; sin datos de las pólizas y sin pasar por la redacción de la IA.
 export const clarificationRequests = [
