@@ -26,17 +26,20 @@ import { checkRewrite } from '../domain/rewrite-check.js'
 import { handoffRiskLevel, queryTypeRiskLevel, type RiskLevel, type Urgency } from '../domain/risk-level.js'
 import {
   approvalNotice,
-  clarificationRequest,
+  clarificationRequestFor,
   customerStatusQuestion,
   customerStatusRetryQuestion,
+  courtesyTemplate,
   existingCustomerDniRequest,
   expirationsTemplate,
   firstDniRequest,
   handoffMessage,
   newCustomerDniRequest,
   newCustomerNameRequest,
+  newCustomerNoDataNotice,
   newCustomerPhotoRequest,
   newCustomerPhotoRetryRequest,
+  newCustomerQueryOffer,
   notInsuranceMessage,
   phoneChangePendingMessage,
   prospectHandoffMessage,
@@ -66,6 +69,9 @@ type Stage =
   | ({ stage: 'awaiting_customer_status' } & Identification)
   | ({ stage: 'awaiting_dni' } & Identification)
   | ({ stage: 'awaiting_new_customer_name' } & Identification)
+  // Quien dijo ser cliente nuevo todavía no pidió el alta: se le ofrece resolver consultas o
+  // darle datos de la empresa. notUnderstood: repreguntas seguidas por «no se entiende».
+  | ({ stage: 'awaiting_new_customer_query'; notUnderstood: number } & Identification)
   | ({ stage: 'awaiting_new_customer_dni'; name: string } & Identification)
   | ({ stage: 'awaiting_new_customer_photo'; name: string; dni: string } & Identification)
   // notUnderstood: repreguntas seguidas por «no se entiende» (change asistente-informacion-general).
@@ -76,6 +82,7 @@ export type ProcessResult =
   | { status: 'CUSTOMER_STATUS_REASKED'; responseSent: true }
   | { status: 'DNI_REQUESTED'; responseSent: true }
   | { status: 'NAME_REQUESTED'; responseSent: true }
+  | { status: 'NEW_CUSTOMER_OFFER_SENT'; responseSent: true }
   | { status: 'NEW_CUSTOMER_DNI_REQUESTED'; responseSent: true }
   | { status: 'PHOTO_REQUESTED'; responseSent: true }
   | { status: 'PROSPECT_HANDED_OFF'; responseSent: true }
@@ -242,6 +249,8 @@ export class ProcessIncomingMessage {
         return this.classifyCustomerStatus(turn, stage, text)
       case 'awaiting_dni':
         return this.identifyByDni(turn, stage, text, settings)
+      case 'awaiting_new_customer_query':
+        return this.answerNewCustomerQuery(turn, stage, text)
       case 'awaiting_new_customer_name':
         return this.collectNewCustomerName(turn, stage, text)
       case 'awaiting_new_customer_dni':
@@ -315,9 +324,11 @@ export class ProcessIncomingMessage {
 
     switch (status) {
       case 'NEW_CUSTOMER':
-        this.replyIdentifying(turn, newCustomerNameRequest)
-        turn.nextStage = () => ({ stage: 'awaiting_new_customer_name', ...identification })
-        return { status: 'NAME_REQUESTED', responseSent: true }
+        // El alta no empieza sola: primero se le ofrece resolver consultas o darle datos de
+        // la empresa. Recién si pide contratar se le piden los documentos (RF-ATE-05).
+        this.replyIdentifying(turn, newCustomerQueryOffer)
+        turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
+        return { status: 'NEW_CUSTOMER_OFFER_SENT', responseSent: true }
       case 'EXISTING_CUSTOMER':
         this.replyIdentifying(turn, identification.linkedIds.length > 0 ? repeatedDniRequest : existingCustomerDniRequest)
         turn.nextStage = () => ({ stage: 'awaiting_dni', ...identification })
@@ -326,6 +337,70 @@ export class ProcessIncomingMessage {
         this.replyIdentifying(turn, customerStatusRetryQuestion)
         turn.nextStage = () => ({ stage: 'awaiting_customer_status', ...identification })
         return { status: 'CUSTOMER_STATUS_REASKED', responseSent: true }
+    }
+  }
+
+  // Quien dijo ser cliente nuevo todavía no pidió el alta: se le ofrece resolver consultas o
+  // darle datos de la empresa. Solo si pide contratar se le piden los documentos; una consulta
+  // que necesita un cliente identificado vuelve a la pregunta de si ya es cliente.
+  private async answerNewCustomerQuery(
+    turn: Turn,
+    stage: Identification & { notUnderstood: number },
+    text: string,
+  ): Promise<ProcessResult> {
+    const identification = identificationOf(stage)
+    const question = maskDni(text)
+    let intent: Intent
+    try {
+      ;({ intent } = await this.ai.classifyIntent(question, intentContext(turn.conversation)))
+    } catch {
+      return this.handoffIdentifying(turn, { kind: 'provider-failure', step: 'intent' })
+    }
+
+    switch (intent) {
+      case 'contratar':
+        this.replyIdentifying(turn, newCustomerNameRequest)
+        turn.nextStage = () => ({ stage: 'awaiting_new_customer_name', ...identification })
+        return { status: 'NAME_REQUESTED', responseSent: true }
+      case 'información de la agencia': {
+        const ref = turn.caseFor({ kind: 'identifying' })
+        turn.receiveIn(ref)
+        const result = await this.sendAgencyInfo(turn, ref, question, 'incoming', intent)
+        if (result.status !== 'ANSWER_SENT') {
+          turn.nextStage = () => ({ stage: 'unidentified' })
+          return result
+        }
+        turn.reply(ref, newCustomerQueryOffer)
+        turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
+        return { status: 'AGENCY_INFO_SENT', responseSent: true }
+      }
+      case 'no es de seguros':
+        this.replyIdentifying(turn, notInsuranceMessage)
+        this.replyIdentifying(turn, newCustomerQueryOffer)
+        turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
+        return { status: 'NOT_INSURANCE_REPLIED', responseSent: true }
+      case 'saludo':
+        this.replyIdentifying(turn, newCustomerQueryOffer)
+        turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
+        return { status: 'NEW_CUSTOMER_OFFER_SENT', responseSent: true }
+      case 'no se entiende': {
+        const step = clarificationStep(stage.notUnderstood)
+        if (step.kind === 'handoff') return this.handoffIdentifying(turn, { kind: 'not-understood' })
+        this.replyIdentifying(turn, clarificationRequestFor(step.notUnderstood))
+        turn.nextStage = () => ({
+          stage: 'awaiting_new_customer_query',
+          notUnderstood: step.notUnderstood,
+          ...identification,
+        })
+        return { status: 'CLARIFICATION_REQUESTED', responseSent: true }
+      }
+      default:
+        // Una consulta que necesita un cliente identificado: al no ser cliente, no tiene
+        // pólizas ni datos. Se vuelve a preguntar si ya es cliente.
+        this.replyIdentifying(turn, newCustomerNoDataNotice)
+        this.replyIdentifying(turn, customerStatusQuestion)
+        turn.nextStage = () => ({ stage: 'awaiting_customer_status', ...identification })
+        return { status: 'CUSTOMER_STATUS_REQUESTED', responseSent: true }
     }
   }
 
@@ -504,11 +579,15 @@ export class ProcessIncomingMessage {
         return { status: 'NOT_INSURANCE_REPLIED', responseSent: true }
       case 'handoff':
         return this.handoffIn(turn, ref, { kind: 'intent', intent }, query.answers, { intent, urgency })
+      case 'register':
+        // Un cliente identificado que pide contratar: ya es cliente, no hay alta que hacer.
+        return this.handoffIn(turn, ref, { kind: 'intent', intent }, query.answers, { intent, urgency })
       case 'clarify': {
-        // La repregunta es fija: no pasa por la redacción del proveedor de IA.
+        // La repregunta no pasa por la redacción del proveedor de IA, y cada intento usa una
+        // redacción distinta para no repetir el mismo mensaje.
         const step = clarificationStep(notUnderstood)
         if (step.kind === 'handoff') return this.handoffIn(turn, ref, { kind: 'not-understood' }, query.answers, { intent })
-        turn.reply(ref, clarificationRequest, query.answers)
+        turn.reply(ref, clarificationRequestFor(step.notUnderstood), query.answers)
         turn.nextStage = () => ({ stage: 'identified', customerId: customer.id, notUnderstood: step.notUnderstood })
         return { status: 'CLARIFICATION_REQUESTED', responseSent: true }
       }
@@ -590,7 +669,7 @@ export class ProcessIncomingMessage {
       case 'statuses':
         return statusesTemplate(customer, this.clock())
       case 'courtesy':
-        return `Gracias por escribirnos, ${customer.firstName}. ¿En qué lo puedo ayudar?`
+        return courtesyTemplate(customer)
     }
   }
 

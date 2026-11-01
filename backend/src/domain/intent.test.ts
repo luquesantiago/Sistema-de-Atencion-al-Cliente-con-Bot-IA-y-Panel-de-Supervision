@@ -22,6 +22,11 @@ describe('actionForIntent', () => {
     expect(actionForIntent('no es de seguros')).toEqual({ kind: 'unrelated' })
   })
 
+  it('«contratar» manda a registrar el alta', () => {
+    expect(actionForIntent('contratar')).toEqual({ kind: 'register' })
+    expect(isIntent('contratar')).toBe(true)
+  })
+
   it('repregunta lo que no se entiende', () => {
     expect(actionForIntent('no se entiende')).toEqual({ kind: 'clarify' })
   })

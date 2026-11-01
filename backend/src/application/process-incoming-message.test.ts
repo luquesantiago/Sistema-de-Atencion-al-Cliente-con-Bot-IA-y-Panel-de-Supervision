@@ -6,20 +6,24 @@ import type { Intent } from '../domain/intent.js'
 import type { Urgency } from '../domain/risk-level.js'
 import {
   approvalNotice,
-  clarificationRequest,
+  clarificationRequestFor,
+  clarificationRequests,
   customerStatusQuestion,
   customerStatusRetryQuestion,
   existingCustomerDniRequest,
   firstDniRequest,
   handoffMessage,
   newCustomerNameRequest,
+  newCustomerNoDataNotice,
   newCustomerPhotoRequest,
   newCustomerPhotoRetryRequest,
+  newCustomerQueryOffer,
   notInsuranceMessage,
   phoneChangePendingMessage,
   prospectHandoffMessage,
   repeatedDniRequest,
   useNewPhoneRequest,
+  welcomeMessage,
 } from '../domain/templates.js'
 import type { WhatsAppClient } from '../domain/whatsapp-client.js'
 import { InMemoryAgencyInfoSource } from '../infrastructure/in-memory-agency-info.js'
@@ -228,7 +232,7 @@ describe('número vinculado (RF-ATE-03, RF-CAR-03)', () => {
   it('vinculado a dos clientes: sin consulta guardada, manda la bienvenida', async () => {
     link(phone, ana, bruno)
     await expect(send(ana.dni)).resolves.toMatchObject({ status: 'WELCOME_SENT' })
-    expect(lastText()).toBe('Gracias, Ana. ¿En qué lo puedo ayudar?')
+    expect(lastText()).toBe(welcomeMessage(ana))
     expect(ai.classified).toEqual([])
   })
 
@@ -374,7 +378,7 @@ describe('cambio de teléfono (RF-CAR-05)', () => {
     await send('123')
     await send('sí')
     await expect(send(ana.dni)).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING', answer: 'WELCOME_SENT' })
-    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([phoneChangePendingMessage, 'Gracias, Ana. ¿En qué lo puedo ayudar?'])
+    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([phoneChangePendingMessage, welcomeMessage(ana)])
   })
 
   it('si ya hay una solicitud pendiente, no se crea otra', async () => {
@@ -398,10 +402,15 @@ describe('cambio de teléfono (RF-CAR-05)', () => {
 })
 
 describe('cliente nuevo (RF-ATE-05)', () => {
+  // El alta no empieza sola: al decir que es nuevo se le ofrece resolver consultas y solo
+  // cuando pide contratar se le piden los documentos.
   async function upToPhoto(dni = '99.000.010') {
     ai.customerStatuses.set('Soy nuevo cliente', 'NEW_CUSTOMER')
     await send('hola')
-    await expect(send('Soy nuevo cliente')).resolves.toMatchObject({ status: 'NAME_REQUESTED' })
+    await expect(send('Soy nuevo cliente')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_OFFER_SENT' })
+    expect(lastText()).toBe(newCustomerQueryOffer)
+    ai.intents.set('quiero contratar', 'contratar')
+    await expect(send('quiero contratar')).resolves.toMatchObject({ status: 'NAME_REQUESTED' })
     expect(lastText()).toBe(newCustomerNameRequest)
     await expect(send('Laura Inventada')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_DNI_REQUESTED' })
     return send(dni)
@@ -438,6 +447,8 @@ describe('cliente nuevo (RF-ATE-05)', () => {
     ai.customerStatuses.set('Soy nuevo', 'NEW_CUSTOMER')
     await send('hola')
     await send('Soy nuevo')
+    ai.intents.set('quiero contratar', 'contratar')
+    await send('quiero contratar')
     await send('Laura Inventada')
     await expect(send('no me lo acuerdo')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_DNI_REQUESTED' })
   })
@@ -454,6 +465,8 @@ describe('cliente nuevo (RF-ATE-05)', () => {
     await send('30111222')
     ai.customerStatuses.set('soy nuevo', 'NEW_CUSTOMER')
     await send('soy nuevo')
+    ai.intents.set('quiero contratar', 'contratar')
+    await send('quiero contratar')
     await send('Carla')
     await expect(send(carla.dni)).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'DNI de otra persona' })
   })
@@ -470,6 +483,56 @@ describe('cliente nuevo (RF-ATE-05)', () => {
     await send('ya soy cliente')
     await expect(send('99000010')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REQUESTED' })
     expect(store.snapshot().conversations).toHaveLength(2)
+  })
+
+  // Ramas de la oferta: solo «contratar» empieza el alta; el resto se resuelve y vuelve a ofrecer.
+  async function upToOffer() {
+    ai.customerStatuses.set('Soy nuevo cliente', 'NEW_CUSTOMER')
+    await send('hola')
+    await expect(send('Soy nuevo cliente')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_OFFER_SENT' })
+    expect(lastText()).toBe(newCustomerQueryOffer)
+  }
+
+  it('«quiero contratar» en la oferta empieza el alta por el nombre', async () => {
+    await upToOffer()
+    ai.intents.set('quiero contratar', 'contratar')
+    await expect(send('quiero contratar')).resolves.toMatchObject({ status: 'NAME_REQUESTED' })
+    expect(lastText()).toBe(newCustomerNameRequest)
+  })
+
+  it('«no es de seguros» en la oferta responde el texto fijo y vuelve a ofrecer', async () => {
+    await upToOffer()
+    ai.intents.set('¿me vendés zapatillas?', 'no es de seguros')
+    await expect(send('¿me vendés zapatillas?')).resolves.toMatchObject({ status: 'NOT_INSURANCE_REPLIED' })
+    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([notInsuranceMessage, newCustomerQueryOffer])
+  })
+
+  it('un saludo en la oferta vuelve a ofrecer, sin alta', async () => {
+    await upToOffer()
+    ai.intents.set('hola', 'saludo')
+    await expect(send('hola')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_OFFER_SENT' })
+    expect(lastText()).toBe(newCustomerQueryOffer)
+  })
+
+  it('una consulta que necesita un cliente identificado avisa que no hay datos y vuelve a preguntar si ya es cliente', async () => {
+    await upToOffer()
+    ai.intents.set('¿cuánto debo?', 'otra consulta')
+    await expect(send('¿cuánto debo?')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REQUESTED' })
+    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([newCustomerNoDataNotice, customerStatusQuestion])
+  })
+
+  it('con tres «no se entiende» seguidos en la oferta se deriva', async () => {
+    await upToOffer()
+    ai.intents.set('asdfgh', 'no se entiende')
+    await expect(send('asdfgh')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    await expect(send('asdfgh')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
+    await expect(send('asdfgh')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'no se entendió la consulta' })
+  })
+
+  it('una falla del proveedor al decidir en la oferta deriva', async () => {
+    await upToOffer()
+    ai.classifyError = new Error('HTTP 429')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla del proveedor al decidir' })
   })
 })
 
@@ -665,6 +728,13 @@ describe('casos por intención', () => {
     expect(conversation.messages.slice(-2).map((message) => message.text)).toEqual(['¿me vendés zapatillas?', notInsuranceMessage])
   })
 
+  it('un cliente identificado que pide contratar deriva, sin alta', async () => {
+    link(phone, ana)
+    ai.intents.set('quiero contratar un seguro', 'contratar')
+    await expect(send('quiero contratar un seguro')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'intención: contratar' })
+    expect(lastText()).toBe(handoffMessage)
+  })
+
   it('una consulta guardada que no es de seguros recibe la bienvenida', async () => {
     link(phone, ana, bruno)
     ai.intents.set('¿me vendés zapatillas?', 'no es de seguros')
@@ -678,7 +748,7 @@ describe('casos por intención', () => {
     ai.classifyError = new Error('HTTP 429')
     await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla del proveedor al decidir' })
     expect(lastText()).toBe(handoffMessage)
-    expect(whatsapp.textsTo(phone)).not.toContain(clarificationRequest)
+    expect(whatsapp.textsTo(phone).filter((text) => clarificationRequests.includes(text))).toEqual([])
     expect((await openConversation()).cases.find((item) => item.handedOff)?.type).toBeNull()
   })
 })
@@ -692,9 +762,9 @@ describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
     await send('¿cuándo vence?')
     ai.rewritten.length = 0
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
-    expect(lastText()).toBe(clarificationRequest)
+    expect(clarificationRequests).toContain(lastText())
     await expect(send('lo otro')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
-    expect(lastText()).toBe(clarificationRequest)
+    expect(clarificationRequests).toContain(lastText())
     expect(ai.rewritten).toEqual([])
 
     const conversation = await openConversation()
@@ -743,7 +813,7 @@ describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
     ai.intents.set('eso que te dije', 'no se entiende')
     await send('eso que te dije')
     await expect(send(ana.dni)).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
-    expect(lastText()).toBe(clarificationRequest)
+    expect(clarificationRequests).toContain(lastText())
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'no se entendió la consulta' })
   })
@@ -1227,11 +1297,23 @@ describe('información de la agencia antes de identificarse (RF-ATE-06, RF-ATE-0
     expect((await openConversation()).suspended).toBe(false)
   })
 
-  it('mientras se pide el nombre del cliente nuevo, la pregunta se toma como el nombre, como hoy', async () => {
+  it('mientras se ofrece la consulta al cliente nuevo, la pregunta de agencia se responde', async () => {
     ai.customerStatuses.set('soy nuevo', 'NEW_CUSTOMER')
     ai.intents.set('¿qué seguros tienen?', 'información de la agencia')
     await send('hola')
     await send('soy nuevo')
+    await expect(send('¿qué seguros tienen?')).resolves.toMatchObject({ status: 'AGENCY_INFO_SENT' })
+    expect(ai.rewritten.at(-1)?.template).toContain('seguros de auto')
+    expect(lastText()).toBe(newCustomerQueryOffer)
+  })
+
+  it('mientras se pide el nombre del cliente nuevo, la pregunta se toma como el nombre, como hoy', async () => {
+    ai.customerStatuses.set('soy nuevo', 'NEW_CUSTOMER')
+    ai.intents.set('¿qué seguros tienen?', 'información de la agencia')
+    ai.intents.set('quiero contratar', 'contratar')
+    await send('hola')
+    await send('soy nuevo')
+    await send('quiero contratar')
     ai.classified.length = 0
     await expect(send('¿qué seguros tienen?')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_DNI_REQUESTED' })
     expect(ai.classified).toEqual([])
@@ -1346,8 +1428,10 @@ describe('nivel de riesgo al derivar (RF-DER-01)', () => {
 
   it('el alta de un cliente nuevo queda media', async () => {
     ai.customerStatuses.set('Soy nuevo cliente', 'NEW_CUSTOMER')
+    ai.intents.set('quiero contratar', 'contratar')
     await send('Hola')
     await send('Soy nuevo cliente')
+    await send('quiero contratar')
     await send('Laura Inventada')
     await send('99000010')
     await expect(sendPhoto()).resolves.toMatchObject({ status: 'PROSPECT_HANDED_OFF' })

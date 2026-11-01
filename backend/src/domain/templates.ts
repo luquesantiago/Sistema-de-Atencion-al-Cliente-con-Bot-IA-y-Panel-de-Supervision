@@ -28,6 +28,15 @@ export const newCustomerPhotoRetryRequest = 'Para continuar con el alta, necesit
 export const customerStatusQuestion =
   'Para orientarlo mejor, ¿ya es cliente de Seguros Castaño o sería un cliente nuevo?'
 
+// Quien dice ser cliente nuevo todavía no arranca el alta: primero se le ofrece resolver
+// consultas o darle datos de la empresa. El alta empieza solo si pide contratar.
+export const newCustomerQueryOffer =
+  'Perfecto. ¿Tiene alguna consulta sobre nuestros servicios o necesita algún dato de la empresa? Si quiere contratar un seguro, indíquemelo y le pido los datos para iniciar el alta.'
+
+// Consulta que necesita un cliente identificado, hecha por alguien que todavía no lo es.
+export const newCustomerNoDataNotice =
+  'Como todavía no es cliente de Seguros Castaño, no tiene pólizas ni datos registrados en la empresa.'
+
 export const customerStatusRetryQuestion =
   'Disculpe, no pude identificar si ya es cliente o si sería un cliente nuevo. ¿Podría confirmármelo?'
 
@@ -45,9 +54,18 @@ export const phoneChangePendingMessage =
 export const notInsuranceMessage =
   'Disculpe, esa consulta no tiene que ver con Seguros Castaño. Si tiene una consulta sobre sus seguros, estamos para ayudarlo.'
 
-// Repregunta cuando no se entiende la consulta: fija, sin datos de las pólizas.
-export const clarificationRequest =
-  'Disculpe, no terminé de entender su consulta. ¿Podría contármela con otras palabras?'
+// Repreguntas cuando no se entiende la consulta: una redacción distinta por intento, para no
+// repetir el mismo mensaje; sin datos de las pólizas y sin pasar por la redacción de la IA.
+export const clarificationRequests = [
+  'Disculpe, no terminé de entender su consulta. ¿Podría contármela con otras palabras?',
+  'Todavía no entendí bien su consulta. ¿Podría explicarla de otra manera?',
+]
+
+// step es la cantidad de repreguntas que ya se mandaron (1 la primera, 2 la segunda). Con un
+// paso fuera del catálogo se usa el último texto.
+export function clarificationRequestFor(step: number): string {
+  return clarificationRequests[step - 1] ?? clarificationRequests[clarificationRequests.length - 1] ?? ''
+}
 
 export const useNewPhoneRequest =
   'Para solicitar un cambio de teléfono, escríbanos desde el nuevo número. Así podremos verificarlo antes de iniciar el trámite.'
@@ -80,11 +98,11 @@ function displayStatus(policy: CustomerPolicy, now: Date): string {
 }
 
 export function welcomeMessage(customer: Customer): string {
-  return `Gracias, ${customer.firstName}. ¿En qué lo puedo ayudar?`
+  return `Hola, ${customer.firstName}. ¿En qué lo puedo ayudar?`
 }
 
 export function courtesyTemplate(customer: Customer): string {
-  return `Gracias por escribirnos, ${customer.firstName}. ¿En qué lo puedo ayudar?`
+  return `Hola, ${customer.firstName}. ¿En qué lo puedo ayudar?`
 }
 
 export function expirationsTemplate(customer: Customer, now: Date): string {
