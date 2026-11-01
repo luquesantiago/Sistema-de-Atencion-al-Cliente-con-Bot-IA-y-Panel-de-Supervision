@@ -176,6 +176,9 @@ function detalleAlerta(caso: CasoBandeja): string {
 
 // El banner muestra solo el mensaje dinámico; el color sale de la prioridad.
 function mensajeAlerta(caso: CasoBandeja, alertas: AlertaBandeja[]): { clase: string; texto: string } {
+  if (!caso.handedOff) {
+    return { clase: BANNERS_ALERTA.bajo, texto: 'Seguimiento: Sin seguimiento requerido' }
+  }
   const { prioridad } = prioridadDelCaso(caso)
   const prefijo = prioridad === 'critico' ? 'Atención' : prioridad === 'medio' ? 'Revisión' : 'Seguimiento'
   const pendientes =
