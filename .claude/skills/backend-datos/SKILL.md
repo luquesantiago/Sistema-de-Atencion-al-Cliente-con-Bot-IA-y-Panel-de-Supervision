@@ -55,7 +55,8 @@ docker compose exec backend npx prisma generate
 - Cliente y teléfono son N:M. Puede haber clientes persona (DNI + apellido + nombre) o empresa (CUIT + razón social) en la misma tabla.
 - Una moneda por póliza, solo pesos o dólares.
 - El borrador retenido, la respuesta enviada y la corrección se guardan por separado.
-- Una baja aprobada pone la póliza en "dada de baja". `activo = false` marca solo registros cargados por error. La cartera activa son las pólizas en estado "activa", no vencidas y con `activo = true`.
+- Una baja aprobada pone la póliza en "dada de baja". En `policia`, `activo = false` marca solo registros cargados por error. La cartera activa son las pólizas en estado "activa", no vencidas y con `activo = true`.
+- En `cliente`, `activo = false` es la baja lógica: la fila se conserva. `findByDni` y `findById` la devuelven marcada con `active: false` (el asistente la revalida por DNI); `linkedCustomerIds` la excluye de la identificación por número; el vínculo de `cliente_telefono` no se modifica (`isPhoneLinkedTo` no depende del estado). Si la baja ocurre con una sesión identificada abierta, el asistente cierra la conversación con `endByDeactivation` y el próximo mensaje arranca un chat nuevo.
 
 ## API
 

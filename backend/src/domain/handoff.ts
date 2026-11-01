@@ -14,7 +14,8 @@ export type HandoffReason =
   | { kind: 'new-customer' }
   | { kind: 'dni-unrecognized' }
   | { kind: 'dni-other-person' }
-  // El cliente de la conversación ya no está en la cartera.
+  // La fila del cliente de la conversación ya no existe en la base (la baja lógica no
+  // llega acá: reinicia la sesión y vuelve a pedir el DNI).
   | { kind: 'customer-missing' }
   | { kind: 'not-understood' }
   | { kind: 'missing-data'; data: MissingData }

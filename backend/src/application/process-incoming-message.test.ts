@@ -43,6 +43,7 @@ const ana: Customer = {
   dni: '99000001',
   firstName: 'Ana',
   lastName: 'Ficticia',
+  active: true,
   policies: [
     { number: 'POL-90001', ramo: 'auto', status: 'activa', expirationDate: '2027-03-15', currency: 'ARS', installments: [] },
     { number: 'POL-90002', ramo: 'hogar', status: 'activa', expirationDate: '2026-09-01', currency: 'ARS', installments: [] },
@@ -53,9 +54,10 @@ const bruno: Customer = {
   dni: '99000002',
   firstName: 'Bruno',
   lastName: 'Ficticio',
+  active: true,
   policies: [{ number: 'POL-90003', ramo: 'moto', status: 'suspendida por mora', expirationDate: '2026-12-10', currency: 'ARS', installments: [] }],
 }
-const carla: Customer = { id: 3, dni: '99000003', firstName: 'Carla', lastName: 'Ficticia', policies: [] }
+const carla: Customer = { id: 3, dni: '99000003', firstName: 'Carla', lastName: 'Ficticia', active: true, policies: [] }
 
 // La información de la agencia para estas pruebas: los catálogos de las migraciones, con la
 // dirección y el teléfono de ejemplo.
@@ -265,6 +267,66 @@ describe('otro DNI en una conversación identificada', () => {
     await expect(send('y el de 99000002?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'DNI de otra persona' })
     expect(lastText()).toBe(handoffMessage)
     expect((await openConversation()).suspended).toBe(true)
+  })
+})
+
+describe('baja de cliente con sesión identificada (RF-CAR-03)', () => {
+  it('la sesión se cierra y el próximo mensaje arranca un chat nuevo que pide la identificación', async () => {
+    link(phone, ana)
+    ai.intents.set('¿cuándo vence mi seguro?', 'vencimiento')
+    await expect(send('¿cuándo vence mi seguro?')).resolves.toMatchObject({ status: 'ANSWER_SENT' })
+    const old = await openConversation()
+    customers.deactivate(ana.id)
+
+    await expect(send('hola')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REQUESTED' })
+    expect(lastText()).toBe(customerStatusQuestion)
+
+    expect(store.snapshot().conversations.find((item) => item.id === old.id)?.endedAt).toEqual(now)
+    expect(casesOf(old.id)[0]?.closedAt).toEqual(now)
+    const open = await openConversation()
+    expect(open.id).not.toBe(old.id)
+    expect(open.customerId).toBeNull()
+  })
+
+  it('el DNI del cliente inactivo se reconoce en el chat nuevo y revalida su sesión', async () => {
+    link(phone, ana)
+    ai.intents.set('¿cuándo vence mi seguro?', 'vencimiento')
+    await expect(send('¿cuándo vence mi seguro?')).resolves.toMatchObject({ status: 'ANSWER_SENT' })
+    customers.deactivate(ana.id)
+
+    // «hola» queda como consulta pendiente; el DNI la responde con la cortesía.
+    ai.intents.set('hola', 'saludo')
+    await expect(send('hola')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REQUESTED' })
+    ai.customerStatuses.set('cliente', 'EXISTING_CUSTOMER')
+    await expect(send('cliente')).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
+
+    // Ya revalidada, la sesión sigue y responde los datos del cliente.
+    ai.intents.set('¿y el vencimiento?', 'vencimiento')
+    await expect(send('¿y el vencimiento?')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'vencimiento' })
+    expect(lastText()).toContain('POL-90001 (auto): vence el 15/03/2027.')
+  })
+
+  it('el DNI de un cliente inactivo desde un número sin vínculo pide el cambio de teléfono (regla 9)', async () => {
+    customers.deactivate(ana.id)
+    ai.intents.set('hola', 'saludo')
+    await expect(send('hola')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REQUESTED' })
+    ai.customerStatuses.set('cliente', 'EXISTING_CUSTOMER')
+    await expect(send('cliente')).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING' })
+    expect((await openConversation()).customerId).toBe(ana.id)
+    expect((await openConversation()).suspended).toBe(false)
+  })
+
+  it('una conversación suspendida por un caso derivado sigue en silencio, sin cerrarla por la baja', async () => {
+    link(phone, ana)
+    ai.intents.set('tuve un siniestro', 'siniestro')
+    await expect(send('tuve un siniestro')).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
+    const suspended = await openConversation()
+    customers.deactivate(ana.id)
+    await expect(send('hola')).resolves.toMatchObject({ status: 'SILENCED' })
+    expect((await openConversation()).id).toBe(suspended.id)
+    expect(store.snapshot().conversations.find((item) => item.id === suspended.id)?.endedAt).toBeNull()
   })
 })
 
@@ -1069,6 +1131,31 @@ describe('respuestas (RF-ATE-02, RF-ATE-04)', () => {
     await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla de la redacción' })
   })
 
+  it('la primera redacción rechazada se reintenta con el motivo del control y la segunda se envía', async () => {
+    await identifyShared()
+    ai.intents.set('¿cuándo vence?', 'vencimiento')
+    ai.rewriteResult = (input) =>
+      input.rejection
+        ? 'Ana, le cuento: su póliza POL-90001 de auto vence el 15/03/2027 y la POL-90002 de hogar venció el 01/09/2026.'
+        : input.template.replace('15/03/2027', '15/03/2028')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'ANSWER_SENT' })
+    expect(ai.rewritten).toHaveLength(2)
+    expect(ai.rewritten[1]?.rejection).toBe('datos distintos de la plantilla')
+    expect(lastText()).toContain('le cuento')
+    expect(whatsapp.textsTo(phone).some((text) => text.includes('2028'))).toBe(false)
+  })
+
+  it('si el reintento de la redacción falla, se deriva como falla y el borrador rechazado queda guardado', async () => {
+    await identifyShared()
+    ai.intents.set('¿cuándo vence?', 'vencimiento')
+    ai.rewriteResult = (input) => {
+      if (input.rejection) throw new Error('timeout')
+      return input.template.replace('15/03/2027', '15/03/2028')
+    }
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla de la redacción' })
+    expect(store.snapshot().replies.find((reply) => reply.sentMessageId === null)?.text).toContain('15/03/2028')
+  })
+
   it('el saludo se responde con cortesía redactada, sin derivar', async () => {
     await identifyShared()
     ai.intents.set('gracias!', 'saludo')
@@ -1111,12 +1198,13 @@ describe('saldo (RF-ATE-01, RF-ATE-02)', () => {
       { number: 3, dueDate: '2026-10-07', amountCents: 4500000, paid: false },
     ],
   }
-  const diego: Customer = { id: 4, dni: '99000004', firstName: 'Diego', lastName: 'Ficticio', policies: [diegoPolicy] }
+  const diego: Customer = { id: 4, dni: '99000004', firstName: 'Diego', lastName: 'Ficticio', active: true, policies: [diegoPolicy] }
   const elena: Customer = {
     id: 5,
     dni: '99000005',
     firstName: 'Elena',
     lastName: 'Ficticia',
+    active: true,
     policies: [{
       number: 'POL-90011',
       ramo: 'hogar',
@@ -1132,6 +1220,7 @@ describe('saldo (RF-ATE-01, RF-ATE-02)', () => {
     dni: '99000006',
     firstName: 'Fede',
     lastName: 'Ficticio',
+    active: true,
     policies: [
       { ...diegoPolicy, number: 'POL-90012' },
       { number: 'POL-90013', ramo: 'moto', status: 'activa', expirationDate: '2027-02-01', currency: 'ARS', installments: [] },

@@ -14,7 +14,7 @@ function policy(number: string, installments: Installment[], overrides: Partial<
 }
 
 function customerWith(policies: CustomerPolicy[]): Customer {
-  return { id: 90099, dni: '99000099', firstName: 'Ana', lastName: 'Prueba', policies }
+  return { id: 90099, dni: '99000099', firstName: 'Ana', lastName: 'Prueba', policies, active: true }
 }
 
 describe('policyBalance', () => {

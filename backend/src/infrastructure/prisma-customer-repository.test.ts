@@ -48,6 +48,7 @@ describe('customerFromRecord', () => {
       dni: '99000001',
       firstName: 'Ana',
       lastName: 'Ficticia',
+      active: true,
       policies: [
         { number: 'POL-00126', ramo: 'auto', status: 'suspendida por mora', expirationDate: '2027-03-15', currency: 'ARS', installments: [] },
         { number: 'POL-00131', ramo: 'hogar', status: 'activa', expirationDate: '2026-09-01', currency: 'ARS', installments: [] },
@@ -55,8 +56,8 @@ describe('customerFromRecord', () => {
     })
   })
 
-  it('un cliente cargado por error no se usa', () => {
-    expect(customerFromRecord(record({ activo: false, poliza: [policy('POL-00126')] }))).toBeNull()
+  it('un cliente inactivo se devuelve marcado como inactivo, no descartado', () => {
+    expect(customerFromRecord(record({ activo: false, poliza: [policy('POL-00126')] }))).toMatchObject({ id: 7, active: false })
   })
 
   it('una póliza cargada por error no aparece', () => {

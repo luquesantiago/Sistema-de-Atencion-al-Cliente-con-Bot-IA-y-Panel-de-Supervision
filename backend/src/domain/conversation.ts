@@ -250,6 +250,17 @@ export function endByRestart(conversation: OpenConversation): ConversationEnd {
   }
 }
 
+// Baja del cliente detectada al llegar un mensaje a una sesión identificada: la sesión se
+// invalida a esta hora (nunca antes del cierre de un caso) y el mensaje empieza una
+// conversación nueva, como si el número escribiera por primera vez. Cierra los mismos
+// casos que el reinicio: los no derivados y sin nada pendiente.
+export function endByDeactivation(conversation: OpenConversation, now: Date): ConversationEnd {
+  return {
+    endedAt: notBeforeClosedCases(conversation, now),
+    caseIds: casesClosedWithConversation(conversation),
+  }
+}
+
 const settingKeys = {
   maxDniRetries: 'max_intentos_dni',
   inactivityMinutes: 'minutos_inactividad_sesion',
