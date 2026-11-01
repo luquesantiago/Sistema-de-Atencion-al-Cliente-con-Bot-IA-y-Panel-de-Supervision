@@ -21,7 +21,7 @@
   --color-warning-bg: #fef3c7;
   --color-warning-text: #92400e;
   --color-danger-bg: #fee2e2;
-  --color-danger-text: #b91c1c;
+  --color-danger-text: #b30202;
 
   /* Derivados de la paleta para superficies que la guía no nombra */
   --color-danger-hover: #8f1d17;
@@ -52,12 +52,16 @@
   --radius-lg: 16px;
   --shadow-soft: 0 2px 8px rgba(43, 18, 24, 0.08);
   --sidebar-width: 18rem;
+
+
 }
 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-primary-hover) var(--color-secondary);
 }
 
 /* Tipografía base (design.md §4) */
@@ -133,3 +137,4 @@ h2 {
     scroll-behavior: auto !important;
   }
 }
+

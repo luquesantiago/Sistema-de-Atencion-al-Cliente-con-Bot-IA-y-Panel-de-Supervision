@@ -469,3 +469,22 @@ Breakpoints (mobile-first, con `min-width`):
 - Preferir `var(--token)` a repetir valores hexadecimales y estilos arbitrarios.
 - Antes de crear una clase o componente nuevo, comprobar si ya existe uno equivalente.
 - Si una regla visual entra en conflicto con un requisito funcional, preservar la funcionalidad y resolver el diseño de forma coherente con esta guía.
+
+## 9. Movimiento
+
+El panel es una superficie **Operate**: el movimiento confirma estado, continuidad y jerarquía; no decora ni hace esperar. Hay un solo momento autoral: la ficha del cliente se asienta al costado de la fila elegida.
+
+| Pieza | Movimiento | Duración |
+|---|---|---|
+| Nombre de la fila → título de la ficha | View Transition nativa: el nombre viaja de la celda de la tabla al encabezado de la ficha (y vuelta al cerrar); el resto del panel entra con el crossfade raíz | 280 ms / cierre 180 ms, `cubic-bezier(0.16, 1, 0.3, 1)` |
+| Ficha del cliente | Entra desde la derecha 14 px y escala 0,995 → 1; en `<1024px` asciende 10 px | 280 ms, `cubic-bezier(0.16, 1, 0.3, 1)` |
+| Filas del listado | Opacidad, con escalonado de 18 ms por fila y tope de 6 filas | 180 ms |
+| Diálogos | El velo aparece; el panel entra 8 px y escala 0,985 → 1 | 180 ms / 220 ms |
+| Avisos de éxito y riesgo | Aparecen desde −4 px con opacidad | 180 ms |
+| Hover y selección de filas | Transición de fondo y borde; la barra interior de selección crece | 160 ms / 240 ms |
+| Botones de la cartera | Transición de fondo, borde y color | 150 ms |
+
+- Todo el movimiento de entrada vive bajo `@media (prefers-reduced-motion: no-preference)`. Con `reduce`, el contenido aparece directamente en su estado final y las transiciones quedan instantáneas; nunca se oculta contenido por defecto.
+- El viaje del nombre usa `document.startViewTransition` solo en pantallas de `≥1024px` sin `reduce`; si el navegador no lo soporta, manda la animación CSS de la ficha. Al cerrar, el foco del teclado vuelve al botón de la fila de origen.
+- No animar `width`, `height`, `top`, `left` ni márgenes. No usar bucles, rebotes ni desenfoques animados.
+- La salida no se anima: en una superficie operativa, cerrar debe sentirse inmediato.

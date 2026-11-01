@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { flushSync } from 'react-dom'
 import type { Modulo, ModuloPanel, OpcionesNavegacion } from '../navigation'
 import PageHeader from '../components/PageHeader'
 import EstadoPanel from '../components/EstadoPanel'
@@ -38,6 +39,15 @@ import { listarBandeja } from '../api/bandeja'
 
 const LIMITE_PAGINA = 25
 const RETRASO_BUSQUEDA_MS = 300
+const NOMBRE_TRANSICION_FICHA = 'ficha-cliente'
+
+// La ficha se desprende de la fila solo donde el gesto se ve completo: en
+// pantallas anchas, sin movimiento reducido y con View Transitions nativas.
+function admiteTransicionDeFicha(): boolean {
+  return typeof document.startViewTransition === 'function'
+    && window.matchMedia('(min-width: 1024px)').matches
+    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
 
 function identificacion(cliente: ClienteLista | ClienteDetalle): string {
   if (cliente.cuit) return `CUIT ${cliente.cuit}`
@@ -216,6 +226,7 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
   const cargandoMasRef = useRef(false)
   const clienteEnChatRef = useRef<string | null>(null)
   const guardandoRef = useRef(false)
+  const transicionDeFichaRef = useRef(false)
 
   // Ediciones de cartera.
   const [catalogos, setCatalogos] = useState<Catalogos | null>(null)
@@ -232,6 +243,7 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
   const [errorTelefono, setErrorTelefono] = useState<string | null>(null)
   const [clienteEnChat, setClienteEnChat] = useState<string | null>(null)
   const [avisoChat, setAvisoChat] = useState<{ tono: 'info' | 'riesgo'; texto: string } | null>(null)
+  const [fichaConTransicion, setFichaConTransicion] = useState(false)
 
   const cargar = useCallback(async (busqueda: string, silencioso = false) => {
     const numero = ++numeroDeConsulta.current
@@ -310,7 +322,80 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
     setNuevoTelefono('')
     setErrorTelefono(null)
     setCargandoDetalle(false)
+    setFichaConTransicion(false)
   }, [])
+
+  // El nombre viaja de la fila al título de la ficha. La clase apaga la
+  // animación CSS mientras la View Transition toma las snapshots.
+  const abrirDetalleDesdeFila = useCallback((cliente: ClienteLista, fila: HTMLTableRowElement | null) => {
+    const celdaNombre = fila?.querySelector<HTMLElement>('.tabla__nombre') ?? null
+    if (
+      seleccionado !== null
+      || celdaNombre === null
+      || transicionDeFichaRef.current
+      || !admiteTransicionDeFicha()
+    ) {
+      void abrirDetalle(cliente)
+      return
+    }
+
+    transicionDeFichaRef.current = true
+    celdaNombre.classList.add('tabla__nombre--vt')
+    celdaNombre.style.setProperty('view-transition-name', NOMBRE_TRANSICION_FICHA)
+
+    const transicion = document.startViewTransition(() => {
+      flushSync(() => {
+        setFichaConTransicion(true)
+        void abrirDetalle(cliente)
+      })
+      celdaNombre.style.removeProperty('view-transition-name')
+      celdaNombre.classList.remove('tabla__nombre--vt')
+    })
+
+    void transicion.finished.finally(() => {
+      transicionDeFichaRef.current = false
+    })
+  }, [abrirDetalle, seleccionado])
+
+  const cerrarDetalleDesdeBoton = useCallback(() => {
+    const id = seleccionado
+    if (id === null) {
+      cerrarDetalle()
+      return
+    }
+    const fila = document.querySelector<HTMLTableRowElement>(
+      `tr[data-cliente-id="${CSS.escape(id)}"]`,
+    )
+    const celdaNombre = fila?.querySelector<HTMLElement>('.tabla__nombre') ?? null
+    // Cerrar quita el botón del foco: el teclado vuelve a la fila de origen.
+    const devolverFocoALaFila = () => {
+      fila?.querySelector<HTMLButtonElement>('.tabla__ver')?.focus()
+    }
+    if (
+      celdaNombre === null
+      || !fichaConTransicion
+      || transicionDeFichaRef.current
+      || !admiteTransicionDeFicha()
+    ) {
+      cerrarDetalle()
+      devolverFocoALaFila()
+      return
+    }
+
+    transicionDeFichaRef.current = true
+    const transicion = document.startViewTransition(() => {
+      flushSync(() => cerrarDetalle())
+      celdaNombre.classList.add('tabla__nombre--vt')
+      celdaNombre.style.setProperty('view-transition-name', NOMBRE_TRANSICION_FICHA)
+      devolverFocoALaFila()
+    })
+
+    void transicion.finished.finally(() => {
+      celdaNombre.style.removeProperty('view-transition-name')
+      celdaNombre.classList.remove('tabla__nombre--vt')
+      transicionDeFichaRef.current = false
+    })
+  }, [seleccionado, fichaConTransicion, cerrarDetalle])
 
   // «Ir al chat»: busca los casos abiertos del cliente en la Bandeja de Atención. Si hay
   // uno, abre esa conversación; si hay varios, llega a la bandeja filtrada por el cliente.
@@ -701,14 +786,16 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
             </tr>
           </thead>
           <tbody>
-            {items.map((cliente) => {
+            {items.map((cliente, indice) => {
               const activo = seleccionado === cliente.id
               return (
                 <tr
                   key={cliente.id}
                   className="tabla__fila"
+                  data-cliente-id={cliente.id}
                   aria-current={activo ? 'true' : undefined}
-                  onClick={() => void abrirDetalle(cliente)}
+                  style={{ animationDelay: `${Math.min(indice, 6) * 18}ms` }}
+                  onClick={(evento) => abrirDetalleDesdeFila(cliente, evento.currentTarget)}
                 >
                   <td className="tabla__identificacion">{identificacion(cliente)}</td>
                   <td className="tabla__nombre">{nombreCompleto(cliente)}</td>
@@ -740,10 +827,10 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
                           // «Viendo» alterna: tocarlo cierra la ficha, igual que el
                           // botón Cerrar del panel, y vuelve la lista completa.
                           if (activo) {
-                            cerrarDetalle()
+                            cerrarDetalleDesdeBoton()
                             return
                           }
-                          void abrirDetalle(cliente)
+                          abrirDetalleDesdeFila(cliente, evento.currentTarget.closest('tr'))
                         }}
                       >
                         {activo ? 'Viendo' : 'Ver detalle'}
@@ -820,10 +907,14 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
         </div>
 
         {seleccionado !== null ? (
-          <aside className="detalle-panel" aria-label="Detalle del cliente" aria-busy={cargandoDetalle || undefined}>
+          <aside
+            className={`detalle-panel${fichaConTransicion ? ' detalle-panel--vt' : ''}`}
+            aria-label="Detalle del cliente"
+            aria-busy={cargandoDetalle || undefined}
+          >
             <div className="detalle-panel__encabezado">
               <h2 className="detalle-panel__titulo">{tituloFicha}</h2>
-              <button type="button" className="detalle-panel__cerrar" onClick={cerrarDetalle}>
+              <button type="button" className="detalle-panel__cerrar" onClick={cerrarDetalleDesdeBoton}>
                 Cerrar
               </button>
             </div>
