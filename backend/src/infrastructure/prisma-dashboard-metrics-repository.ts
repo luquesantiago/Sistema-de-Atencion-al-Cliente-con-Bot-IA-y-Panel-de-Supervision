@@ -1,4 +1,4 @@
-import type { DashboardMetricsRepository } from '../domain/dashboard-metrics.js'
+import type { DashboardGeneralSummary, DashboardMetricsRepository } from '../domain/dashboard-metrics.js'
 
 type PendingStateFilter = {
   estado_prospecto?: { is: { nombre: 'pendiente' } }
@@ -32,10 +32,15 @@ type RiskAlertModel = {
   }): Promise<Array<{ id_alerta: number; nivel_riesgo: { nombre: string } }>>
 }
 
+type CaseModel = {
+  count(args: { where: { fecha_cierre?: null | { not: null }; fecha_derivacion?: null } }): Promise<number>
+}
+
 export type DashboardMetricsDataSource = {
   prospecto: CountModel
   solicitud_accion: CountModel
   alerta: RiskAlertModel
+  caso: CaseModel
 }
 
 export class PrismaDashboardMetricsRepository implements DashboardMetricsRepository {
@@ -72,7 +77,21 @@ export class PrismaDashboardMetricsRepository implements DashboardMetricsReposit
       },
       select: { id_alerta: true, nivel_riesgo: { select: { nombre: true } } },
     })
-    console.log('[dashboard] Alertas de riesgo abiertas:', alerts)
     return alerts.length
+  }
+
+  public async getGeneralSummary(): Promise<DashboardGeneralSummary> {
+    const [totalAbiertos, totalCerrados, totalCasos, casosAutomatizados] = await Promise.all([
+      this.dataSource.caso.count({ where: { fecha_cierre: null } }),
+      this.dataSource.caso.count({ where: { fecha_cierre: { not: null } } }),
+      this.dataSource.caso.count({ where: {} }),
+      this.dataSource.caso.count({ where: { fecha_derivacion: null } }),
+    ])
+
+    return {
+      totalAbiertos,
+      totalCerrados,
+      tasaAutomatizacionBot: totalCasos === 0 ? 0 : (casosAutomatizados / totalCasos) * 100,
+    }
   }
 }

@@ -107,13 +107,31 @@ export default function Dashboard({ modulo, rol, onNavegar }: DashboardProps) {
           descripcion={errorMetricas}
           tono="alerta"
         />
-      ) : (
+      ) : cargandoMetricas ? (
         <EstadoPanel
-          titulo={cargandoMetricas ? 'Cargando métricas' : 'Trámites por aprobar'}
-          descripcion={cargandoMetricas
-            ? 'Estamos consultando los datos actuales de la base.'
-            : `${metricas?.tramitesPorAprobar ?? 0} trámite(s) pendiente(s) de aprobación.`}
+          titulo="Cargando métricas"
+          descripcion="Estamos consultando los datos actuales de la base."
         />
+      ) : (
+        <section aria-labelledby="resumen-general-titulo">
+          <h2 id="resumen-general-titulo">Resumen general</h2>
+          <div className="tarjetas">
+            <article className="tarjeta">
+              <span className="tarjeta__etiqueta">Casos abiertos</span>
+              <span className="tarjeta__valor">{metricas?.resumenGeneral.totalAbiertos ?? '—'}</span>
+            </article>
+            <article className="tarjeta">
+              <span className="tarjeta__etiqueta">Casos cerrados</span>
+              <span className="tarjeta__valor">{metricas?.resumenGeneral.totalCerrados ?? '—'}</span>
+            </article>
+            <article className="tarjeta">
+              <span className="tarjeta__etiqueta">Tasa de automatización</span>
+              <span className="tarjeta__valor">
+                {metricas?.resumenGeneral.tasaAutomatizacionBot ?? '—'}%
+              </span>
+            </article>
+          </div>
+        </section>
       )}
     </div>
   )
