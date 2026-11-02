@@ -9,7 +9,61 @@ import {
   IconoCampana,
   IconoPausa,
 } from '../components/iconos'
-import { obtenerMetricasDashboard, type DashboardMetrics } from '../api/dashboard'
+import {
+  obtenerMetricasDashboard,
+  type DashboardHourlyVolume,
+  type DashboardMetrics,
+} from '../api/dashboard'
+
+const GRAFICO_ANCHO = 500
+const GRAFICO_ALTO = 150
+const GRAFICO_BASE = 126
+const GRAFICO_TOPE = 12
+const GRAFICO_MAXIMO_ETIQUETAS = 8
+
+type PuntoGrafico = {
+  x: number
+  y: number
+  hora: string
+  cantidad: number
+}
+
+function redondear(valor: number): number {
+  return Math.round(valor * 100) / 100
+}
+
+function construirPuntos(volumen: DashboardHourlyVolume[]): PuntoGrafico[] {
+  const maximo = Math.max(1, ...volumen.map((item) => item.cantidad))
+  const paso = volumen.length > 1 ? GRAFICO_ANCHO / (volumen.length - 1) : GRAFICO_ANCHO
+  return volumen.map((item, indice) => ({
+    x: redondear(indice * paso),
+    y: redondear(GRAFICO_BASE - (item.cantidad / maximo) * (GRAFICO_BASE - GRAFICO_TOPE)),
+    hora: item.hora,
+    cantidad: item.cantidad,
+  }))
+}
+
+function curvaSuavizada(puntos: PuntoGrafico[]): string {
+  if (puntos.length === 0) return ''
+  if (puntos.length === 1) return `M ${puntos[0].x} ${puntos[0].y}`
+  let trazo = `M ${puntos[0].x} ${puntos[0].y}`
+  for (let i = 0; i < puntos.length - 1; i += 1) {
+    const anterior = puntos[i - 1] ?? puntos[i]
+    const actual = puntos[i]
+    const siguiente = puntos[i + 1]
+    const posterior = puntos[i + 2] ?? siguiente
+    const cp1x = redondear(actual.x + (siguiente.x - anterior.x) / 6)
+    const cp1y = redondear(actual.y + (siguiente.y - anterior.y) / 6)
+    const cp2x = redondear(siguiente.x - (posterior.x - actual.x) / 6)
+    const cp2y = redondear(siguiente.y - (posterior.y - actual.y) / 6)
+    trazo += ` C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${siguiente.x} ${siguiente.y}`
+  }
+  return trazo
+}
+
+function pasoEtiquetas(cantidad: number): number {
+  return Math.max(1, Math.ceil(cantidad / GRAFICO_MAXIMO_ETIQUETAS))
+}
 
 interface DashboardProps {
   modulo: Modulo
@@ -63,6 +117,22 @@ export default function Dashboard({ modulo, rol, onNavegar }: DashboardProps) {
       </div>
     )
   }
+
+  const volumenPorHora = metricas?.volumenPorHora ?? []
+  const puntosGrafico = construirPuntos(volumenPorHora)
+  const trazoGrafico = curvaSuavizada(puntosGrafico)
+  const areaGrafico = puntosGrafico.length > 0
+    ? `${trazoGrafico} L ${GRAFICO_ANCHO} ${GRAFICO_BASE} L 0 ${GRAFICO_BASE} Z`
+    : ''
+  const pasoEtiquetasGrafico = pasoEtiquetas(puntosGrafico.length)
+  const etiquetasGrafico = puntosGrafico.filter(
+    (_, indice) => indice % pasoEtiquetasGrafico === 0 || indice === puntosGrafico.length - 1,
+  )
+  const consultasHoy = metricas?.consultasHoy ?? '—'
+  const casosCerrados = metricas?.casosCerrados ?? '—'
+  const resueltosPorBot = metricas?.resueltosPorBot ?? '—'
+  const tasaAutomatizacion = Math.round(metricas?.tasaAutomatizacion ?? 0)
+  const estadoAutomatizacion = tasaAutomatizacion >= 60 ? 'Óptimo' : 'Moderado'
 
   return (
     <div className="pagina">
@@ -124,24 +194,100 @@ export default function Dashboard({ modulo, rol, onNavegar }: DashboardProps) {
           descripcion="Estamos consultando los datos actuales de la base."
         />
       ) : (
-        <section aria-labelledby="resumen-general-titulo">
-          <h2 id="resumen-general-titulo">Resumen general</h2>
-          <div className="tarjetas">
-            <article className="tarjeta">
-              <span className="tarjeta__etiqueta">Casos abiertos</span>
-              <span className="tarjeta__valor">{metricas?.resumenGeneral.totalAbiertos ?? '—'}</span>
-            </article>
-            <article className="tarjeta">
-              <span className="tarjeta__etiqueta">Casos cerrados</span>
-              <span className="tarjeta__valor">{metricas?.resumenGeneral.totalCerrados ?? '—'}</span>
-            </article>
-            <article className="tarjeta">
-              <span className="tarjeta__etiqueta">Tasa de automatización</span>
-              <span className="tarjeta__valor">
-                {metricas?.resumenGeneral.tasaAutomatizacionBot ?? '—'}%
-              </span>
-            </article>
-          </div>
+        <section className="dashboard-inferior" aria-label="Análisis de la jornada">
+          <article
+            className="panel-dashboard panel-dashboard--grafico"
+            aria-labelledby="volumen-chats-titulo"
+          >
+            <h2 id="volumen-chats-titulo">Volumen de chats por hora</h2>
+            <p className="panel-dashboard__nota">Consultas registradas hoy por hora.</p>
+            <svg
+              className="grafico-chats"
+              viewBox={`0 0 ${GRAFICO_ANCHO} ${GRAFICO_ALTO}`}
+              role="img"
+              aria-label="Volumen de chats de hoy por hora"
+            >
+              <defs>
+                <linearGradient id="degradado-volumen-chats" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.35" />
+                  <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              {areaGrafico ? <path d={areaGrafico} fill="url(#degradado-volumen-chats)" /> : null}
+              {trazoGrafico ? (
+                <path
+                  d={trazoGrafico}
+                  fill="none"
+                  stroke="var(--color-primary)"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                />
+              ) : null}
+              <line
+                className="grafico-chats__base"
+                x1={0}
+                y1={GRAFICO_BASE}
+                x2={GRAFICO_ANCHO}
+                y2={GRAFICO_BASE}
+              />
+              <g className="grafico-chats__eje">
+                {etiquetasGrafico.map((punto, indice) => (
+                  <text
+                    key={punto.hora}
+                    x={punto.x}
+                    y={GRAFICO_ALTO - 4}
+                    textAnchor={indice === 0 ? 'start' : indice === etiquetasGrafico.length - 1 ? 'end' : 'middle'}
+                  >
+                    {punto.hora}
+                  </text>
+                ))}
+              </g>
+            </svg>
+          </article>
+
+          <article
+            className="panel-dashboard panel-dashboard--resumen"
+            aria-labelledby="resumen-operativo-titulo"
+          >
+            <h2 id="resumen-operativo-titulo">Resumen operativo</h2>
+            <dl className="resumen-operativo">
+              <div className="resumen-operativo__fila">
+                <dt>Consultas de hoy</dt>
+                <dd>{consultasHoy}</dd>
+              </div>
+              <div className="resumen-operativo__fila">
+                <dt>Casos cerrados</dt>
+                <dd>{casosCerrados}</dd>
+              </div>
+              <div className="resumen-operativo__fila">
+                <dt>Resueltos por bot</dt>
+                <dd>{resueltosPorBot}</dd>
+              </div>
+            </dl>
+
+            <div className="resumen-operativo__automatizacion">
+              <div className="resumen-operativo__barra-encabezado">
+                <span>Tasa de automatización</span>
+                <span className={`estado-automatizacion estado-automatizacion--${tasaAutomatizacion >= 60 ? 'optimo' : 'moderado'}`}>
+                  {estadoAutomatizacion}
+                </span>
+              </div>
+              <div
+                className="barra-progreso"
+                role="progressbar"
+                aria-label="Tasa de automatización del bot"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={tasaAutomatizacion}
+              >
+                <span
+                  className="barra-progreso__relleno"
+                  style={{ width: `${tasaAutomatizacion}%` }}
+                />
+              </div>
+              <span className="resumen-operativo__porcentaje">{tasaAutomatizacion}%</span>
+            </div>
+          </article>
         </section>
       )}
     </div>

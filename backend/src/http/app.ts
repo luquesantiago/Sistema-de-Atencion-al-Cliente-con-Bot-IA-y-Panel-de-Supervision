@@ -180,13 +180,13 @@ export function createApp(
       }
       const tramitesPorAprobar = await dashboardMetricsRepository.countPendingProcedures()
       const alertasRiesgoAbiertas = await dashboardMetricsRepository.countOpenRiskAlerts()
-      const resumenGeneral = await dashboardMetricsRepository.getGeneralSummary()
+      const resumenOperativo = await dashboardMetricsRepository.getOperationalSummary(new Date())
       response.status(200).json({
         casosDerivadosSinTomar: 0,
         respuestasRetenidas: 0,
         tramitesPorAprobar,
         alertasRiesgoAbiertas,
-        resumenGeneral,
+        ...resumenOperativo,
       })
     } catch (error) {
       handleRequestError(error, response, next)

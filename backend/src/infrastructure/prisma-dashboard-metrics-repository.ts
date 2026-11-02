@@ -1,4 +1,9 @@
-import type { DashboardGeneralSummary, DashboardMetricsRepository } from '../domain/dashboard-metrics.js'
+import {
+  argentinaDayRange,
+  type DashboardHourlyVolume,
+  type DashboardMetricsRepository,
+  type DashboardOperationalSummary,
+} from '../domain/dashboard-metrics.js'
 
 type PendingStateFilter = {
   estado_prospecto?: { is: { nombre: 'pendiente' } }
@@ -32,8 +37,22 @@ type RiskAlertModel = {
   }): Promise<Array<{ id_alerta: number; nivel_riesgo: { nombre: string } }>>
 }
 
+type CaseRow = {
+  fecha_apertura: Date
+  fecha_cierre: Date | null
+  fecha_derivacion: Date | null
+}
+
 type CaseModel = {
-  count(args: { where: { fecha_cierre?: null | { not: null }; fecha_derivacion?: null } }): Promise<number>
+  findMany(args: {
+    where: {
+      OR: [
+        { fecha_apertura: { gte: Date; lt: Date } },
+        { fecha_cierre: { gte: Date; lt: Date } },
+      ]
+    }
+    select: { fecha_apertura: true; fecha_cierre: true; fecha_derivacion: true }
+  }): Promise<CaseRow[]>
 }
 
 export type DashboardMetricsDataSource = {
@@ -41,6 +60,27 @@ export type DashboardMetricsDataSource = {
   solicitud_accion: CountModel
   alerta: RiskAlertModel
   caso: CaseModel
+}
+
+const HOURS_OF_DAY = Array.from(
+  { length: 24 },
+  (_, hour) => `${String(hour).padStart(2, '0')}hs`,
+)
+
+const argentinaHour = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'America/Argentina/Buenos_Aires',
+  hour: '2-digit',
+  hourCycle: 'h23',
+})
+
+function hourlyVolume(dates: Date[]): DashboardHourlyVolume[] {
+  const counts = new Map(HOURS_OF_DAY.map((hora) => [hora, 0]))
+  for (const date of dates) {
+    const hora = `${argentinaHour.format(date)}hs`
+    const current = counts.get(hora)
+    if (current !== undefined) counts.set(hora, current + 1)
+  }
+  return HOURS_OF_DAY.map((hora) => ({ hora, cantidad: counts.get(hora) ?? 0 }))
 }
 
 export class PrismaDashboardMetricsRepository implements DashboardMetricsRepository {
@@ -80,18 +120,35 @@ export class PrismaDashboardMetricsRepository implements DashboardMetricsReposit
     return alerts.length
   }
 
-  public async getGeneralSummary(): Promise<DashboardGeneralSummary> {
-    const [totalAbiertos, totalCerrados, totalCasos, casosAutomatizados] = await Promise.all([
-      this.dataSource.caso.count({ where: { fecha_cierre: null } }),
-      this.dataSource.caso.count({ where: { fecha_cierre: { not: null } } }),
-      this.dataSource.caso.count({ where: {} }),
-      this.dataSource.caso.count({ where: { fecha_derivacion: null } }),
-    ])
+  public async getOperationalSummary(now: Date): Promise<DashboardOperationalSummary> {
+    const { start, end } = argentinaDayRange(now)
+    const cases = await this.dataSource.caso.findMany({
+      where: {
+        OR: [
+          { fecha_apertura: { gte: start, lt: end } },
+          { fecha_cierre: { gte: start, lt: end } },
+        ],
+      },
+      select: { fecha_apertura: true, fecha_cierre: true, fecha_derivacion: true },
+    })
+
+    const createdToday = cases.filter(
+      (item) => item.fecha_apertura >= start && item.fecha_apertura < end,
+    )
+    const consultasHoy = createdToday.length
+    const resueltosPorBot = createdToday.filter((item) => item.fecha_derivacion === null).length
+    const casosCerrados = cases.filter(
+      (item) => item.fecha_cierre !== null && item.fecha_cierre >= start && item.fecha_cierre < end,
+    ).length
+    const tasaAutomatizacion =
+      consultasHoy === 0 ? 0 : Math.round((resueltosPorBot / consultasHoy) * 100)
 
     return {
-      totalAbiertos,
-      totalCerrados,
-      tasaAutomatizacionBot: totalCasos === 0 ? 0 : (casosAutomatizados / totalCasos) * 100,
+      consultasHoy,
+      casosCerrados,
+      resueltosPorBot,
+      tasaAutomatizacion,
+      volumenPorHora: hourlyVolume(createdToday.map((item) => item.fecha_apertura)),
     }
   }
 }
