@@ -9,7 +9,7 @@ Los comandos corren desde la raíz del repo, con el stack levantado (`docker com
 
 ## 2. Backend: agregaciones Prisma y endpoint
 
-- [ ] 2.1 Implementar con Prisma el conteo de alertas abiertas en niveles `medio`, `alto` y `critico`, excluyendo alertas atendidas. Verificar: `docker compose exec backend npm test`.
+- [x] 2.1 Implementar con Prisma el conteo de alertas abiertas en niveles `medio`, `alto` y `critico`, excluyendo alertas atendidas. Verificar: `docker compose exec backend npm test`.
 - [x] 2.2 Implementar con Prisma `tramitesPorAprobar` sumando prospectos y solicitudes de acción en estado `pendiente`, excluyendo estados decididos. Verificar: `docker compose exec backend npm test`.
 - [ ] 2.3 Implementar con Prisma `totalAbiertos`, `totalCerrados` y la fórmula de `tasaAutomatizacionBot`, incluyendo el caso sin casos. Verificar: `docker compose exec backend npm test`.
 - [x] 2.4 Devolver `casosDerivadosSinTomar: 0` y `respuestasRetenidas: 0` sin agregar lógica de esas métricas. Verificar: `docker compose exec backend npm test`.
@@ -19,7 +19,7 @@ Los comandos corren desde la raíz del repo, con el stack levantado (`docker com
 ## 3. Frontend: Dashboard
 
 - [x] 3.1 Crear el cliente API tipado para las métricas y consumirlo desde `Dashboard.tsx`. Verificar: `docker compose exec frontend npm run lint`.
-- [ ] 3.2 Conectar las tarjetas de alertas de riesgo abiertas y trámites por aprobar. Verificar: `docker compose exec frontend npm run lint` y `docker compose exec frontend npm run build`.
+- [x] 3.2 Conectar las tarjetas de alertas de riesgo abiertas y trámites por aprobar. Verificar: `docker compose exec frontend npm run lint` y `docker compose exec frontend npm run build`.
 - [ ] 3.3 Conectar la sección inferior de resumen general con totales y tasa de automatización. Verificar: `docker compose exec frontend npm run lint` y `docker compose exec frontend npm run build`.
 - [x] 3.4 Implementar estados visibles de carga y error sin mostrar ceros como sustituto de un error. Verificar: `docker compose exec frontend npm run lint` y `docker compose exec frontend npm run build`.
 

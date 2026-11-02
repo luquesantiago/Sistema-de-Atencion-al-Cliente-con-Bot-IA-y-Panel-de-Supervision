@@ -179,11 +179,12 @@ export function createApp(
         return
       }
       const tramitesPorAprobar = await dashboardMetricsRepository.countPendingProcedures()
+      const alertasRiesgoAbiertas = await dashboardMetricsRepository.countOpenRiskAlerts()
       response.status(200).json({
         casosDerivadosSinTomar: 0,
         respuestasRetenidas: 0,
         tramitesPorAprobar,
-        alertasRiesgoAbiertas: 0,
+        alertasRiesgoAbiertas,
         resumenGeneral: {
           totalAbiertos: 0,
           totalCerrados: 0,

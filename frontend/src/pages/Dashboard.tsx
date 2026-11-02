@@ -91,7 +91,9 @@ export default function Dashboard({ modulo, rol, onNavegar }: DashboardProps) {
                   ? '…'
                   : indicador.etiqueta === 'Trámites por aprobar'
                     ? (metricas?.tramitesPorAprobar ?? '—')
-                    : '—'}
+                    : indicador.etiqueta === 'Alertas de riesgo abiertas'
+                      ? (metricas?.alertasRiesgoAbiertas ?? '—')
+                      : '—'}
               </span>
               <span className="tarjeta__nota">{indicador.nota}</span>
             </article>

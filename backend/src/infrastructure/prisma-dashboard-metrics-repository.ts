@@ -5,13 +5,37 @@ type PendingStateFilter = {
   estado_solicitud?: { is: { nombre: 'pendiente' } }
 }
 
+type RiskAlertFilter = {
+  fecha_atencion: null
+  nivel_riesgo: {
+    is: {
+      nombre: {
+        in: [
+          'medio', 'Medio', 'MEDIO',
+          'alto', 'Alto', 'ALTO',
+          'critico', 'Critico', 'CRITICO',
+          'crítico', 'Crítico', 'CRÍTICO',
+        ]
+      }
+    }
+  }
+}
+
 type CountModel = {
   count(args: { where: PendingStateFilter }): Promise<number>
+}
+
+type RiskAlertModel = {
+  findMany(args: {
+    where: RiskAlertFilter
+    select: { id_alerta: true; nivel_riesgo: { select: { nombre: true } } }
+  }): Promise<Array<{ id_alerta: number; nivel_riesgo: { nombre: string } }>>
 }
 
 export type DashboardMetricsDataSource = {
   prospecto: CountModel
   solicitud_accion: CountModel
+  alerta: RiskAlertModel
 }
 
 export class PrismaDashboardMetricsRepository implements DashboardMetricsRepository {
@@ -27,5 +51,28 @@ export class PrismaDashboardMetricsRepository implements DashboardMetricsReposit
       }),
     ])
     return pendingProspects + pendingActionRequests
+  }
+
+  public async countOpenRiskAlerts(): Promise<number> {
+    const alerts = await this.dataSource.alerta.findMany({
+      where: {
+        fecha_atencion: null,
+        nivel_riesgo: {
+          is: {
+            nombre: {
+              in: [
+                'medio', 'Medio', 'MEDIO',
+                'alto', 'Alto', 'ALTO',
+                'critico', 'Critico', 'CRITICO',
+                'crítico', 'Crítico', 'CRÍTICO',
+              ],
+            },
+          },
+        },
+      },
+      select: { id_alerta: true, nivel_riesgo: { select: { nombre: true } } },
+    })
+    console.log('[dashboard] Alertas de riesgo abiertas:', alerts)
+    return alerts.length
   }
 }
