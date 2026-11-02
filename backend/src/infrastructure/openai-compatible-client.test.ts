@@ -12,6 +12,24 @@ function fakeFetch(status: number, payload: unknown, requests: RecordedRequest[]
   }
 }
 
+// La primera llamada falla con el estado indicado y después responde bien.
+function flakyFetch(firstStatus: number, payload: unknown, requests: RecordedRequest[] = []): typeof fetch {
+  return async (input, init) => {
+    requests.push({ url: String(input), body: JSON.parse(String(init?.body)) })
+    if (requests.length === 1) return new Response(JSON.stringify({ error: 'boom' }), { status: firstStatus })
+    return new Response(JSON.stringify(payload), { status: 200 })
+  }
+}
+
+// La primera llamada lanza el error recibido y después responde bien.
+function failsOnceThen(payload: unknown, error: Error, requests: RecordedRequest[] = []): typeof fetch {
+  return async (input, init) => {
+    requests.push({ url: String(input), body: JSON.parse(String(init?.body)) })
+    if (requests.length === 1) throw error
+    return new Response(JSON.stringify(payload), { status: 200 })
+  }
+}
+
 function completion(content: unknown) {
   return { choices: [{ message: { content: JSON.stringify(content) } }] }
 }
@@ -118,6 +136,14 @@ describe('classifyIntent', () => {
     expect(line('mis datos')).toContain('no es para consultar las pólizas')
   })
 
+  it('explica los casos difíciles con ejemplos', () => {
+    expect(intentInstructions).toContain('«¿qué cubre mi seguro?», «¿qué incluye el plan?»')
+    expect(intentInstructions).toContain('«¿me pasa con una persona o un operador?»')
+    expect(intentInstructions).toContain('«¿sigue mi siniestro?», «¿me pagan el choque?»')
+    expect(intentInstructions).toContain('pedir grúa o asistencia → «otra consulta»')
+    expect(intentInstructions).toContain('«saludo» es solo el saludo, el agradecimiento o la despedida sin otra consulta.')
+  })
+
   it('tiene «información de la agencia» y le da prioridad a lo que se deriva', async () => {
     const requests: RecordedRequest[] = []
     await clientWith(fakeFetch(200, completion({ intencion: 'información de la agencia' }), requests)).classifyIntent('¿dónde están?', [])
@@ -158,6 +184,44 @@ describe('classifyIntent', () => {
     await expect(clientWith(fakeFetch(429, { error: 'rate limit' })).classifyIntent('x', [])).rejects.toThrow('HTTP 429')
   })
 
+  it('reintenta una vez ante un 429 y devuelve la respuesta del segundo intento', async () => {
+    const requests: RecordedRequest[] = []
+    const client = clientWith(flakyFetch(429, completion({ intencion: 'vencimiento' }), requests))
+    await expect(client.classifyIntent('¿cuándo vence?', [])).resolves.toEqual({ intent: 'vencimiento', urgency: null })
+    expect(requests).toHaveLength(2)
+  })
+
+  it('reintenta una vez ante un 500 y devuelve la respuesta del segundo intento', async () => {
+    const requests: RecordedRequest[] = []
+    const client = clientWith(flakyFetch(500, completion({ intencion: 'saldo' }), requests))
+    await expect(client.classifyIntent('¿cuánto debo?', [])).resolves.toEqual({ intent: 'saldo', urgency: null })
+    expect(requests).toHaveLength(2)
+  })
+
+  it('reintenta una vez ante un timeout y devuelve la respuesta del segundo intento', async () => {
+    const requests: RecordedRequest[] = []
+    const client = clientWith(failsOnceThen(
+      completion({ intencion: 'vencimiento' }),
+      new DOMException('The operation timed out', 'TimeoutError'),
+      requests,
+    ))
+    await expect(client.classifyIntent('¿cuándo vence?', [])).resolves.toEqual({ intent: 'vencimiento', urgency: null })
+    expect(requests).toHaveLength(2)
+  })
+
+  it('reintenta una vez ante una falla de red y devuelve la respuesta del segundo intento', async () => {
+    const requests: RecordedRequest[] = []
+    const client = clientWith(failsOnceThen(completion({ intencion: 'vencimiento' }), new TypeError('fetch failed'), requests))
+    await expect(client.classifyIntent('¿cuándo vence?', [])).resolves.toEqual({ intent: 'vencimiento', urgency: null })
+    expect(requests).toHaveLength(2)
+  })
+
+  it('un 4xx determinístico no se reintenta', async () => {
+    const requests: RecordedRequest[] = []
+    await expect(clientWith(fakeFetch(404, { error: 'not found' }, requests)).classifyIntent('x', [])).rejects.toThrow('HTTP 404')
+    expect(requests).toHaveLength(1)
+  })
+
   it('lanza si la respuesta no trae choices', async () => {
     await expect(clientWith(fakeFetch(200, {})).classifyIntent('x', [])).rejects.toThrow()
   })
@@ -188,6 +252,14 @@ describe('classifyCustomerStatus', () => {
     ])
   })
 
+  it('explica cuándo un cliente existente ya lo es, con ejemplos', async () => {
+    const requests: RecordedRequest[] = []
+    await clientWith(fakeFetch(200, completion({ tipo: 'EXISTING_CUSTOMER' }), requests)).classifyCustomerStatus('ya soy cliente hace años')
+    const body = requests[0]?.body as { messages: Array<{ role: string; content: string }> }
+    expect(body.messages[0]?.content).toContain('«ya soy cliente hace años», «tengo pólizas con ustedes»')
+    expect(body.messages[0]?.content).toContain('«sería mi primera póliza»')
+  })
+
 })
 
 describe('rewrite', () => {
@@ -214,5 +286,27 @@ describe('rewrite', () => {
 
   it('lanza si el texto viene vacío', async () => {
     await expect(clientWith(fakeFetch(200, completion({ texto: ' ' }))).rewrite({ template: 'x', question: null })).rejects.toThrow()
+  })
+
+  it('en el reintento, agrega el motivo del control a las instrucciones', async () => {
+    const requests: RecordedRequest[] = []
+    const client = clientWith(fakeFetch(200, completion({ texto: 'Hola Ana.' }), requests))
+
+    await client.rewrite({ template: 'Hola.', question: null, rejection: 'datos distintos de la plantilla' })
+
+    const body = requests[0]?.body as { messages: Array<{ role: string; content: string }> }
+    expect(body.messages[0]?.content).toContain('La redacción anterior fue rechazada por este control: «datos distintos de la plantilla»')
+    expect(body.messages[0]?.content).toContain('Corregí únicamente ese problema, sin cambiar los demás datos.')
+    expect(body.messages[0]?.content).toContain('no digas que sos una persona')
+  })
+
+  it('sin rechazo, las instrucciones de redacción son las habituales', async () => {
+    const requests: RecordedRequest[] = []
+    const client = clientWith(fakeFetch(200, completion({ texto: 'Hola Ana.' }), requests))
+
+    await client.rewrite({ template: 'Hola.', question: null })
+
+    const body = requests[0]?.body as { messages: Array<{ role: string; content: string }> }
+    expect(body.messages[0]?.content).not.toContain('fue rechazada por este control')
   })
 })

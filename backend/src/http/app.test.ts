@@ -442,10 +442,11 @@ describe('endpoints de clientes', () => {
         dni: '30111222',
         firstName: 'Laura',
         lastName: 'Gómez',
+        active: true,
         policies: [policy('POL-00123', '2026-06-20')],
       },
-      { id: 2, dni: '28111222', firstName: 'Ramiro', lastName: 'Pérez', policies: [] },
-      { id: 3, dni: '40111222', firstName: 'Sofía', lastName: 'Benítez', policies: [] },
+      { id: 2, dni: '28111222', firstName: 'Ramiro', lastName: 'Pérez', active: true, policies: [] },
+      { id: 3, dni: '40111222', firstName: 'Sofía', lastName: 'Benítez', active: true, policies: [] },
     ])
     // Un mismo teléfono vinculado a dos clientes (RF-CAR-03).
     customers.addPhoneLink(1, 17, '5491155551001')

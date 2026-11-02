@@ -31,6 +31,7 @@ const customer: Customer = {
   dni: '99000099',
   firstName: 'Ana',
   lastName: 'Prueba',
+  active: true,
   policies: [
     { number: 'POL-90001', ramo: 'auto', status: 'activa', expirationDate: '2026-10-04', currency: 'ARS', installments: [] },
     { number: 'POL-90002', ramo: 'hogar', status: 'activa', expirationDate: '2026-10-03', currency: 'ARS', installments: [] },
