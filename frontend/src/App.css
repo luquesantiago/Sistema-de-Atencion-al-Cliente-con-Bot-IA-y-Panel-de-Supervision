@@ -529,6 +529,69 @@
   color: var(--color-text-muted);
 }
 
+/* Fila superior de KPI: cuatro columnas en escritorio (design.md §5) */
+
+@media (min-width: 640px) {
+  .tarjetas--kpi {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .tarjetas--kpi {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.tarjeta--kpi {
+  align-items: flex-start;
+  gap: 0;
+}
+
+.tarjeta__icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem;
+  border-radius: var(--radius-md);
+}
+
+.tarjeta__icono svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.tarjeta__icono--amber {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.tarjeta__icono--red {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.tarjeta__icono--rose {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.tarjeta__icono--pink {
+  background: var(--color-accent-light);
+  color: var(--color-primary);
+}
+
+.tarjeta--kpi .tarjeta__etiqueta {
+  margin-top: 0.75rem;
+}
+
+.tarjeta__valor--kpi {
+  margin: 0.75rem 0;
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
 /* Panel destacado: superficie de cristal con acento vino */
 
 .operativo {

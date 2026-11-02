@@ -23,7 +23,14 @@ Los comandos corren desde la raíz del repo, con el stack levantado (`docker com
 - [x] 3.3 Conectar la sección inferior de resumen general con totales y tasa de automatización. Verificar: `docker compose exec frontend npm run lint` y `docker compose exec frontend npm run build`.
 - [x] 3.4 Implementar estados visibles de carga y error sin mostrar ceros como sustituto de un error. Verificar: `docker compose exec frontend npm run lint` y `docker compose exec frontend npm run build`.
 
-## 4. Verificación integrada
+## 4. Fila superior de tarjetas KPI
+
+- [x] 4.1 Reorganizar la fila superior como una grilla responsive de cuatro columnas (1 / 2 / 4) conservando el orden «Casos derivados sin tomar», «Respuestas retenidas», «Trámites por aprobar» y «Alertas de riesgo abiertas». Verificar: `docker compose exec frontend npm run build`.
+- [x] 4.2 Agregar el valor provisional `—` y los subtextos de «Casos derivados sin tomar» y «Respuestas retenidas» sin hardcodear los valores de las tarjetas conectadas a la API. Verificar: `docker compose exec frontend npm run lint`.
+- [x] 4.3 Incorporar los íconos de campana, pausa, documento con tilde y alerta como SVG inline en `iconos.tsx`, con contenedores de fondo semántico suave según los tokens de `docs/design.md`. Verificar: `docker compose exec frontend npm run build`.
+- [x] 4.4 Verificar la fila superior en móvil, tablet y escritorio. Verificar: `docker compose exec frontend npm run lint` y `docker compose exec frontend npm run build`.
+
+## 5. Verificación integrada
 
 - [ ] 4.1 Consultar el endpoint con datos de prueba y comparar sus resultados con MySQL, comprobando que cada alerta, trámite y caso se cuente una sola vez. Verificar: `docker compose exec backend npm test`.
 - [x] 4.2 Ejecutar la batería disponible:

@@ -30,6 +30,26 @@ Los valores numéricos del ejemplo son ilustrativos, excepto los dos campos de c
 - **WHEN** se consulta el endpoint antes de que estén implementadas las métricas de otros integrantes
 - **THEN** `casosDerivadosSinTomar` y `respuestasRetenidas` aparecen con valor numérico `0` y el resto del contrato permanece disponible
 
+### Requirement: El Dashboard presenta una fila superior de cuatro tarjetas KPI
+
+El sistema SHALL mostrar en la fila superior del Dashboard cuatro tarjetas KPI en una única grilla responsive: una columna en móvil, dos desde 640 px y cuatro desde 1024 px. Cada tarjeta SHALL incluir un ícono en contenedor con fondo semántico suave, etiqueta, valor destacado y subtexto, respetando los tokens de `docs/design.md` (RF-SUP-05).
+
+El orden SHALL ser: «Casos derivados sin tomar», «Respuestas retenidas», «Trámites por aprobar» y «Alertas de riesgo abiertas».
+
+Las tarjetas «Trámites por aprobar» y «Alertas de riesgo abiertas» SHALL mostrar los valores recibidos del endpoint. Las tarjetas «Casos derivados sin tomar» y «Respuestas retenidas» SHALL mostrar `—` como valor provisional mientras sus métricas no estén implementadas.
+
+#### Scenario: Fila de KPI responsive
+- **WHEN** el administrador abre el Dashboard en un ancho de móvil, tablet o escritorio
+- **THEN** las cuatro tarjetas se distribuyen en una, dos o cuatro columnas respectivamente, sin cambiar su orden
+
+#### Scenario: Tarjetas conectadas a la API
+- **WHEN** el endpoint devuelve `tramitesPorAprobar` y `alertasRiesgoAbiertas`
+- **THEN** esas tarjetas muestran los valores recibidos con el valor en tipografía destacada y junto a su subtexto
+
+#### Scenario: Métricas todavía no implementadas
+- **WHEN** se muestra la fila superior antes de implementar `casosDerivadosSinTomar` y `respuestasRetenidas`
+- **THEN** sus tarjetas muestran `—` y conservan los subtextos «60 minutos para alertar, valor provisional.» y «Se retienen y derivan, nunca se envían.»
+
 ### Requirement: Las alertas de riesgo abiertas se cuentan por nivel
 
 El sistema SHALL contar en `alertasRiesgoAbiertas` las alertas con `fecha_atencion IS NULL` cuyos niveles sean `medio`, `alto` o `critico`, sin contar alertas ya atendidas (RF-SUP-05).

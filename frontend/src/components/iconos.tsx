@@ -56,6 +56,27 @@ export function IconoTramites({ className }: IconoProps) {
   )
 }
 
+/** Casos derivados sin tomar: campana de aviso. */
+export function IconoCampana({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <path d="M10.268 21a2 2 0 0 0 3.464 0" />
+      <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" />
+    </PanelIcono>
+  )
+}
+
+/** Trámites por aprobar: documento con tilde. */
+export function IconoArchivoCheck({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <path d="M15 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v4a2 2 0 0 0 2 2h4" />
+      <path d="m9 15 2 2 4-4" />
+    </PanelIcono>
+  )
+}
+
 export function IconoClientes({ className }: IconoProps) {
   return (
     <PanelIcono className={className}>

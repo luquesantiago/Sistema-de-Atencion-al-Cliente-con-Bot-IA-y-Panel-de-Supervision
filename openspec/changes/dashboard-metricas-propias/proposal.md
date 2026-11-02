@@ -14,6 +14,10 @@ El Dashboard necesita mostrar métricas reales de la base MySQL, pero este chang
   - `resumenGeneral.tasaAutomatizacionBot`, calculada como `(casos con fecha_derivacion IS NULL / total_casos) * 100`.
 - Devolver `casosDerivadosSinTomar: 0` y `respuestasRetenidas: 0` como valores de compatibilidad, sin implementar esas métricas.
 - Conectar en `Dashboard.tsx` las tarjetas de alertas y trámites y la sección de resumen general.
+- Reorganizar la fila superior del Dashboard como una grilla responsive de cuatro tarjetas KPI en una sola fila: una columna en móvil, dos desde 640 px y cuatro desde 1024 px.
+- Presentar en ese orden «Casos derivados sin tomar», «Respuestas retenidas», «Trámites por aprobar» y «Alertas de riesgo abiertas», cada una con ícono en contenedor de fondo semántico suave, etiqueta, valor destacado y subtexto.
+- Mostrar `—` como valor provisional en «Casos derivados sin tomar» y «Respuestas retenidas» mientras sus métricas sigan sin implementarse, sin hardcodear los valores de las tarjetas conectadas a la API.
+- Implementar los íconos como SVG inline con los tokens de `docs/design.md`, sin incorporar Tailwind, `lucide-react` ni otras dependencias visuales.
 - Mostrar estados explícitos de carga y error en las superficies conectadas.
 - No agregar tablas, columnas ni migraciones.
 
@@ -26,7 +30,7 @@ El Dashboard necesita mostrar métricas reales de la base MySQL, pero este chang
 ## Impact
 
 - **Backend:** nuevo contrato de métricas, handler HTTP y repositorio o servicio Prisma de solo lectura.
-- **Frontend:** cliente API tipado y estado de carga/error para las tres tarjetas o secciones asignadas.
+- **Frontend:** cliente API tipado, fila superior con cuatro tarjetas KPI responsive, íconos SVG inline y estado de carga/error para las tres superficies asignadas.
 - **Base de datos:** solo lecturas de `alerta`, `nivel_riesgo`, `caso`, `prospecto`, `solicitud_accion` y sus catálogos; no hay cambios de esquema.
 - **Pruebas:** agregaciones dinámicas, exclusión de estados cerrados o decididos, fórmula de automatización, contrato JSON y estados del Dashboard.
 

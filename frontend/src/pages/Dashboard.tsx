@@ -3,26 +3,13 @@ import type { Modulo, ModuloPanel } from '../navigation'
 import type { RolUsuario } from '../usuario'
 import PageHeader from '../components/PageHeader'
 import EstadoPanel from '../components/EstadoPanel'
+import {
+  IconoAlerta,
+  IconoArchivoCheck,
+  IconoCampana,
+  IconoPausa,
+} from '../components/iconos'
 import { obtenerMetricasDashboard, type DashboardMetrics } from '../api/dashboard'
-
-const INDICADORES = [
-  {
-    etiqueta: 'Casos derivados sin tomar',
-    nota: '60 minutos para alertar, valor provisional.',
-  },
-  {
-    etiqueta: 'Respuestas retenidas',
-    nota: 'Se retienen y derivan; nunca se envían.',
-  },
-  {
-    etiqueta: 'Trámites por aprobar',
-    nota: 'Bajas, contrato y alta de conductor.',
-  },
-  {
-    etiqueta: 'Alertas de riesgo abiertas',
-    nota: 'Gravedad y motivo, no solo color.',
-  },
-]
 
 interface DashboardProps {
   modulo: Modulo
@@ -82,22 +69,46 @@ export default function Dashboard({ modulo, rol, onNavegar }: DashboardProps) {
       <PageHeader titulo={modulo.nombre} descripcion={modulo.descripcion} />
 
       <section aria-label="Indicadores del día">
-        <div className="tarjetas">
-          {INDICADORES.map((indicador) => (
-            <article className="tarjeta" key={indicador.etiqueta}>
-              <span className="tarjeta__etiqueta">{indicador.etiqueta}</span>
-              <span className="tarjeta__valor">
-                {cargandoMetricas
-                  ? '…'
-                  : indicador.etiqueta === 'Trámites por aprobar'
-                    ? (metricas?.tramitesPorAprobar ?? '—')
-                    : indicador.etiqueta === 'Alertas de riesgo abiertas'
-                      ? (metricas?.alertasRiesgoAbiertas ?? '—')
-                      : '—'}
-              </span>
-              <span className="tarjeta__nota">{indicador.nota}</span>
-            </article>
-          ))}
+        <div className="tarjetas tarjetas--kpi">
+          <article className="tarjeta tarjeta--kpi">
+            <span className="tarjeta__icono tarjeta__icono--rose" aria-hidden="true">
+              <IconoCampana />
+            </span>
+            <span className="tarjeta__etiqueta">Casos derivados sin tomar</span>
+            <span className="tarjeta__valor tarjeta__valor--kpi">—</span>
+            <span className="tarjeta__nota">60 minutos para alertar, valor provisional.</span>
+          </article>
+
+          <article className="tarjeta tarjeta--kpi">
+            <span className="tarjeta__icono tarjeta__icono--pink" aria-hidden="true">
+              <IconoPausa />
+            </span>
+            <span className="tarjeta__etiqueta">Respuestas retenidas</span>
+            <span className="tarjeta__valor tarjeta__valor--kpi">—</span>
+            <span className="tarjeta__nota">Se retienen y derivan, nunca se envían.</span>
+          </article>
+
+          <article className="tarjeta tarjeta--kpi">
+            <span className="tarjeta__icono tarjeta__icono--amber" aria-hidden="true">
+              <IconoArchivoCheck />
+            </span>
+            <span className="tarjeta__etiqueta">Trámites por aprobar</span>
+            <span className="tarjeta__valor tarjeta__valor--kpi">
+              {cargandoMetricas ? '…' : (metricas?.tramitesPorAprobar ?? '—')}
+            </span>
+            <span className="tarjeta__nota">Bajas, contrato y alta de conductor.</span>
+          </article>
+
+          <article className="tarjeta tarjeta--kpi">
+            <span className="tarjeta__icono tarjeta__icono--red" aria-hidden="true">
+              <IconoAlerta />
+            </span>
+            <span className="tarjeta__etiqueta">Alertas de riesgo abiertas</span>
+            <span className="tarjeta__valor tarjeta__valor--kpi">
+              {cargandoMetricas ? '…' : (metricas?.alertasRiesgoAbiertas ?? '—')}
+            </span>
+            <span className="tarjeta__nota">Gravedad y motivo, no solo color.</span>
+          </article>
         </div>
       </section>
 

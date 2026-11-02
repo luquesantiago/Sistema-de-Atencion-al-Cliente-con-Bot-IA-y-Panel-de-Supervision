@@ -44,7 +44,11 @@ La ruta se registra en `createApp` y delega en una capa de aplicación/repositor
 
 ### 4. Dashboard
 
-`Dashboard.tsx` carga las métricas al abrirse para el administrador. Mientras espera, muestra un estado de carga estable; si falla la API, muestra un error explícito y no convierte el error en ceros. Cuando responde, reemplaza los valores vacíos de las tarjetas de alertas y trámites y muestra el resumen general con totales y porcentaje.
+`Dashboard.tsx` carga las métricas al abrirse para el administrador. Mientras espera, muestra un estado de carga estable; si falla la API, muestra un error explícito y no convierte el error en ceros. Cuando responde, reemplaza los valores de las tarjetas de alertas y trámites y muestra el resumen general con totales y porcentaje.
+
+La fila superior se organiza como una única grilla responsive de cuatro tarjetas: una columna en móvil, dos desde 640 px y cuatro desde 1024 px. El orden es «Casos derivados sin tomar», «Respuestas retenidas», «Trámites por aprobar» y «Alertas de riesgo abiertas». Cada tarjeta incluye un ícono en un contenedor con fondo semántico suave, etiqueta, valor en tipografía destacada y subtexto. Las dos primeras conservan `—` como valor provisional mientras sus métricas no estén implementadas; las dos últimas muestran los valores del endpoint.
+
+Los íconos se implementan como SVG inline en `frontend/src/components/iconos.tsx`, reutilizando el componente base existente. No se incorporan Tailwind ni `lucide-react` porque `docs/design.md` exige CSS plano y prohíbe dependencias con fines visuales.
 
 Los textos permanecen en español, los estados se expresan con texto además de color y se respetan los tokens y componentes definidos en `docs/design.md`.
 
