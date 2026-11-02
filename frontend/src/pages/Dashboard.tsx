@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react'
 import type { Modulo, ModuloPanel } from '../navigation'
 import type { RolUsuario } from '../usuario'
 import PageHeader from '../components/PageHeader'
 import EstadoPanel from '../components/EstadoPanel'
+import { obtenerMetricasDashboard, type DashboardMetrics } from '../api/dashboard'
 
 const INDICADORES = [
   {
@@ -29,6 +31,25 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ modulo, rol, onNavegar }: DashboardProps) {
+  const [metricas, setMetricas] = useState<DashboardMetrics | null>(null)
+  const [cargandoMetricas, setCargandoMetricas] = useState(true)
+  const [errorMetricas, setErrorMetricas] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (rol === 'operador') return
+    const controller = new AbortController()
+    obtenerMetricasDashboard(controller.signal)
+      .then(setMetricas)
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setErrorMetricas(error instanceof Error ? error.message : 'No se pudieron cargar las métricas.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setCargandoMetricas(false)
+      })
+    return () => controller.abort()
+  }, [rol])
+
   if (rol === 'operador') {
     return (
       <div className="pagina">
@@ -65,17 +86,33 @@ export default function Dashboard({ modulo, rol, onNavegar }: DashboardProps) {
           {INDICADORES.map((indicador) => (
             <article className="tarjeta" key={indicador.etiqueta}>
               <span className="tarjeta__etiqueta">{indicador.etiqueta}</span>
-              <span className="tarjeta__valor">—</span>
+              <span className="tarjeta__valor">
+                {cargandoMetricas
+                  ? '…'
+                  : indicador.etiqueta === 'Trámites por aprobar'
+                    ? (metricas?.tramitesPorAprobar ?? '—')
+                    : '—'}
+              </span>
               <span className="tarjeta__nota">{indicador.nota}</span>
             </article>
           ))}
         </div>
       </section>
 
-      <EstadoPanel
-        titulo="Todavía no hay datos para mostrar"
-        descripcion="Los indicadores se completan cuando la cartera y la cola de derivaciones estén cargadas. No se muestran valores de ejemplo para no confundirlos con datos reales."
-      />
+      {errorMetricas ? (
+        <EstadoPanel
+          titulo="No se pudieron cargar las métricas"
+          descripcion={errorMetricas}
+          tono="alerta"
+        />
+      ) : (
+        <EstadoPanel
+          titulo={cargandoMetricas ? 'Cargando métricas' : 'Trámites por aprobar'}
+          descripcion={cargandoMetricas
+            ? 'Estamos consultando los datos actuales de la base.'
+            : `${metricas?.tramitesPorAprobar ?? 0} trámite(s) pendiente(s) de aprobación.`}
+        />
+      )}
     </div>
   )
 }
