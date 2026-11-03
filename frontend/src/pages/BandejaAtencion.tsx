@@ -720,8 +720,8 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
       return (
         <div className="bandeja__estado">
           <EstadoPanel
-            titulo="Ningún caso coincide con la búsqueda"
-            descripcion="Probá con otro teléfono, nombre o patente. Se buscan los casos de esta página."
+            titulo="Ningún chat coincide con la búsqueda"
+            descripcion="Probá con otro teléfono, nombre o patente. Se buscan los chats de esta página."
           />
         </div>
       )
