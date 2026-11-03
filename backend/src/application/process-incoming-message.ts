@@ -116,7 +116,7 @@ export type ProcessResult =
   | { status: 'CLARIFICATION_REQUESTED'; responseSent: true }
   | { status: 'AGENCY_INFO_SENT'; responseSent: true }
   | { status: 'APPROVAL_NOTICE_SENT'; intent: Intent; responseSent: true }
-  | { status: 'HANDOFF_SENT'; reason: string; responseSent: true }
+  | { status: 'HANDOFF_SENT'; reason: string; responseSent: boolean }
   | { status: 'NOT_INSURANCE_REPLIED'; responseSent: true }
   | { status: 'IGNORED_MEDIA'; responseSent: false }
   | { status: 'SILENCED'; responseSent: false }
@@ -231,8 +231,18 @@ export class ProcessIncomingMessage {
       turn.keepImageRef(message)
       turn.receiveIn(turn.caseFor({ kind: 'suspended' }))
       await this.conversations.save(turn.changes, async () => {})
-      console.log('[asistente] conversación en silencio: mensaje guardado sin respuesta')
       return { status: 'SILENCED', responseSent: false }
+    }
+
+    const threatDetected = await this.checkThreat(message)
+    if (threatDetected) {
+      const turn = new Turn(open, message.phone, at, messageTextForCase(message), undefined, greetingFresh)
+      turn.keepImageRef(message)
+      const ref = turn.caseFor({ kind: 'identifying' })
+      turn.receiveIn(ref)
+      turn.changes.handoff = handoffOf(ref, { kind: 'threat-detected' })
+      await this.conversations.save(turn.changes, async () => {})
+      return { status: 'HANDOFF_SENT', reason: 'mensaje sospechoso: posible intento de manipulación o exfiltración', responseSent: false }
     }
 
     const settings = await this.conversations.settings()
@@ -263,7 +273,6 @@ export class ProcessIncomingMessage {
         closePrevious = { conversationId: conversation.id, ...endByDeactivation(conversation, at) }
         conversation = null
         stage = undefined
-        console.log('[asistente] baja de cliente: sesión invalidada, chat nuevo')
       } else {
         known = current ?? undefined
       }
@@ -281,7 +290,6 @@ export class ProcessIncomingMessage {
 
     if (closePrevious) this.stages.delete(closePrevious.conversationId)
     if (turn.nextStage) this.stages.set(saved.conversationId, turn.nextStage(saved))
-    if (turn.changes.handoff) console.log(`[asistente] derivación: ${turn.changes.handoff.reason}`)
     return result
   }
 
@@ -939,6 +947,18 @@ export class ProcessIncomingMessage {
     turn.changes.handoff = handoff
     turn.reply(ref, handoffMessage, answers)
     return { status: 'HANDOFF_SENT', reason: handoff.reason, responseSent: true }
+  }
+
+  private async checkThreat(message: IncomingWhatsAppMessage): Promise<boolean> {
+    const text = message.media === 'image' ? '' : String(message.text ?? '').trim()
+    if (!text) return false
+    try {
+      return await this.ai.isThreat(text)
+    } catch {
+      // Ante falla del proveedor, no bloqueamos el flujo: la regla de riesgo exige derivar solo
+      // con un ataque positivo. Si la IA no responde, se sigue con la lógica normal.
+      return false
+    }
   }
 }
 
