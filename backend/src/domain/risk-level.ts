@@ -61,6 +61,7 @@ export function reasonRiskLevel(reason: HandoffReason): RiskLevel {
     case 'dni-unrecognized':
     case 'dni-other-person':
     case 'customer-missing':
+    case 'threat-detected':
     case 'rewrite-rejected':
       return 'medio'
     case 'not-understood':

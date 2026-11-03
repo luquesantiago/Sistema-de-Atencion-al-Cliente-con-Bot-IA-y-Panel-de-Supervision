@@ -50,6 +50,16 @@ export type ResultadoProspecto = {
   decision: DecisionTramite
   casoId: number
   clienteId?: number
+  /** Solo al aprobar: si el aviso del alta salió por WhatsApp. */
+  notificationSent?: boolean
+  warning?: string
+}
+
+export type ResultadoAvisoAlta = {
+  id: number
+  decision: 'aprobar'
+  notificationSent: boolean
+  warning?: string
 }
 
 export type ResultadoCambioTelefono = {
@@ -148,6 +158,11 @@ export async function decidirCambioDatos(
 ): Promise<ResultadoCambioDatos> {
   return leer<ResultadoCambioDatos>(
     await fetch(`/api/tramites/cambios-datos/${encodeURIComponent(String(id))}/decision`, enviarJson(datos)),
+export async function reintentarAvisoAlta(id: number): Promise<ResultadoAvisoAlta> {
+  return leer<ResultadoAvisoAlta>(
+    await fetch(`/api/tramites/prospectos/${encodeURIComponent(String(id))}/notificacion`, {
+      method: 'POST',
+    }),
   )
 }
 

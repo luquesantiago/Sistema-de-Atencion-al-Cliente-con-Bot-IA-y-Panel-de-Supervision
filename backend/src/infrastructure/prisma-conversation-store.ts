@@ -118,6 +118,23 @@ export class PrismaConversationStore implements ConversationStore {
     return parseSettings(rows)
   }
 
+  // La misma búsqueda que evita duplicar la solicitud al guardarla.
+  public async hasPendingPhoneChange(phone: string, customerId: number): Promise<boolean> {
+    try {
+      const request = await this.prisma.solicitud_accion.findFirst({
+        where: {
+          tipo_accion: { is: { nombre: 'cambio de teléfono' } },
+          estado_solicitud: { is: { nombre: 'pendiente' } },
+          caso: { is: { conversacion: { is: { id_cliente: customerId, telefono: { is: { numero: phone } } } } } },
+        },
+        select: { id_solicitud: true },
+      })
+      return request !== null
+    } catch (error) {
+      throw storeError('leer las solicitudes de', error)
+    }
+  }
+
   public async save(changes: ConversationChanges, send: () => Promise<void>): Promise<SavedConversation> {
     let sendError: unknown = null
     try {

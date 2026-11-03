@@ -38,5 +38,7 @@ export interface AiClient {
   // pidiendo, si ya preguntó: le sirve al modelo para interpretar una respuesta corta
   // («Juan»). No decide qué hacer con eso: lo decide el código.
   extractDataChange(text: string, context: readonly ContextMessage[], pendingField?: DataChangeField | null): Promise<DataChangeExtraction>
+  // Revisa si el mensaje intenta manipular, exfiltrar o engañar al asistente.
+  isThreat(text: string): Promise<boolean>
   rewrite(input: RewriteInput): Promise<string>
 }

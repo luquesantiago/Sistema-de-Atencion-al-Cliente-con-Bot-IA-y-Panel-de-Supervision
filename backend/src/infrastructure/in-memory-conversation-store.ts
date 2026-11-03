@@ -116,6 +116,11 @@ export class InMemoryConversationStore implements ConversationStore {
     return { ...this.currentSettings }
   }
 
+  public async hasPendingPhoneChange(phone: string, customerId: number): Promise<boolean> {
+    return this.state.phoneChanges.some((request) =>
+      request.customerId === customerId && request.phone === phone && request.status === 'pendiente')
+  }
+
   public async save(changes: ConversationChanges, send: () => Promise<void>): Promise<SavedConversation> {
     if (this.failNextSave) {
       this.failNextSave = false
@@ -135,12 +140,12 @@ export class InMemoryConversationStore implements ConversationStore {
 
   // Lo que hace la decisión de un trámite o el cierre desde la bandeja: cierra el caso con
   // responsable y, si no queda otro caso derivado sin cerrar, saca la marca de silencio.
-  public closeCase(caseId: number, at: Date): void {
+  public closeCase(caseId: number, at: Date, decision: 'aprobada' | 'rechazada' = 'aprobada'): void {
     const closed = this.state.cases.find((item) => item.id === caseId)
     if (!closed) throw new Error(`No existe el caso ${caseId}`)
     closed.closedAt = at
     for (const request of this.state.phoneChanges) {
-      if (request.caseId === caseId && request.status === 'pendiente') request.status = 'aprobada'
+      if (request.caseId === caseId && request.status === 'pendiente') request.status = decision
     }
     const conversation = this.state.conversations.find((item) => item.id === closed.conversationId)
     const otherHandoff = this.state.cases.some((item) =>

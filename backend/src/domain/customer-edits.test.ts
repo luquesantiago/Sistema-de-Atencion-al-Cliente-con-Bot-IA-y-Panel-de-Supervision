@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   assertPolicyWindow,
+  createPolicyInstallments,
   parseCreateCustomer,
   parseCreatePolicy,
   parseLinkPhone,
@@ -281,13 +282,14 @@ describe('parseCreatePolicy', () => {
     })
   })
 
-  it('acepta el mínimo: sin coberturas, sin bien y sin prima', () => {
+  it('acepta el mínimo: sin coberturas y sin bien, con la prima', () => {
     const input = parseCreatePolicy(3, {
       ramo: 'vida',
       status: 'activa',
       currency: 'ARS',
       startDate: '2026-10-01',
       expirationDate: '2027-10-01',
+      premiumCents: 8_000_00,
     })
     expect(input).toEqual({
       customerId: 3,
@@ -296,6 +298,7 @@ describe('parseCreatePolicy', () => {
       currency: 'ARS',
       startDate: '2026-10-01',
       expirationDate: '2027-10-01',
+      premiumCents: 8_000_00,
       coverages: [],
     })
   })
@@ -337,6 +340,23 @@ describe('parseCreatePolicy', () => {
     expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), expirationDate: '2026-05-01' }))
   })
 
+  it('rechaza un alta sin prima mensual: sin prima no hay cuotas', () => {
+    const { premiumCents: _premiumCents, ...sinPrima } = altaCompleta()
+    expect(expectValidationError(() => parseCreatePolicy(1, sinPrima)).message)
+      .toBe('La prima mensual es obligatoria para dar de alta una póliza.')
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), premiumCents: null }))
+  })
+
+  it('rechaza una prima en cero', () => {
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), premiumCents: 0 }))
+  })
+
+  it('toma las cuotas pagas declaradas y rechaza una cantidad que no es entera', () => {
+    expect(parseCreatePolicy(1, { ...altaCompleta(), paidInstallments: 2 }).paidInstallments).toBe(2)
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), paidInstallments: 1.5 }))
+    expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), paidInstallments: -1 }))
+  })
+
   it('rechaza una prima negativa', () => {
     expectValidationError(() => parseCreatePolicy(1, { ...altaCompleta(), premiumCents: -100 }))
   })
@@ -350,5 +370,39 @@ describe('parseCreatePolicy', () => {
       ...altaCompleta(),
       coverages: [{ id: 12, planId: 2, description: null, insuredSumCents: null }],
     }))
+  })
+})
+
+describe('createPolicyInstallments', () => {
+  const alta = (startDate: string, paidInstallments?: number) => ({
+    ...parseCreatePolicy(1, {
+      ramo: 'auto',
+      status: 'activa',
+      currency: 'ARS',
+      startDate,
+      expirationDate: '2027-11-03',
+      premiumCents: 45_000_00,
+    }),
+    ...(paidInstallments === undefined ? {} : { paidInstallments }),
+  })
+
+  it('una póliza que empieza hoy tiene todas sus cuotas sin pagar', () => {
+    const plan = createPolicyInstallments(alta('2026-11-03'), '2026-11-03')
+    expect(plan).toHaveLength(12)
+    expect(plan.every((item) => !item.paid && item.amountCents === 45_000_00)).toBe(true)
+  })
+
+  it('con cuotas vencidas deja pagas las que declara quien carga', () => {
+    const plan = createPolicyInstallments(alta('2026-08-03', 2), '2026-11-03')
+    expect(plan.slice(0, 4).map((item) => item.paid)).toEqual([true, true, false, false])
+  })
+
+  it('con cuotas vencidas exige declarar cuántas están pagas', () => {
+    expect(expectValidationError(() => createPolicyInstallments(alta('2026-08-03'), '2026-11-03')).message)
+      .toBe('Indique cuántas de las 3 cuotas ya vencidas están pagas.')
+  })
+
+  it('rechaza más cuotas pagas que vencidas', () => {
+    expectValidationError(() => createPolicyInstallments(alta('2026-08-03', 4), '2026-11-03'))
   })
 })

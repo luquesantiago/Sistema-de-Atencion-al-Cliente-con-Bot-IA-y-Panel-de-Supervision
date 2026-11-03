@@ -71,7 +71,14 @@ export type DecisionResult = {
 }
 
 // casoId: el caso del alta, para abrirlo en la bandeja después de rechazarla.
-export type ProspectDecisionResult = DecisionResult & { casoId: number }
+// phone: el número de la conversación, al que se avisa el alta aprobada.
+export type ProspectDecisionResult = DecisionResult & { casoId: number; phone: string }
+
+// El aviso de un alta aprobada, para reintentarlo (RF-ATE-05).
+export type ProspectNotification = {
+  id: number
+  phone: string
+}
 
 export type PhoneChangeDecisionResult = DecisionResult & {
   phone: string
@@ -101,6 +108,9 @@ export interface RequestManagementRepository {
   recordPhoneChangeNotification(id: number, text: string, sentAt: Date): Promise<void>
   getDataChangeNotification(id: number): Promise<DecisionNotification>
   recordDataChangeNotification(id: number, text: string, sentAt: Date): Promise<void>
+  // 404 si el prospecto no existe y 409 si no está confirmado: solo el alta aprobada se avisa.
+  getProspectNotification(id: number): Promise<ProspectNotification>
+  recordProspectNotification(id: number, text: string, sentAt: Date): Promise<void>
 }
 
 export class RequestManagementError extends Error {

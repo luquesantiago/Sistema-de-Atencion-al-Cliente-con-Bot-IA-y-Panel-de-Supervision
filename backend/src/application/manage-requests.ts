@@ -7,11 +7,16 @@ import {
   type PendingPhoneChange,
   type PendingProspect,
   type PhoneChangeDecisionInput,
+  type ProspectDecisionResult,
   type ProspectDecisionInput,
   type RequestManagementRepository,
 } from '../domain/request-management.js'
 
 const maxPageSize = 100
+
+// Aviso fijo del alta aprobada, sin redacción de la IA (RF-ATE-05). Lo revisa el equipo en el PR.
+const prospectApprovedText =
+  'Su alta como cliente de Seguros Castaño fue confirmada. Desde ahora puede consultarnos por este WhatsApp sobre sus pólizas.'
 const maxId = 4_294_967_295
 
 export class ManageRequests {
@@ -31,18 +36,31 @@ export class ManageRequests {
     return this.repository.listPendingPhoneChanges(page)
   }
 
-  public listPendingDataChanges(page: PageRequest): Promise<PendingDataChange[]> {
+public listPendingDataChanges(page: PageRequest): Promise<PendingDataChange[]> {
     validatePage(page)
     return this.repository.listPendingDataChanges(page)
   }
 
-  public decideProspect(input: ProspectDecisionInput) {
+  public async decideProspect(input: ProspectDecisionInput): Promise<Omit<ProspectDecisionResult, 'phone'> & { notificationSent?: boolean }> {
     validateDecision(input.id, input.decision, input.fundamento)
     if (input.decision === 'aprobar') {
       validateName(input.nombre, 'nombre')
       validateName(input.apellido, 'apellido')
     }
-    return this.repository.decideProspect(input)
+    const { phone, ...result } = await this.repository.decideProspect(input)
+    // El rechazo no se avisa solo: el operador se lo explica desde la bandeja.
+    if (result.decision !== 'aprobar') return result
+    const notificationSent = await this.sendProspectNotification(result.id, phone)
+    return { ...result, notificationSent }
+  }
+
+  public async retryProspectNotification(id: number) {
+    if (!isValidId(id)) {
+      throw new RequestManagementError(400, 'VALIDATION_ERROR', 'El identificador del trámite no es válido.')
+    }
+    const notification = await this.repository.getProspectNotification(id)
+    const notificationSent = await this.sendProspectNotification(notification.id, notification.phone)
+    return { id: notification.id, decision: 'aprobar' as const, notificationSent }
   }
 
   public async decidePhoneChange(input: PhoneChangeDecisionInput) {
@@ -92,6 +110,21 @@ export class ManageRequests {
       notification.decision,
     )
     return { id: notification.id, decision: notification.decision, notificationSent }
+  // Mismo patrón que el aviso del cambio de teléfono: el envío va después de la transacción,
+  // así una falla de WhatsApp no deshace el alta.
+  private async sendProspectNotification(id: number, phone: string) {
+    try {
+      await this.whatsapp.sendText(phone, prospectApprovedText)
+    } catch {
+      console.error(`[tramites] No se pudo avisar el alta ${id} al cliente.`)
+      return false
+    }
+    try {
+      await this.repository.recordProspectNotification(id, prospectApprovedText, this.clock())
+    } catch {
+      console.error(`[tramites] No se pudo guardar el aviso del alta ${id}.`)
+    }
+    return true
   }
 
   private async sendPhoneChangeNotification(id: number, phone: string, decision: 'aprobar' | 'rechazar') {

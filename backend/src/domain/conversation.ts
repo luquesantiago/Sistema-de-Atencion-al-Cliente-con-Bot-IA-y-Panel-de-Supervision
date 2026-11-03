@@ -114,6 +114,8 @@ export type SavedConversation = {
 export interface ConversationStore {
   findOpen(phone: string): Promise<OpenConversation | null>
   settings(): Promise<Settings>
+  // Si el cliente tiene una solicitud de cambio de teléfono pendiente para ese número.
+  hasPendingPhoneChange(phone: string, customerId: number): Promise<boolean>
   // send corre después de las escrituras: si lanza, no queda nada guardado.
   save(changes: ConversationChanges, send: () => Promise<void>): Promise<SavedConversation>
 }

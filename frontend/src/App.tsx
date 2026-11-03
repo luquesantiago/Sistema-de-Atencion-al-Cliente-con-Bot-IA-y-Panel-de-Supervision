@@ -5,7 +5,14 @@ import BandejaAtencion from './pages/BandejaAtencion'
 import TramitesAprobar from './pages/TramitesAprobar'
 import BaseClientes from './pages/BaseClientes'
 import Login from './pages/Login'
-import { MODULOS, type DestinoBandeja, type Modulo, type ModuloPanel, type OpcionesNavegacion } from './navigation'
+import {
+  MODULOS,
+  type DestinoBandeja,
+  type DestinoClientes,
+  type Modulo,
+  type ModuloPanel,
+  type OpcionesNavegacion,
+} from './navigation'
 import type { UsuarioPanel } from './usuario'
 import './App.css'
 
@@ -13,6 +20,7 @@ type PropsPagina = {
   modulo: Modulo
   onNavegar: (destino: ModuloPanel, opciones?: OpcionesNavegacion) => void
   bandejaInicial?: DestinoBandeja
+  clientesInicial?: DestinoClientes
 }
 
 const PAGINAS: Record<Exclude<ModuloPanel, 'dashboard'>, ComponentType<PropsPagina>> = {
@@ -24,13 +32,16 @@ const PAGINAS: Record<Exclude<ModuloPanel, 'dashboard'>, ComponentType<PropsPagi
 function App() {
   const [activo, setActivo] = useState<ModuloPanel>('dashboard')
   const [bandejaInicial, setBandejaInicial] = useState<DestinoBandeja | undefined>(undefined)
+  const [clientesInicial, setClientesInicial] = useState<DestinoClientes | undefined>(undefined)
   const [usuario, setUsuario] = useState<UsuarioPanel | null>(null)
   const modulo = MODULOS.find((item) => item.id === activo) ?? MODULOS[0]
   const Pagina = activo === 'dashboard' ? undefined : PAGINAS[activo]
 
-  // El destino de la bandeja viaja con la navegación y se descarta al salir de ella.
+  // El destino de la bandeja o de la base de clientes viaja con la navegación
+  // y se descarta al salir de ese módulo.
   function navegar(destino: ModuloPanel, opciones?: OpcionesNavegacion) {
     setBandejaInicial(destino === 'bandeja' ? opciones?.bandeja : undefined)
+    setClientesInicial(destino === 'clientes' ? opciones?.clientes : undefined)
     setActivo(destino)
   }
 
@@ -73,7 +84,14 @@ function App() {
         <main className="panel__principal" id="contenido">
           {Pagina === undefined
             ? <Dashboard modulo={modulo} rol={usuario.rol} onNavegar={navegar} />
-            : <Pagina modulo={modulo} onNavegar={navegar} bandejaInicial={bandejaInicial} />}
+            : (
+              <Pagina
+                modulo={modulo}
+                onNavegar={navegar}
+                bandejaInicial={bandejaInicial}
+                clientesInicial={clientesInicial}
+              />
+            )}
         </main>
       </div>
     </>
