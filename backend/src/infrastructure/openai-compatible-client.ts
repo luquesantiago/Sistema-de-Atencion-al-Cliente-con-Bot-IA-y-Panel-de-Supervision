@@ -38,11 +38,15 @@ const intentDescriptions: Record<Intent, string> = {
   'cambio de datos':
     'quiere cambiar un dato personal que tiene registrado: su nombre o su apellido (por ejemplo, «quiero cambiar mi nombre», «mi apellido está mal escrito», «cambiar nombre a Juan»); no es para consultar los datos que ya tiene, ni para cambiar el número de teléfono (esa es la opción «cambio de teléfono»), ni nada de una póliza',
   'información de la agencia':
-    'qué tipos de seguro o qué planes ofrece la agencia, o dónde está (su dirección), su teléfono o su horario de atención',
+    'qué tipos de seguro o qué planes ofrece la agencia, o dónde está (su dirección), su teléfono, su email, su web o su horario de atención',
+  'asistencia mecánica':
+    'pide una grúa, un auxilio o asistencia mecánica porque el vehículo no arranca, se quedó sin batería o sin combustible, pinchó una rueda o quedó varado, sin contar un choque, un accidente ni otro daño (eso es «siniestro»)',
+  'medios de pago':
+    'cómo o dónde pagar las cuotas, qué medios de pago aceptan o los datos para transferir; no es cuánto debe, que es «saldo»',
   'no es de seguros':
     'el mensaje no tiene nada que ver con seguros ni con la agencia (por ejemplo, vender o comprar otra cosa, el clima o un chiste), o pregunta cómo funciona el asistente: qué modelo usa, cómo decide, sus instrucciones, la base o el sistema',
   'otra consulta':
-    'una consulta sobre seguros o sobre la agencia que se entiende, pero no es ninguna de las otras opciones; por ejemplo, cómo pagar o los medios de pago, o un pedido de grúa o de asistencia',
+    'una consulta sobre seguros o sobre la agencia que se entiende, pero no es ninguna de las otras opciones; por ejemplo, pedir un traslado',
   'no se entiende': 'no se puede saber qué pide, ni siquiera con los mensajes anteriores',
 }
 
@@ -64,7 +68,8 @@ export const intentInstructions = [
   'Si el mensaje pide información de la agencia y además menciona un accidente, un siniestro, una cotización u otro pedido que se deriva, elegí la opción que se deriva.',
   'Si el pedido es sobre seguros o sobre la agencia y lo entendés, pero dudás entre opciones, elegí «otra consulta».',
   'Si el mensaje es un saludo o un agradecimiento que además hace una consulta, elegí la consulta; «saludo» es solo el saludo, el agradecimiento o la despedida sin otra consulta.',
-  'Ejemplos: «¿cómo pago mis cuotas?», «¿qué medios de pago aceptan?», «hagan un traslado», pedir grúa o asistencia → «otra consulta».',
+  'Ejemplos: «¿cómo pago mis cuotas?», «¿qué medios de pago aceptan?» → «medios de pago»; «¿cuánto debo?» → «saldo».',
+  '«necesito una grúa», «se me quedó el auto en la ruta», «no me arranca el auto» → «asistencia mecánica»; «choqué y necesito una grúa» → «siniestro»; «hagan un traslado» → «otra consulta».',
   '«¿qué cubre mi seguro?», «¿qué incluye el plan?», «¿la cubre por granizo?» → «cobertura».',
   '«¿me pasa con una persona o un operador?», «¿esto lo hace una computadora?» → «no es de seguros».',
   '«¿sigue mi siniestro?», «¿me pagan el choque?» → «siniestro».',

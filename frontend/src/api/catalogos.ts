@@ -4,6 +4,8 @@
  * `GET /api/catalogos`, con los valores vigentes de la base.
  */
 
+import { leer } from './respuesta'
+
 export type OpcionCatalogo = {
   id: number
   name: string
@@ -18,9 +20,5 @@ export type Catalogos = {
 }
 
 export async function obtenerCatalogos(): Promise<Catalogos> {
-  const respuesta = await fetch('/api/catalogos')
-  if (!respuesta.ok) {
-    throw new Error(`El servidor respondió ${respuesta.status} al consultar los catálogos.`)
-  }
-  return (await respuesta.json()) as Catalogos
+  return leer<Catalogos>(await fetch('/api/catalogos'))
 }

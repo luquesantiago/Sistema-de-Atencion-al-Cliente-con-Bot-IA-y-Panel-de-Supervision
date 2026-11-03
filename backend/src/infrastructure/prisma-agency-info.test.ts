@@ -29,6 +29,10 @@ describe('agencyInfoFromRows', () => {
       plans: ['terceros', 'todo riesgo'],
       address: 'Ficticia 123',
       phone: '11 7816-8015',
+      assistancePhone: null,
+      email: null,
+      web: null,
+      paymentMethods: null,
       hours: [{ day: 1, opens: '09:00', closes: '18:00' }],
     })
   })
@@ -37,6 +41,33 @@ describe('agencyInfoFromRows', () => {
     const info = agencyInfoFromRows(rows)
     expect(info.ramos).not.toContain('vida')
     expect(info.plans).not.toContain('plan dado de baja')
+  })
+
+  it('lee el teléfono de grúa, el email, la web y los medios de pago cargados', () => {
+    const info = agencyInfoFromRows({
+      ...rows,
+      settings: [
+        ...rows.settings,
+        { clave: 'telefono_asistencia', valor: ' 0800 555 0000 ' },
+        { clave: 'email_agencia', valor: 'contacto@ejemplo.com' },
+        { clave: 'web_agencia', valor: 'https://ejemplo.com' },
+        { clave: 'medios_pago', valor: 'Transferencia al alias EJEMPLO.ALIAS' },
+      ],
+    })
+    expect(info).toMatchObject({
+      assistancePhone: '0800 555 0000',
+      email: 'contacto@ejemplo.com',
+      web: 'https://ejemplo.com',
+      paymentMethods: 'Transferencia al alias EJEMPLO.ALIAS',
+    })
+  })
+
+  it('los datos nuevos sin cargar (valor vacío, como los deja la migración) dan null', () => {
+    const info = agencyInfoFromRows({
+      ...rows,
+      settings: [...rows.settings, { clave: 'telefono_asistencia', valor: '' }, { clave: 'medios_pago', valor: '' }],
+    })
+    expect(info).toMatchObject({ assistancePhone: null, email: null, web: null, paymentMethods: null })
   })
 
   it('una clave ausente o con el valor vacío da null', () => {

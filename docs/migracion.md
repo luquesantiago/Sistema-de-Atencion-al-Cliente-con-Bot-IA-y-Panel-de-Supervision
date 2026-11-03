@@ -104,10 +104,11 @@ Para la demo hay una carga aparte que **borra la cartera y las conversaciones** 
 
 ## Usuarios
 
-- **De prueba:** `admin` (rol administrador, «Admin Prueba») y `operador` (rol operador, «Operador Prueba»), con contraseña 1234. Van en una migración SQL, así existen en todas las bases aunque no se haya corrido la migración de la planilla: el panel del Parcial 1 atribuye todo a `operador`. El repo es público: antes de producción se borran o se les cambia la contraseña.
+- **De prueba:** `admin` (rol administrador, «Admin Prueba») y `operador` (rol operador, «Operador Prueba»), con contraseña 1234. Van en una migración SQL, así existen en todas las bases aunque no se haya corrido la migración de la planilla, y sirven para entrar al panel en cualquier base. El repo es público: antes de producción se borran o se les cambia la contraseña.
 - **Históricos:** el script de la planilla crea a Roberto Castaño (administrador, usuario `roberto`) y a Graciela Castaño (operador, usuario `graciela`) activos, con contraseña `seguros1234` (decisión del equipo, 06/10/2026). Son los responsables de los casos migrados y quienes atendieron sus alertas. El repo es público: antes de producción se les cambia la contraseña. El apellido de Graciela es un supuesto (en la carta es hija de Roberto).
-- Diego no se carga ahora porque no figura en la planilla.
-- El algoritmo de hash es bcrypt, con prefijo `$2b$` y coste 10: literal en la migración `20260929204929_caso_poliza_cambio_telefono_usuarios_prueba` para los usuarios de prueba, y generado con `bcryptjs` por el script de la planilla para los históricos. El login del Parcial 2 usa el mismo.
+- Para entrar al panel sirven los usuarios activos de esta lista: `admin` y `operador` con `1234`, y `roberto` y `graciela` con `seguros1234`.
+- Diego no se carga ahora porque no figura en la planilla: hasta que se lo cargue no puede iniciar sesión.
+- El algoritmo de hash es bcrypt, con prefijo `$2b$` y coste 10: literal en la migración `20260929204929_caso_poliza_cambio_telefono_usuarios_prueba` para los usuarios de prueba, y generado con `bcryptjs` por el script de la planilla para los históricos. El login del panel (`POST /api/sesion`, change `acceso-por-rol`) compara contra ese hash con `bcryptjs`.
 
 ## A tener en cuenta
 

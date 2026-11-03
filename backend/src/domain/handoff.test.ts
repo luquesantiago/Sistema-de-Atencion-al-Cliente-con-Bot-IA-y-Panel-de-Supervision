@@ -15,6 +15,8 @@ describe('describeHandoffReason', () => {
     [{ kind: 'missing-data', data: 'policies' }, 'cliente sin pólizas'],
     [{ kind: 'missing-data', data: 'installments' }, 'póliza sin cuotas registradas'],
     [{ kind: 'missing-data', data: 'agency-info' }, 'datos de la agencia incompletos'],
+    [{ kind: 'missing-data', data: 'assistance-phone' }, 'sin teléfono de grúa o asistencia cargado'],
+    [{ kind: 'missing-data', data: 'payment-methods' }, 'sin medios de pago cargados'],
     [{ kind: 'provider-failure', step: 'customer-status' }, 'falla del proveedor al identificar el tipo de cliente'],
     [{ kind: 'provider-failure', step: 'intent' }, 'falla del proveedor al decidir'],
     [{ kind: 'provider-failure', step: 'rewrite' }, 'falla de la redacción'],

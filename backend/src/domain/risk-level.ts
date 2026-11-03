@@ -35,6 +35,8 @@ export function queryTypeRiskLevel(type: QueryType | null): RiskLevel | null {
     case 'cobertura':
     case 'baja':
     case 'modificación':
+    // Por la urgencia de quien está varado (change configuracion-agencia).
+    case 'asistencia mecánica':
       return 'medio'
     case 'cambio de teléfono':
     // El cambio de datos personal también es un dato de cartera: nivel bajo, sin la
@@ -46,6 +48,7 @@ export function queryTypeRiskLevel(type: QueryType | null): RiskLevel | null {
     case 'estado de póliza':
     case 'saludo':
     case 'información de la agencia':
+    case 'medios de pago':
     case null:
       return null
   }

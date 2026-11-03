@@ -91,7 +91,7 @@ describe('waitingSince', () => {
 describe('queryTypeRiskLevels', () => {
   it('da los tipos con nivel propio y ninguno más', () => {
     const levels = queryTypeRiskLevels()
-    expect(levels).toHaveLength(8)
+    expect(levels).toHaveLength(9)
     expect(levels).toEqual(expect.arrayContaining([
       { type: 'siniestro', level: 'alto' },
       { type: 'reclamo', level: 'alto' },
@@ -99,6 +99,7 @@ describe('queryTypeRiskLevels', () => {
       { type: 'cobertura', level: 'medio' },
       { type: 'baja', level: 'medio' },
       { type: 'modificación', level: 'medio' },
+      { type: 'asistencia mecánica', level: 'medio' },
       { type: 'cambio de teléfono', level: 'bajo' },
       { type: 'cambio de datos', level: 'bajo' },
     ]))
