@@ -753,6 +753,33 @@ describe('silencio (RF-DER-03)', () => {
   })
 })
 
+describe('número bloqueado', () => {
+  function blockPhone() {
+    assistant = new ProcessIncomingMessage(customers, store, agency, ai, whatsapp, () => now, async (value) => value === phone)
+  }
+
+  it('no responde, no llama a la IA y no guarda el mensaje de un número bloqueado', async () => {
+    link(phone, ana)
+    ai.intents.set('¿cuándo vence mi seguro?', 'vencimiento')
+    await expect(send('¿cuándo vence mi seguro?')).resolves.toMatchObject({ status: 'ANSWER_SENT' })
+    const messagesBefore = (await openConversation()).messages.length
+    const sentBefore = whatsapp.sent.length
+    ai.classified.length = 0
+
+    blockPhone()
+    await expect(send('¿tenés algo pendiente?')).resolves.toEqual({ status: 'BLOCKED', responseSent: false })
+    expect(whatsapp.sent.length).toBe(sentBefore)
+    expect(ai.classified).toEqual([])
+    expect((await openConversation()).messages).toHaveLength(messagesBefore)
+  })
+
+  it('los demás números siguen atendidos', async () => {
+    blockPhone()
+    await expect(send('hola', otherPhone)).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REQUESTED' })
+    expect(whatsapp.textsTo(otherPhone)).toHaveLength(1)
+  })
+})
+
 describe('reinicio del backend', () => {
   it('termina la conversación que no estaba en silencio y empieza una nueva', async () => {
     await send('hola')

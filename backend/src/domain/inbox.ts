@@ -24,6 +24,8 @@ export type InboxEntry = {
   severity: RiskLevel | null
   customer: InboxCustomer | null
   phone: string
+  // El número está bloqueado desde la bandeja: el asistente ignora sus mensajes.
+  phoneBlocked: boolean
   queryType: QueryType | null
   handoffReason: string | null
   handedOffAt: Date | null
@@ -83,6 +85,8 @@ export interface InboxRepository {
   recordOperatorReply(caseId: number, actor: PanelActor, text: string, sentAt: Date, takeIfUnassigned: boolean): Promise<{ messageId: number }>
   // null si el caso no está en la bandeja o el mensaje no es una imagen de su conversación.
   findImage(caseId: number, messageId: number): Promise<InboxImageRef | null>
+  // Bloquea o desbloquea el número de la conversación del caso; null si el caso no existe.
+  setPhoneBlocked(caseId: number, blocked: boolean): Promise<{ phone: string } | null>
 }
 
 export type InboxLabel = 'alta-pendiente' | 'alta-rechazada' | 'pedido-pendiente' | 'cambio-telefono-pendiente'

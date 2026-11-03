@@ -29,6 +29,11 @@ const adapter = new PrismaMariaDb({
 const prisma = new PrismaClient({ adapter })
 const whatsapp = new WahaWhatsAppClient(config.whatsappApiUrl, config.whatsappApiKey)
 const customerRepository = new PrismaCustomerRepository(prisma)
+// Número bloqueado desde la bandeja: el asistente no atiende ni guarda sus mensajes.
+const phoneBlocked = async (phone: string): Promise<boolean> => {
+  const row = await prisma.telefono.findUnique({ where: { numero: phone }, select: { bloqueado: true } })
+  return row?.bloqueado ?? false
+}
 const processIncomingMessage = new ProcessIncomingMessage(
  customerRepository,
   new PrismaConversationStore(prisma),
@@ -36,6 +41,7 @@ const processIncomingMessage = new ProcessIncomingMessage(
   new OpenAiCompatibleClient(config.aiApiUrl, config.aiApiKey, config.aiModel),
   whatsapp,
   () => new Date(),
+  phoneBlocked,
 )
 const manageRequests = new ManageRequests(new PrismaRequestManagementRepository(prisma), whatsapp)
 const manageCustomers = new ManageCustomers(customerRepository)

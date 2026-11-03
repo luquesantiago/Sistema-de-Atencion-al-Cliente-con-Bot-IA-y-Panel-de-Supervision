@@ -5,6 +5,7 @@ import { IconoAlerta, IconoInfo, IconoPausa, IconoReanudar, IconoReloj } from '.
 import {
   cerrarCaso,
   contestarCaso,
+  definirBloqueoNumero,
   liberarCaso,
   listarBandeja,
   obtenerCasoBandeja,
@@ -485,11 +486,15 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
   const [reintento, setReintento] = useState(0)
   // Acciones: un borrador por caso (sobrevive al sondeo), lo que está en curso y su resultado.
   const [borradores, setBorradores] = useState<Record<number, string>>({})
-  const [accion, setAccion] = useState<'tomar' | 'liberar' | 'contestar' | 'cerrar' | null>(null)
+  const [accion, setAccion] = useState<'tomar' | 'liberar' | 'contestar' | 'cerrar' | 'bloquear' | null>(null)
   const [avisoCaso, setAvisoCaso] = useState<Aviso | null>(null)
   const [avisoLista, setAvisoLista] = useState<Aviso | null>(null)
   const [dialogoCierre, setDialogoCierre] = useState(false)
   const [errorCierre, setErrorCierre] = useState<string | null>(null)
+  const cuerpoChat = useRef<HTMLDivElement>(null)
+  // Último mensaje visto en el chat abierto: null mientras no se cargó, para
+  // distinguir «recién entré» de «llegó uno nuevo» en el sondeo.
+  const ultimoMensajeChat = useRef<number | null>(null)
 
   // Sondeo cada 5 segundos: la siguiente consulta se programa al terminar la anterior, así
   // nunca se superponen; con la pestaña oculta no consulta y al volver consulta enseguida.
@@ -566,6 +571,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
     setFueraDeBandeja(false)
     setAvisoCaso(null)
     setDialogoCierre(false)
+    ultimoMensajeChat.current = null
   }, [])
 
   const cerrarDetalle = useCallback(() => {
@@ -575,6 +581,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
     setFueraDeBandeja(false)
     setAvisoCaso(null)
     setDialogoCierre(false)
+    ultimoMensajeChat.current = null
   }, [])
 
   function quitarFiltroCliente() {
@@ -596,6 +603,25 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
   const detalleActual = detalle !== null && detalle.case.caseId === seleccionado ? detalle : null
   const casoDeLista = seleccionado === null ? null : casos?.find((caso) => caso.caseId === seleccionado) ?? null
   const casoDelDetalle = detalleActual?.case ?? casoDeLista
+
+  // Al entrar a un chat se ve el último mensaje, sin tener que bajar. Si llega
+  // uno nuevo mientras se mira el hilo, solo baja si ya se estaba cerca del
+  // final, así no se arranca el scroll de quien está leyendo el historial.
+  useEffect(() => {
+    const contenedor = cuerpoChat.current
+    if (contenedor === null || detalleActual === null) return
+    const ultimo = detalleActual.messages.at(-1)?.id ?? null
+    if (ultimoMensajeChat.current === null) {
+      ultimoMensajeChat.current = ultimo
+      contenedor.scrollTop = contenedor.scrollHeight
+      return
+    }
+    if (ultimo === ultimoMensajeChat.current) return
+    ultimoMensajeChat.current = ultimo
+    if (contenedor.scrollHeight - contenedor.scrollTop - contenedor.clientHeight < 80) {
+      contenedor.scrollTop = contenedor.scrollHeight
+    }
+  }, [detalleActual])
 
   async function tomar(caso: CasoBandeja) {
     setAccion('tomar')
@@ -624,6 +650,28 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
       })
     } catch (error) {
       setAvisoCaso({ tono: 'riesgo', texto: mensajeDeError(error, 'No se pudo liberar el caso.') })
+    } finally {
+      setAccion(null)
+      refrescar()
+    }
+  }
+
+  // Bloquear o desbloquear el número que se está viendo: mientras esté bloqueado, el
+  // asistente ignora sus mensajes.
+  async function alternarBloqueo(caso: CasoBandeja) {
+    const bloqueado = !caso.phoneBlocked
+    setAccion('bloquear')
+    setAvisoCaso(null)
+    try {
+      await definirBloqueoNumero(caso.caseId, bloqueado)
+      setAvisoCaso({
+        tono: bloqueado ? 'riesgo' : 'exito',
+        texto: bloqueado
+          ? `Bloqueaste el número ${caso.phone}: el asistente deja de atenderlo hasta que lo desbloquees.`
+          : `Desbloqueaste el número ${caso.phone}: el asistente vuelve a atenderlo.`,
+      })
+    } catch (error) {
+      setAvisoCaso({ tono: 'riesgo', texto: mensajeDeError(error, 'No se pudo cambiar el bloqueo del número.') })
     } finally {
       setAccion(null)
       refrescar()
@@ -797,6 +845,26 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
         )}
         <button
           type="button"
+          className={`conversacion__accion ${caso.phoneBlocked ? 'conversacion__accion--desbloquear' : 'conversacion__accion--bloquear'}`}
+          onClick={() => void alternarBloqueo(caso)}
+          disabled={accion !== null}
+          aria-busy={accion === 'bloquear'}
+          title={
+            caso.phoneBlocked
+              ? 'Volver a permitir que el asistente atienda este número'
+              : 'Dejar de atender este número de WhatsApp'
+          }
+        >
+          {accion === 'bloquear'
+            ? caso.phoneBlocked
+              ? 'Desbloqueando…'
+              : 'Bloqueando…'
+            : caso.phoneBlocked
+              ? 'Desbloquear usuario'
+              : 'Bloquear número'}
+        </button>
+        <button
+          type="button"
           className="conversacion__accion conversacion__accion--cerrar"
           onClick={() => {
             setErrorCierre(null)
@@ -858,7 +926,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
           ) : null}
         </header>
 
-        <div className="chat-body">
+        <div className="chat-body" ref={cuerpoChat}>
           <AvisoAccion aviso={avisoCaso} />
 
           {fueraDeBandeja ? (
@@ -888,6 +956,12 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
             </ol>
           )}
         </div>
+
+        {caso?.phoneBlocked ? (
+          <p className="chat__bloqueo" role="status">
+            Bloqueaste a este número: el asistente no le responderá.
+          </p>
+        ) : null}
 
         {caso && caso.handedOff && !fueraDeBandeja ? (
           <CajaRespuesta

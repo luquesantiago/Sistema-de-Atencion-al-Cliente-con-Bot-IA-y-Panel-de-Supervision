@@ -34,6 +34,8 @@ export type InboxItem = {
   label: InboxLabel | null
   customer: InboxCustomer | null
   phone: string
+  // true si el número está bloqueado: el asistente ignora sus mensajes.
+  phoneBlocked: boolean
   queryType: QueryType | null
   handoffReason: string | null
   handedOff: boolean
@@ -66,6 +68,8 @@ export type ReplyResult =
   | { sent: true; saved: false; warning: string }
 
 export type ReleaseResult = { caseId: number; releasedAt: Date }
+
+export type PhoneBlockResult = { caseId: number; phone: string; phoneBlocked: boolean }
 
 export type CloseRequest = { reason?: string | null; alertsReviewed?: boolean }
 
@@ -186,6 +190,18 @@ export class ManageInbox {
     return { caseId, closedAt: outcome.closedAt }
   }
 
+  // Bloquear o desbloquear el número de WhatsApp del caso: mientras esté bloqueado, el
+  // asistente ignora sus mensajes. Cualquier operador puede cambiarlo, sin tomar el caso.
+  public async setPhoneBlocked(id: string, blocked: boolean): Promise<PhoneBlockResult> {
+    const caseId = parseCaseId(id)
+    const state = await this.repository.findActionState(caseId)
+    if (!state || !state.inInbox) throw notInInbox()
+    const updated = await this.repository.setPhoneBlocked(caseId, blocked)
+    if (!updated) throw notInInbox()
+    console.log(`[bandeja] caso ${caseId}: número ${blocked ? 'bloqueado' : 'desbloqueado'}`)
+    return { caseId, phone: updated.phone, phoneBlocked: blocked }
+  }
+
   // La imagen se pide a WhatsApp en el momento y no se guarda (decisión 7).
   public async findImage(caseIdText: string, messageIdText: string): Promise<WhatsAppImage> {
     const caseId = parseCaseId(caseIdText)
@@ -211,6 +227,7 @@ function toItem(entry: InboxEntry, actor: PanelActor): InboxItem {
     label: inboxLabel(entry),
     customer: entry.customer,
     phone: entry.phone,
+    phoneBlocked: entry.phoneBlocked,
     queryType: entry.queryType,
     handoffReason: entry.handoffReason,
     handedOff: entry.handedOffAt !== null,

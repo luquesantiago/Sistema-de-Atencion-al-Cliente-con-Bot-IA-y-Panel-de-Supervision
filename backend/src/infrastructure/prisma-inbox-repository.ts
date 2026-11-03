@@ -45,7 +45,7 @@ const entrySelect = {
   },
   conversacion: {
     select: {
-      telefono: { select: { numero: true } },
+      telefono: { select: { numero: true, bloqueado: true } },
       cliente: { select: { id_cliente: true, dni: true, cuit: true, razon_social: true, nombre: true, apellido: true } },
     },
   },
@@ -266,6 +266,20 @@ export class PrismaInboxRepository implements InboxRepository {
     return { ref: message.id_imagen_whatsapp, phone: caseRow.conversacion.telefono.numero }
   }
 
+  // El bloqueo es del número, no del caso: se escribe sobre telefono de la conversación.
+  public async setPhoneBlocked(caseId: number, blocked: boolean): Promise<{ phone: string } | null> {
+    const caseRow = await this.prisma.caso.findUnique({
+      where: { id_caso: caseId },
+      select: { conversacion: { select: { id_telefono: true, telefono: { select: { numero: true } } } } },
+    })
+    if (!caseRow) return null
+    await this.prisma.telefono.update({
+      where: { id_telefono: caseRow.conversacion.id_telefono },
+      data: { bloqueado: blocked },
+    })
+    return { phone: caseRow.conversacion.telefono.numero }
+  }
+
   private async entriesFor(ordered: Array<{ caseId: number; severityOrder: number | null }>): Promise<InboxEntry[]> {
     if (ordered.length === 0) return []
     const [records, levels] = await Promise.all([
@@ -382,6 +396,7 @@ export function toInboxEntry(record: InboxCaseRecord, severity: RiskLevel | null
     severity,
     customer: toCustomer(record.conversacion.cliente),
     phone: record.conversacion.telefono.numero,
+    phoneBlocked: record.conversacion.telefono.bloqueado,
     queryType: toQueryType(record.tipo_consulta?.nombre ?? null),
     handoffReason: record.motivo_derivacion,
     handedOffAt: record.fecha_derivacion,

@@ -109,6 +109,7 @@ export type ProcessResult =
   | { status: 'NOT_INSURANCE_REPLIED'; responseSent: true }
   | { status: 'IGNORED_MEDIA'; responseSent: false }
   | { status: 'SILENCED'; responseSent: false }
+  | { status: 'BLOCKED'; responseSent: false }
   | { status: 'DUPLICATE_IGNORED'; responseSent: false }
 
 const prospectPhotoText = 'El cliente envió una foto de su DNI por WhatsApp. La imagen no se almacena en el sistema.'
@@ -191,9 +192,15 @@ export class ProcessIncomingMessage {
     private readonly ai: AiClient,
     private readonly whatsapp: WhatsAppClient,
     private readonly clock: Clock = () => new Date(),
+    // Número bloqueado desde la bandeja: si lo está, el mensaje no se procesa ni se guarda.
+    private readonly phoneBlocked: (phone: string) => Promise<boolean> = async () => false,
   ) {}
 
   public async execute(message: IncomingWhatsAppMessage): Promise<ProcessResult> {
+    if (await this.phoneBlocked(message.phone)) {
+      console.log('[asistente] número bloqueado: mensaje ignorado')
+      return { status: 'BLOCKED', responseSent: false }
+    }
     if (this.processedMessageIds.has(message.messageId)) {
       return { status: 'DUPLICATE_IGNORED', responseSent: false }
     }

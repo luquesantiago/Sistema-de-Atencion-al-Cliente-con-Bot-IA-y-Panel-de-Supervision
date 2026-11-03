@@ -29,7 +29,7 @@ function record(overrides: Partial<InboxCaseRecord> = {}): InboxCaseRecord {
     prospecto: null,
     solicitud_accion: [],
     conversacion: {
-      telefono: { numero: '5491100000001' },
+      telefono: { numero: '5491100000001', bloqueado: false },
       cliente: { id_cliente: 7, dni: '99000001', cuit: null, razon_social: null, nombre: 'Ana', apellido: 'Prueba' },
     },
     mensaje: [{ contenido: 'me cobraron de más', fecha_hora: new Date('2026-10-15T13:00:00.000Z'), origen_mensaje: { nombre: 'cliente' } }],
@@ -108,6 +108,7 @@ describe('toInboxEntry', () => {
       severity: 'alto',
       customer: { id: 7, name: 'Ana Prueba', document: '99000001' },
       phone: '5491100000001',
+      phoneBlocked: false,
       queryType: 'reclamo',
       handoffReason: 'intención: reclamo',
       handedOffAt: new Date('2026-10-15T13:00:00.000Z'),
@@ -122,7 +123,7 @@ describe('toInboxEntry', () => {
   it('una empresa muestra la razón social y el CUIT', () => {
     const entry = toInboxEntry(record({
       conversacion: {
-        telefono: { numero: '5491100000002' },
+        telefono: { numero: '5491100000002', bloqueado: false },
         cliente: { id_cliente: 8, dni: null, cuit: '30999000001', razon_social: 'Empresa Inventada SA', nombre: null, apellido: null },
       },
     }), 'alto')
@@ -130,9 +131,15 @@ describe('toInboxEntry', () => {
   })
 
   it('una conversación sin cliente da customer null, aunque el teléfono esté vinculado', () => {
-    const entry = toInboxEntry(record({ conversacion: { telefono: { numero: '5491100000001' }, cliente: null } }), 'bajo')
+    const entry = toInboxEntry(record({ conversacion: { telefono: { numero: '5491100000001', bloqueado: false }, cliente: null } }), 'bajo')
     expect(entry.customer).toBeNull()
     expect(entry.phone).toBe('5491100000001')
+    expect(entry.phoneBlocked).toBe(false)
+  })
+
+  it('un número bloqueado se mapea en la entrada', () => {
+    const entry = toInboxEntry(record({ conversacion: { telefono: { numero: '5491100000001', bloqueado: true }, cliente: null } }), null)
+    expect(entry.phoneBlocked).toBe(true)
   })
 
   it('el prospecto pendiente, la solicitud pendiente y el último mensaje recortado', () => {
