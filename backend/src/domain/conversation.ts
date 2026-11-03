@@ -110,6 +110,8 @@ export type SavedConversation = {
 export interface ConversationStore {
   findOpen(phone: string): Promise<OpenConversation | null>
   settings(): Promise<Settings>
+  // Si el cliente tiene una solicitud de cambio de teléfono pendiente para ese número.
+  hasPendingPhoneChange(phone: string, customerId: number): Promise<boolean>
   // send corre después de las escrituras: si lanza, no queda nada guardado.
   save(changes: ConversationChanges, send: () => Promise<void>): Promise<SavedConversation>
 }
@@ -246,6 +248,17 @@ export function endByInactivity(conversation: OpenConversation, now: Date, inact
 export function endByRestart(conversation: OpenConversation): ConversationEnd {
   return {
     endedAt: notBeforeClosedCases(conversation, lastActivity(conversation)),
+    caseIds: casesClosedWithConversation(conversation),
+  }
+}
+
+// Baja del cliente detectada al llegar un mensaje a una sesión identificada: la sesión se
+// invalida a esta hora (nunca antes del cierre de un caso) y el mensaje empieza una
+// conversación nueva, como si el número escribiera por primera vez. Cierra los mismos
+// casos que el reinicio: los no derivados y sin nada pendiente.
+export function endByDeactivation(conversation: OpenConversation, now: Date): ConversationEnd {
+  return {
+    endedAt: notBeforeClosedCases(conversation, now),
     caseIds: casesClosedWithConversation(conversation),
   }
 }

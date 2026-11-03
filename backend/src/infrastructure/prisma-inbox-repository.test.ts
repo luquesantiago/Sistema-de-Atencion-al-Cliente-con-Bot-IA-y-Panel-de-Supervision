@@ -76,6 +76,19 @@ describe('consultas de la bandeja', () => {
     expect(query.values).toContain(12)
   })
 
+  // Una fila por conversación: el listado y el total eligen un caso por charla (derivado,
+  // después cambio de teléfono pendiente, después el más reciente); el detalle no.
+  it('el listado y el total dejan un caso por conversación, y el detalle no', () => {
+    const representative = /AND c\.id_caso = \(\s*SELECT c2\.id_caso FROM caso c2/
+    const list = inboxOrderQuery({ limit: 25, offset: 0 })
+    expect(list.sql).toMatch(representative)
+    expect(list.sql).toMatch(/ORDER BY c2\.fecha_derivacion IS NULL,\s*NOT EXISTS/)
+    expect(list.sql).toMatch(/c2\.id_caso DESC\s*LIMIT 1\)/)
+    expect(inboxCountQuery().sql).toMatch(representative)
+    expect(inboxCountQuery(7).sql).toMatch(representative)
+    expect(inboxOrderQuery({ limit: 1, offset: 0 }, 12).sql).not.toMatch(representative)
+  })
+
   it('el filtro por cliente restringe el listado y el total a ese cliente', () => {
     const query = inboxOrderQuery({ limit: 25, offset: 0 }, undefined, 7)
     expect(query.sql).toContain('JOIN conversacion conv ON conv.id_conversacion = c.id_conversacion')

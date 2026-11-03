@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   caseForMessage,
   casesClosedWithConversation,
+  endByDeactivation,
   endByInactivity,
   endByRestart,
   freshGreeting,
@@ -190,6 +191,19 @@ describe('cierre por reinicio', () => {
       cases: [aCase(10, { handedOff: true, closedAt: minutesAgo(5) }), aCase(11)],
     })
     expect(endByRestart(closedLater)).toEqual({ endedAt: minutesAgo(5), caseIds: [11] })
+  })
+})
+
+describe('cierre por baja del cliente', () => {
+  it('termina a la hora de la baja y cierra los casos no derivados', () => {
+    expect(endByDeactivation(withLastMessage(minutesAgo(3)), now)).toEqual({ endedAt: now, caseIds: [10] })
+  })
+
+  it('no termina antes del cierre de un caso derivado posterior', () => {
+    const closedLater = withLastMessage(minutesAgo(30), {
+      cases: [aCase(10, { handedOff: true, closedAt: minutesAgo(5) }), aCase(11)],
+    })
+    expect(endByDeactivation(closedLater, now)).toEqual({ endedAt: now, caseIds: [11] })
   })
 })
 

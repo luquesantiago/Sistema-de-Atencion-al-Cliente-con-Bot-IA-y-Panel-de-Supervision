@@ -98,6 +98,9 @@ export type Customer = {
   dni: string
   firstName: string
   lastName: string
+  // Baja lógica del cliente (activo = false). El asistente lo identifica igual, pero con la
+  // sesión abierta la invalida y vuelve a pedir el DNI antes de atenderlo.
+  active: boolean
   policies: CustomerPolicy[]
 }
 
@@ -144,10 +147,15 @@ export type CustomerPage = {
 // en el ConversationStore. El panel agrega el listado y la ficha (RF-CAR-01, RF-CAR-02,
 // RF-CAR-03), también de solo lectura.
 export interface CustomerRepository {
+  // Devuelven también los clientes inactivos: el DNI sigue identificando y la baja es una
+  // decisión del panel, no una ausencia de la cartera.
   findByDni(dni: string): Promise<Customer | null>
   findById(id: number): Promise<Customer | null>
   // Ids de los clientes activos vinculados al número (cliente_telefono con el teléfono activo).
   linkedCustomerIds(phone: string): Promise<number[]>
+  // true si el número está vinculado al cliente (teléfono activo), sin importar si el
+  // cliente está activo o inactivo.
+  isPhoneLinkedTo(phone: string, customerId: number): Promise<boolean>
   listCustomers(query: CustomerListQuery): Promise<CustomerPage>
   findCustomerDetail(id: number): Promise<CustomerDetail | null>
 }

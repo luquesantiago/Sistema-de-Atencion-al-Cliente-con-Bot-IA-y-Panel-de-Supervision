@@ -66,8 +66,8 @@ describe('clientes de prueba', () => {
 })
 
 describe('clientes vinculados a un número', () => {
-  const ana: Customer = { id: 1, dni: '99000001', firstName: 'Ana', lastName: 'Ficticia', policies: [] }
-  const bruno: Customer = { id: 2, dni: '99000002', firstName: 'Bruno', lastName: 'Ficticio', policies: [] }
+  const ana: Customer = { id: 1, dni: '99000001', firstName: 'Ana', lastName: 'Ficticia', active: true, policies: [] }
+  const bruno: Customer = { id: 2, dni: '99000002', firstName: 'Bruno', lastName: 'Ficticio', active: true, policies: [] }
 
   it('un número vinculado a un cliente da su id', async () => {
     const repository = new InMemoryCustomerRepository([ana, bruno])
@@ -88,11 +88,11 @@ describe('clientes vinculados a un número', () => {
     expect(await repository.linkedCustomerIds('5490000000002')).toEqual([])
   })
 
-  it('un vínculo con un cliente cargado por error no cuenta', async () => {
+  it('un vínculo con un cliente cargado por error no cuenta en la identificación, pero el DNI sí lo reconoce', async () => {
     const repository = new InMemoryCustomerRepository([ana, bruno])
     repository.linkPhone('5490000000001', ana.id)
     repository.deactivate(ana.id)
     expect(await repository.linkedCustomerIds('5490000000001')).toEqual([])
-    expect(await repository.findByDni(ana.dni)).toBeNull()
+    expect(await repository.findByDni(ana.dni)).toMatchObject({ id: ana.id, active: false })
   })
 })

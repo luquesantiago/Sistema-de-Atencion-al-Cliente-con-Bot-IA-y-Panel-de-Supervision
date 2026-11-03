@@ -21,7 +21,7 @@ export class PrismaCustomerRepository implements CustomerRepository {
 
   public async findByDni(dni: string): Promise<Customer | null> {
     const customer = await this.prisma.cliente.findFirst({
-      where: { dni, activo: true },
+      where: { dni },
       include: customerInclude,
     })
     return customer ? customerFromRecord(customer) : null
@@ -29,7 +29,7 @@ export class PrismaCustomerRepository implements CustomerRepository {
 
   public async findById(id: number): Promise<Customer | null> {
     const customer = await this.prisma.cliente.findFirst({
-      where: { id_cliente: id, activo: true },
+      where: { id_cliente: id },
       include: customerInclude,
     })
     return customer ? customerFromRecord(customer) : null
@@ -45,6 +45,16 @@ export class PrismaCustomerRepository implements CustomerRepository {
       orderBy: { id_cliente: 'asc' },
     })
     return links.map((link) => link.id_cliente)
+  }
+
+  // El vínculo no depende del estado del cliente: un cliente inactivo sigue vinculado a su
+  // número (la baja no lo saca del teléfono).
+  public async isPhoneLinkedTo(phone: string, customerId: number): Promise<boolean> {
+    const link = await this.prisma.cliente_telefono.findFirst({
+      where: { telefono: { numero: phone, activo: true }, id_cliente: customerId },
+      select: { id_cliente: true },
+    })
+    return link !== null
   }
 
   public async listCustomers(query: CustomerListQuery): Promise<CustomerPage> {
@@ -148,11 +158,14 @@ export type CustomerRecord = {
 }
 
 // Convierte la fila de la base al cliente del dominio (design.md, decisión 2). Un cliente
-// cargado por error o sin DNI (una empresa) no se usa; un ramo o un estado que no está en
+// sin DNI (una empresa) no se usa; un cliente inactivo sí, con active = false, para que el
+// asistente pueda identificarlo y reiniciar la sesión. Un ramo o un estado que no está en
 // el dominio es un error de programación y lanza.
 export function customerFromRecord(record: CustomerRecord): Customer | null {
-  if (!record.activo || !record.dni) return null
+  if (!record.dni) return null
   if (!record.nombre || !record.apellido) {
+    // Una fila inactiva a medio cargar se ignora sin lanzar: ya no se usa para atender.
+    if (!record.activo) return null
     throw new Error(`El cliente ${record.id_cliente} no tiene nombre y apellido`)
   }
   const policies: CustomerPolicy[] = record.poliza
@@ -164,6 +177,7 @@ export function customerFromRecord(record: CustomerRecord): Customer | null {
     dni: record.dni,
     firstName: record.nombre,
     lastName: record.apellido,
+    active: record.activo,
     policies,
   }
 }

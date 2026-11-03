@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import type { Modulo, ModuloPanel } from '../navigation'
+import type { Modulo, ModuloPanel, OpcionesNavegacion } from '../navigation'
 import PageHeader from '../components/PageHeader'
 import EstadoPanel from '../components/EstadoPanel'
 import ConfirmarCambio, { type LineaConfirmacion } from '../components/ConfirmarCambio'
@@ -11,6 +11,7 @@ import {
   decidirProspecto,
   listarCambiosTelefono,
   listarProspectos,
+  reintentarAvisoAlta,
   reintentarNotificacion,
   type CambioTelefonoPendiente,
   type DecisionTramite,
@@ -29,7 +30,8 @@ type TramitePendiente =
 type Aviso = {
   tono: 'exito' | 'alerta' | 'riesgo'
   texto: string
-  notificacionId?: number
+  // El aviso por WhatsApp que falló y se puede reintentar: el del alta o el del cambio de teléfono.
+  notificacion?: { tipo: 'prospecto' | 'telefono'; id: number }
   accion?: {
     etiqueta: string
     onClick: () => void
@@ -105,7 +107,7 @@ function AvisoPanel({
   return (
     <div className={`tramites-aviso tramites-aviso--${aviso.tono}`} role={aviso.tono === 'riesgo' ? 'alert' : 'status'}>
       <span>{aviso.texto}</span>
-      {aviso.notificacionId !== undefined ? (
+      {aviso.notificacion !== undefined ? (
         <button type="button" className="boton boton--chico" onClick={onReintentar} disabled={reintentando}>
           {reintentando ? 'Reintentando…' : 'Reintentar aviso'}
         </button>
@@ -448,7 +450,7 @@ export default function TramitesAprobar({
   onNavegar,
 }: {
   modulo: Modulo
-  onNavegar: (destino: ModuloPanel) => void
+  onNavegar: (destino: ModuloPanel, opciones?: OpcionesNavegacion) => void
 }) {
   const [prospectos, setProspectos] = useState<ProspectoPendiente[]>([])
   const [cargandoProspectos, setCargandoProspectos] = useState(true)
@@ -551,6 +553,7 @@ export default function TramitesAprobar({
         { etiqueta: 'Nombre revisado', antes: nombreDeclarado(prospecto), despues: `${datos.nombre} ${datos.apellido}` },
         { etiqueta: 'DNI', antes: prospecto.dni ?? 'No informado', despues: prospecto.dni ?? 'No informado' },
         { etiqueta: 'Teléfono', antes: prospecto.phone, despues: 'Vinculado al cliente' },
+        { etiqueta: 'Aviso al cliente', antes: '—', despues: `WhatsApp a ${prospecto.phone}` },
         { etiqueta: 'Fundamento', antes: '—', despues: datos.fundamento },
       ],
     })
@@ -630,10 +633,23 @@ export default function TramitesAprobar({
             nombre: confirmacion.nombre,
             apellido: confirmacion.apellido,
           })
-          setAviso({
-            tono: 'exito',
-            texto: `Se aprobó el alta de ${confirmacion.nombre} ${confirmacion.apellido}. El cliente${resultado.clienteId ? ` #${resultado.clienteId}` : ''} quedó creado y el teléfono vinculado.`,
-          })
+          const clienteId = resultado.clienteId
+          // Desde la aprobación se va a la ficha del cliente nuevo para cargarle la póliza.
+          const accion = clienteId === undefined
+            ? undefined
+            : {
+                etiqueta: 'Ir a la ficha del cliente',
+                onClick: () => onNavegar('clientes', { clientes: { customerId: clienteId } }),
+              }
+          const creado = `Se aprobó el alta de ${confirmacion.nombre} ${confirmacion.apellido}. El cliente${clienteId ? ` #${clienteId}` : ''} quedó creado y el teléfono vinculado.`
+          setAviso(resultado.notificationSent === false
+            ? {
+                tono: 'alerta',
+                texto: `${creado} No se pudo avisar al cliente por WhatsApp.`,
+                notificacion: { tipo: 'prospecto', id: resultado.id },
+                accion,
+              }
+            : { tono: 'exito', texto: `${creado} El cliente recibió el aviso por WhatsApp.`, accion })
         } else {
           const resultado = await decidirProspecto(confirmacion.prospecto.id, {
             decision: 'rechazar',
@@ -662,7 +678,7 @@ export default function TramitesAprobar({
           setAviso({
             tono: 'alerta',
             texto: `La decisión quedó registrada, pero no se pudo avisar al cliente por WhatsApp.`,
-            notificacionId: resultado.id,
+            notificacion: { tipo: 'telefono', id: resultado.id },
           })
         }
         setSeleccion(null)
@@ -678,24 +694,31 @@ export default function TramitesAprobar({
   }
 
   async function reintentarAviso() {
-    if (aviso?.notificacionId === undefined) return
+    const notificacion = aviso?.notificacion
+    if (notificacion === undefined) return
+    // La acción del aviso (ir a la ficha del cliente) sigue disponible después del reintento.
+    const accion = aviso?.accion
     setReintentando(true)
     try {
-      const resultado = await reintentarNotificacion(aviso.notificacionId)
+      const resultado = notificacion.tipo === 'prospecto'
+        ? await reintentarAvisoAlta(notificacion.id)
+        : await reintentarNotificacion(notificacion.id)
       if (resultado.notificationSent) {
-        setAviso({ tono: 'exito', texto: 'El aviso al cliente se envió por WhatsApp.' })
+        setAviso({ tono: 'exito', texto: 'El aviso al cliente se envió por WhatsApp.', accion })
       } else {
         setAviso({
           tono: 'riesgo',
           texto: 'Todavía no se pudo enviar el aviso al cliente por WhatsApp. La decisión sigue registrada.',
-          notificacionId: resultado.id,
+          notificacion,
+          accion,
         })
       }
     } catch (error) {
       setAviso({
         tono: 'riesgo',
         texto: mensajeDeError(error, 'No se pudo reintentar el aviso al cliente.'),
-        notificacionId: aviso.notificacionId,
+        notificacion,
+        accion,
       })
     } finally {
       setReintentando(false)
@@ -875,7 +898,7 @@ export default function TramitesAprobar({
           descripcion={
             confirmacion.tipo === 'prospecto'
               ? confirmacion.decision === 'aprobar'
-                ? 'Se crea el cliente con el DNI declarado y se vincula el teléfono de la conversación.'
+                ? 'Se crea el cliente con el DNI declarado, se vincula el teléfono de la conversación y el cliente recibe el aviso del alta por WhatsApp.'
                 : 'No se crea ningún cliente. El caso queda abierto en la Bandeja para explicarle el rechazo al cliente.'
               : confirmacion.decision === 'aprobar'
                 ? 'El número nuevo queda vinculado al cliente. El aviso sale por WhatsApp y se guarda en el caso.'

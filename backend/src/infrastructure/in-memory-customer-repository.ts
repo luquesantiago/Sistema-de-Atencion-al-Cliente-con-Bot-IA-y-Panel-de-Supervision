@@ -25,11 +25,13 @@ export class InMemoryCustomerRepository implements CustomerRepository {
   public constructor(private readonly customers: Customer[]) {}
 
   public async findByDni(dni: string): Promise<Customer | null> {
-    return this.activeCustomers().find((customer) => customer.dni === dni) ?? null
+    const customer = this.customers.find((candidate) => candidate.dni === dni)
+    return customer ? this.withActiveState(customer) : null
   }
 
   public async findById(id: number): Promise<Customer | null> {
-    return this.activeCustomers().find((customer) => customer.id === id) ?? null
+    const customer = this.customers.find((candidate) => candidate.id === id)
+    return customer ? this.withActiveState(customer) : null
   }
 
   public async linkedCustomerIds(phone: string): Promise<number[]> {
@@ -38,6 +40,11 @@ export class InMemoryCustomerRepository implements CustomerRepository {
       .filter((link) => link.phone === phone && active.has(link.customerId))
       .map((link) => link.customerId)
       .sort((a, b) => a - b)
+  }
+
+  // El vínculo no depende del estado del cliente: la baja no lo saca del teléfono.
+  public async isPhoneLinkedTo(phone: string, customerId: number): Promise<boolean> {
+    return this.links.some((link) => link.phone === phone && link.customerId === customerId)
   }
 
   public async listCustomers(query: CustomerListQuery): Promise<CustomerPage> {
@@ -99,6 +106,12 @@ export class InMemoryCustomerRepository implements CustomerRepository {
     this.links.push({ phone, customerId })
   }
 
+  // Lo que hace la desvinculación desde Base de Clientes o al aprobar un cambio de teléfono.
+  public unlinkPhone(phone: string, customerId: number): void {
+    const index = this.links.findIndex((link) => link.phone === phone && link.customerId === customerId)
+    if (index >= 0) this.links.splice(index, 1)
+  }
+
   // Vincula un teléfono con su id de teléfono. El mismo número puede estar en dos
   // clientes: así se prueba que la búsqueda lo devuelva a los dos (RF-CAR-03).
   public addPhoneLink(customerId: number, phoneId: number, number: string): void {
@@ -108,13 +121,19 @@ export class InMemoryCustomerRepository implements CustomerRepository {
     this.phoneLinks.set(customerId, links)
   }
 
-  // Marca al cliente como cargado por error (activo = FALSE en la base).
+  // Marca al cliente como dado de baja (activo = FALSE en la base). El estado vive en este
+  // repositorio, no en los objetos compartidos de las pruebas.
   public deactivate(customerId: number): void {
     this.inactiveIds.add(customerId)
   }
 
   private phonesOf(customerId: number): Array<{ id: number; number: string }> {
     return this.phoneLinks.get(customerId) ?? []
+  }
+
+  // Devuelve al cliente con su estado real de baja, sin importar el del objeto recibido.
+  private withActiveState(customer: Customer): Customer {
+    return { ...customer, active: !this.inactiveIds.has(customer.id) }
   }
 
   private activeCustomers(): Customer[] {
@@ -175,6 +194,8 @@ function parseCustomer(value: unknown, path: string): Customer {
     dni,
     firstName: requiredString(value, 'firstName', path),
     lastName: requiredString(value, 'lastName', path),
+    // Los fixtures son cartera de prueba: siempre activos.
+    active: true,
     policies: policies.map((policy, index) => parsePolicy(policy, `${path}.policies[${index}]`)),
   }
 }

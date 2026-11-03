@@ -16,6 +16,9 @@ export type RewriteInput = {
   template: string
   // Pregunta del cliente, con el DNI tapado. null si no hay.
   question: string | null
+  // Motivo por el que el control rechazó la redacción anterior (solo en el reintento):
+  // texto del propio control, nunca contenido del cliente.
+  rejection?: string
 }
 
 // Motor que decide y redacta. El modelo elige de una lista cerrada y nunca redacta

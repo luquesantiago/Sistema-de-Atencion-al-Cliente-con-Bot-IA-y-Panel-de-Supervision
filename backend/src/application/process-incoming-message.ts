@@ -4,6 +4,7 @@ import { balanceTemplate } from '../domain/balance.js'
 import {
   caseForMessage,
   isQueryType,
+  endByDeactivation,
   endByInactivity,
   endByRestart,
   freshGreeting,
@@ -50,6 +51,7 @@ import {
   notInsuranceAndNewCustomerOffer,
   notInsuranceMessage,
   phoneChangePendingMessage,
+  phoneChangeStillPendingMessage,
   prospectHandoffMessage,
   repeatedDniRequest,
   statusesTemplate,
@@ -82,8 +84,15 @@ type Stage =
   | ({ stage: 'awaiting_new_customer_query'; notUnderstood: number } & Identification)
   | ({ stage: 'awaiting_new_customer_dni'; name: string } & Identification)
   | ({ stage: 'awaiting_new_customer_photo'; name: string; dni: string } & Identification)
+  // El DNI coincidió desde un número no vinculado: hasta que se apruebe el cambio de
+  // teléfono, el número no identifica al cliente (decisión de Santiago del 29/10/2026).
+  | { stage: 'awaiting_phone_change'; customerId: number }
   // notUnderstood: repreguntas seguidas por «no se entiende» (change asistente-informacion-general).
-  | { stage: 'identified'; customerId: number; notUnderstood: number }
+  // revalidated: la identificación se hizo con el cliente inactivo (por DNI después de la
+  // baja): no se vuelve a reiniciar la sesión en cada mensaje.
+  | { stage: 'identified'; customerId: number; notUnderstood: number; revalidated: boolean }
+
+type IdentifiedStage = Extract<Stage, { stage: 'identified' }>
 
 export type ProcessResult =
   | { status: 'CUSTOMER_STATUS_REQUESTED'; responseSent: true }
@@ -94,7 +103,9 @@ export type ProcessResult =
   | { status: 'NEW_CUSTOMER_DNI_REQUESTED'; responseSent: true }
   | { status: 'PHOTO_REQUESTED'; responseSent: true }
   | { status: 'PROSPECT_HANDED_OFF'; responseSent: true }
-  | { status: 'PHONE_CHANGE_PENDING'; answer: ProcessResult['status']; responseSent: true }
+  // answer: lo que se hizo con la consulta escrita antes de identificarse, si se respondió.
+  | { status: 'PHONE_CHANGE_PENDING'; answer?: ProcessResult['status']; responseSent: true }
+  | { status: 'PHONE_CHANGE_STILL_PENDING'; responseSent: true }
   | { status: 'NEW_PHONE_REQUESTED'; intent: Intent; responseSent: true }
   | { status: 'CUSTOMER_DATA_SENT'; intent: Intent; responseSent: true }
   | { status: 'CUSTOMER_POLICIES_SENT'; intent: Intent; responseSent: true }
@@ -242,10 +253,26 @@ export class ProcessIncomingMessage {
       return { status: 'IGNORED_MEDIA', responseSent: false }
     }
 
+    // Baja del cliente con la sesión identificada abierta: la sesión se invalida y el mismo
+    // mensaje empieza un chat nuevo, que vuelve a pedir la identificación. Si la etapa ya se
+    // revalidó (DNI después de la baja) o el cliente está activo, se reutiliza la lectura.
+    let known: Customer | undefined
+    if (conversation && stage?.stage === 'identified' && !stage.revalidated) {
+      const current = await this.customers.findById(stage.customerId)
+      if (current && !current.active) {
+        closePrevious = { conversationId: conversation.id, ...endByDeactivation(conversation, at) }
+        conversation = null
+        stage = undefined
+        console.log('[asistente] baja de cliente: sesión invalidada, chat nuevo')
+      } else {
+        known = current ?? undefined
+      }
+    }
+
     const text = message.media === 'image' ? prospectPhotoText : message.text
     const turn = new Turn(conversation, message.phone, at, text, closePrevious, greetingFresh)
     turn.keepImageRef(message)
-    const result = await this.decide(turn, stage, message, settings)
+    const result = await this.decide(turn, stage, message, settings, known)
     if (!turn.hasIncomingCase) turn.receiveIn(turn.caseFor({ kind: 'identifying' }))
 
     const saved = await this.conversations.save(turn.changes, async () => {
@@ -258,7 +285,13 @@ export class ProcessIncomingMessage {
     return result
   }
 
-  private async decide(turn: Turn, stage: Stage | undefined, message: IncomingWhatsAppMessage, settings: Settings): Promise<ProcessResult> {
+  private async decide(
+    turn: Turn,
+    stage: Stage | undefined,
+    message: IncomingWhatsAppMessage,
+    settings: Settings,
+    known?: Customer,
+  ): Promise<ProcessResult> {
     const { text } = message
     if (!stage || stage.stage === 'unidentified') return this.start(turn, text, settings)
     switch (stage.stage) {
@@ -274,9 +307,63 @@ export class ProcessIncomingMessage {
         return this.collectNewCustomerDni(turn, stage, text)
       case 'awaiting_new_customer_photo':
         return this.collectNewCustomerPhoto(turn, stage, message)
+      case 'awaiting_phone_change':
+        return this.whilePhoneChangePending(turn, stage.customerId, text, settings)
       case 'identified':
-        return this.answerIdentified(turn, stage.customerId, stage.notUnderstood, text)
+        // El número pudo desvincularse durante la conversación: sin el vínculo, el mensaje se
+        // atiende como el primero de una conversación nueva (decisión de Santiago del
+        // 29/10/2026). isPhoneLinkedTo no mira la baja: esa ya la resolvió process.
+        if (!(await this.customers.isPhoneLinkedTo(turn.changes.phone, stage.customerId))) {
+          return this.start(turn, text, settings)
+        }
+        return this.answerIdentified(turn, stage, text, known)
     }
+  }
+
+  // Con el cambio de teléfono pendiente, solo se responde la información de la agencia y se
+  // deriva lo urgente; lo demás recibe el aviso de que sigue pendiente. Cuando se decide, el
+  // mensaje se atiende como el primero de una conversación nueva: aprobado, el número ya
+  // identifica al cliente; rechazado, se vuelve a preguntar si ya es cliente.
+  private async whilePhoneChangePending(turn: Turn, customerId: number, text: string, settings: Settings): Promise<ProcessResult> {
+    const { phone } = turn.changes
+    const linkedIds = await this.customers.linkedCustomerIds(phone)
+    if (linkedIds.length > 0 || !(await this.conversations.hasPendingPhoneChange(phone, customerId))) {
+      return this.start(turn, text, settings)
+    }
+    turn.nextStage = () => ({ stage: 'awaiting_phone_change', customerId })
+    const answered = await this.answerWhilePhoneChangePending(turn, { answers: 'incoming', text })
+    if ('result' in answered) return answered.result
+    const ref = turn.caseFor(answered.intent ? { kind: 'intent', intent: answered.intent } : { kind: 'identifying' })
+    turn.receiveIn(ref)
+    turn.reply(ref, phoneChangeStillPendingMessage)
+    return { status: 'PHONE_CHANGE_STILL_PENDING', responseSent: true }
+  }
+
+  // La información de la agencia no es de ningún cliente (RF-ATE-06) y el siniestro o el
+  // reclamo no esperan a la aprobación: se derivan. Con otra intención no responde nada y
+  // devuelve la intención; si el proveedor de IA falla, devuelve null.
+  private async answerWhilePhoneChangePending(
+    turn: Turn,
+    query: PendingQuery,
+  ): Promise<{ result: ProcessResult } | { intent: Intent | null }> {
+    const question = maskDni(query.text)
+    const existing = query.answers === 'incoming' ? undefined : query.answers.existing
+    let intent: Intent
+    let urgency: Urgency | null
+    try {
+      ({ intent, urgency } = await this.ai.classifyIntent(question, intentContext(turn.conversation, existing)))
+    } catch {
+      return { intent: null }
+    }
+    if (intent !== 'información de la agencia' && intent !== 'siniestro' && intent !== 'reclamo') return { intent }
+
+    const caseId = existing === undefined ? undefined : turn.caseOfMessage(existing)
+    const ref = turn.caseFor({ kind: 'intent', intent, ...(caseId === undefined ? {} : { caseId }) })
+    if (query.answers === 'incoming' && !turn.hasIncomingCase) turn.receiveIn(ref)
+    if (intent === 'información de la agencia') {
+      return { result: await this.sendAgencyInfo(turn, ref, question, query.answers, intent) }
+    }
+    return { result: this.handoffIn(turn, ref, { kind: 'intent', intent }, query.answers, { intent, urgency }) }
   }
 
   // Primer mensaje de la conversación (reglas 1 y 2 de AGENTS.md).
@@ -288,7 +375,12 @@ export class ProcessIncomingMessage {
       const customer = await this.customers.findById(linkedIds[0])
       if (customer) {
         turn.changes.customerId = customer.id
-        return this.answerIdentified(turn, customer.id, 0, text, customer)
+        return this.answerIdentified(
+          turn,
+          { stage: 'identified', customerId: customer.id, notUnderstood: 0, revalidated: false },
+          text,
+          customer,
+        )
       }
     }
 
@@ -466,30 +558,37 @@ export class ProcessIncomingMessage {
     return { status: 'CUSTOMER_STATUS_REQUESTED', responseSent: true }
   }
 
-  // El DNI es de un cliente de la cartera: desde un número vinculado tiene que ser uno de
-  // los vinculados; desde uno no vinculado, se pide el cambio de teléfono (regla 9).
+  // El DNI es de un cliente de la cartera: si el número está vinculado a ese cliente (aunque
+  // esté inactivo) se identifica; si el número está vinculado a otros, es el DNI de otra
+  // persona; si no está vinculado a nadie, se pide el cambio de teléfono (regla 9).
   private async recognized(turn: Turn, identification: Identification, customer: Customer): Promise<ProcessResult> {
-    if (identification.linkedIds.length > 0) {
-      if (!identification.linkedIds.includes(customer.id)) {
-        return this.handoffIdentifying(turn, { kind: 'dni-other-person' })
-      }
-      turn.changes.customerId = customer.id
-      // Con la consulta en este mismo mensaje, el mensaje va al caso de la consulta.
-      if (identification.pending?.answers === 'incoming') {
-        return this.answerAfterIdentifying(turn, customer, identification.pending, null)
-      }
-      const ref = turn.caseFor({ kind: 'identifying' })
-      turn.receiveIn(ref)
-      return this.answerAfterIdentifying(turn, customer, identification.pending, ref)
+    const linkedHere = await this.customers.isPhoneLinkedTo(turn.changes.phone, customer.id)
+    if (!linkedHere && identification.linkedIds.length > 0) {
+      return this.handoffIdentifying(turn, { kind: 'dni-other-person' })
     }
-
     turn.changes.customerId = customer.id
-    const ref = turn.caseFor({ kind: 'phone-change-request' })
+    if (!linkedHere) {
+      const ref = turn.caseFor({ kind: 'phone-change-request' })
+      turn.receiveIn(ref)
+      turn.changes.phoneChangeRequest = { case: ref, customerId: customer.id, riskLevel: queryTypeRiskLevel('cambio de teléfono') ?? 'bajo' }
+      turn.reply(ref, phoneChangePendingMessage)
+      turn.nextStage = () => ({ stage: 'awaiting_phone_change', customerId: customer.id })
+      // La consulta escrita antes de identificarse solo se responde si se respondería con el
+      // cambio pendiente; si no, el aviso ya dice que se responderá al aprobarse.
+      const answered = identification.pending ? await this.answerWhilePhoneChangePending(turn, identification.pending) : null
+      return {
+        status: 'PHONE_CHANGE_PENDING',
+        ...(answered && 'result' in answered ? { answer: answered.result.status } : {}),
+        responseSent: true,
+      }
+    }
+    // Con la consulta en este mismo mensaje, el mensaje va al caso de la consulta.
+    if (identification.pending?.answers === 'incoming') {
+      return this.answerAfterIdentifying(turn, customer, identification.pending, null)
+    }
+    const ref = turn.caseFor({ kind: 'identifying' })
     turn.receiveIn(ref)
-    turn.changes.phoneChangeRequest = { case: ref, customerId: customer.id, riskLevel: queryTypeRiskLevel('cambio de teléfono') ?? 'bajo' }
-    turn.reply(ref, phoneChangePendingMessage)
-    const answer = await this.answerAfterIdentifying(turn, customer, identification.pending, ref)
-    return { status: 'PHONE_CHANGE_PENDING', answer: answer.status, responseSent: true }
+    return this.answerAfterIdentifying(turn, customer, identification.pending, ref)
   }
 
   private async answerAfterIdentifying(
@@ -498,7 +597,14 @@ export class ProcessIncomingMessage {
     pending: PendingQuery | null,
     welcomeCase: CaseRef | null,
   ): Promise<ProcessResult> {
-    turn.nextStage = () => ({ stage: 'identified', customerId: customer.id, notUnderstood: 0 })
+    // Si se identificó con el cliente inactivo (DNI después de la baja), la etapa queda
+    // revalidada: no se vuelve a reiniciar la sesión en cada mensaje.
+    turn.nextStage = () => ({
+      stage: 'identified',
+      customerId: customer.id,
+      notUnderstood: 0,
+      revalidated: !customer.active,
+    })
     if (!pending) {
       turn.reply(welcomeCase ?? turn.caseFor({ kind: 'identifying' }), welcomeMessage(customer, turn.greetingFresh))
       return { status: 'WELCOME_SENT', responseSent: true }
@@ -560,17 +666,27 @@ export class ProcessIncomingMessage {
 
   private async answerIdentified(
     turn: Turn,
-    customerId: number,
-    notUnderstood: number,
+    stage: IdentifiedStage,
     text: string,
     known?: Customer,
   ): Promise<ProcessResult> {
-    turn.nextStage = () => ({ stage: 'identified', customerId, notUnderstood: 0 })
-    const customer = known ?? await this.customers.findById(customerId)
-    if (!customer) return this.handoffUntyped(turn, { kind: 'customer-missing' })
+    const customer = known ?? await this.customers.findById(stage.customerId)
+    if (!customer) {
+      // La fila ya no existe: se deriva. La baja lógica no llega acá (reinicia la sesión).
+      turn.nextStage = () => ({ ...stage, notUnderstood: 0 })
+      return this.handoffUntyped(turn, { kind: 'customer-missing' })
+    }
+    // revalidated se recalcula contra el estado actual: si el cliente está inactivo y la
+    // etapa no lo estaba, la sesión ya se habría reiniciado antes de llegar acá.
+    turn.nextStage = () => ({
+      stage: 'identified',
+      customerId: stage.customerId,
+      notUnderstood: 0,
+      revalidated: !customer.active,
+    })
     const dni = findDni(text)
     if (dni && dni !== customer.dni) return this.handoffUntyped(turn, { kind: 'dni-other-person' })
-    return this.answerQuery(turn, customer, { text, answers: 'incoming' }, false, notUnderstood)
+    return this.answerQuery(turn, customer, { text, answers: 'incoming' }, false, stage.notUnderstood)
   }
 
   private async answerQuery(
@@ -601,7 +717,12 @@ export class ProcessIncomingMessage {
       const ref = caseFor('otra consulta')
       if (step.kind === 'handoff') return this.handoffIn(turn, ref, { kind: 'provider-failure', step: 'intent' }, query.answers)
       turn.reply(ref, clarificationRequestFor(step.notUnderstood), query.answers)
-      turn.nextStage = () => ({ stage: 'identified', customerId: customer.id, notUnderstood: step.notUnderstood })
+      turn.nextStage = () => ({
+        stage: 'identified',
+        customerId: customer.id,
+        notUnderstood: step.notUnderstood,
+        revalidated: !customer.active,
+      })
       return { status: 'CLARIFICATION_REQUESTED', responseSent: true }
     }
 
@@ -644,7 +765,12 @@ export class ProcessIncomingMessage {
         const step = clarificationStep(notUnderstood)
         if (step.kind === 'handoff') return this.handoffIn(turn, ref, { kind: 'not-understood' }, query.answers, { intent })
         turn.reply(ref, clarificationRequestFor(step.notUnderstood), query.answers)
-        turn.nextStage = () => ({ stage: 'identified', customerId: customer.id, notUnderstood: step.notUnderstood })
+        turn.nextStage = () => ({
+          stage: 'identified',
+          customerId: customer.id,
+          notUnderstood: step.notUnderstood,
+          revalidated: !customer.active,
+        })
         return { status: 'CLARIFICATION_REQUESTED', responseSent: true }
       }
       case 'approval':
@@ -708,10 +834,22 @@ export class ProcessIncomingMessage {
     } catch {
       return this.handoffIn(turn, ref, { kind: 'provider-failure', step: 'rewrite' }, answers, { intent })
     }
-    const check = checkRewrite(filled.template, draft, filled.literals, ordered)
+    let check = checkRewrite(filled.template, draft, filled.literals, ordered)
     if (!check.ok) {
-      turn.changes.rejectedDraft = { text: draft, answers }
-      return this.handoffIn(turn, ref, { kind: 'rewrite-rejected', detail: check.reason }, answers, { intent })
+      // Un solo reintento con el motivo del control (texto fijo del checker, sin contenido
+      // del cliente): si vuelve a fallar, se deriva como hasta ahora.
+      try {
+        draft = await this.ai.rewrite({ template: filled.template, question, rejection: check.reason })
+        check = checkRewrite(filled.template, draft, filled.literals, ordered)
+      } catch {
+        // El borrador rechazado por el control sigue siendo una respuesta no enviada.
+        turn.changes.rejectedDraft = { text: draft, answers }
+        return this.handoffIn(turn, ref, { kind: 'provider-failure', step: 'rewrite' }, answers, { intent })
+      }
+      if (!check.ok) {
+        turn.changes.rejectedDraft = { text: draft, answers }
+        return this.handoffIn(turn, ref, { kind: 'rewrite-rejected', detail: check.reason }, answers, { intent })
+      }
     }
 
     turn.reply(ref, draft, answers)

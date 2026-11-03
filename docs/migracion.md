@@ -54,8 +54,53 @@ La planilla no registra cuotas ni pagos (RF-CAR-02): la migración no escribe en
   ```
 
   No escribe nada si la tabla `cuota` ya tiene filas, si falta POL-00123 o POL-00124, o si una de las pólizas elegidas no tiene prima. Si no, carga todo en una transacción e informa cuántas cuotas cargó por póliza y cuántas quedaron sin pagar.
-- **Cómo se quitan:** mientras sean las únicas cuotas, vaciando la tabla (`DELETE FROM cuota`). Antes de cargar cuotas reales hay que vaciarla: la base no distingue unas de otras.
+- **Cómo se quitan:** mientras sean las únicas cuotas, vaciando la tabla (`DELETE FROM cuota`). Si ya se dieron de alta pólizas desde el panel, sus cuotas también se borrarían: la base no distingue unas de otras. Antes de cargar cuotas reales hay que vaciarla.
 - **A tener en cuenta:** como la cartera migrada está vencida por fecha, todas las cuotas de ejemplo quedan vencidas y la demo no muestra cuotas por vencer. El cliente recibe estos importes como reales, igual que la dirección y el teléfono de ejemplo. La prima de POL-00124 no tenía símbolo y se tomó como pesos.
+
+## Cuotas del alta de póliza
+
+El alta de póliza desde Base de Clientes registra el plan de cuotas en la misma transacción (RF-CAR-02), con la regla de las cuotas de ejemplo (`backend/src/domain/installments.ts`): una cuota por mes desde el inicio de la vigencia, el mismo día de cada mes (el último si el mes es más corto), mientras venza antes del vencimiento, con la prima mensual como importe. Por eso la prima es obligatoria en el alta.
+
+- Las cuotas con vencimiento anterior a la fecha de carga (en Argentina) ya vencieron: quien carga declara cuántas están pagas, empezando por la más antigua. El sistema no supone pagos ni deuda. Las demás quedan sin pagar.
+- **Supuestos provisorios**, hasta que la agencia informe cómo son sus cuotas: el plan mensual por el importe de la prima, y la fecha de pago de una cuota declarada paga, que es su vencimiento (el pago real no se conoce).
+- Editar la prima o la vigencia de una póliza no regenera sus cuotas.
+
+## Datos de demostración
+
+Para la demo hay una carga aparte que **borra la cartera y las conversaciones** y carga clientes ficticios armados para probar los casos límite del asistente. No es la migración de la planilla: los datos históricos se pierden hasta volver a cargarlos (ver abajo).
+
+- **Qué borra:** clientes, teléfonos, pólizas, cuotas, coberturas, bienes, siniestros, prospectos, conversaciones, casos, mensajes, respuestas, solicitudes y alertas. **Qué deja:** los catálogos, los parámetros, el horario de atención y los usuarios.
+- **Qué carga:** son datos ficticios. Los clientes llevan el apellido «Demo», los DNI son de la serie 991000xx y cada póliza dice «Dato ficticio de demostración» en sus observaciones. Las fechas se calculan desde el día de la carga, así siempre hay cuotas vencidas y por vencer.
+
+  | Cliente | DNI | Teléfono | Pólizas | Caso límite |
+  |---|---|---|---|---|
+  | Lucía Demo | 99100001 | `DEMO_TELEFONO_CLIENTE`, solo ella | POL-00001 auto en pesos con 2 cuotas vencidas sin pagar; POL-00002 hogar en dólares al día; POL-00003 moto vencida por fecha, todo pago | Identificación sin DNI; vencimiento, estado, saldo y «mis pólizas» con varias pólizas y monedas |
+  | Martín Demo | 99100002 | `DEMO_TELEFONO_COMPARTIDO` | POL-00004 auto que empieza el día de la carga (solo cuotas por vencer); POL-00006 moto suspendida por mora con 3 cuotas vencidas sin pagar | Número compartido: pide el DNI |
+  | Sofía Demo | 99100003 | `DEMO_TELEFONO_COMPARTIDO` | POL-00005 vida sin prima ni cuotas | El saldo se deriva por dato ausente; DNI de otra persona desde el número compartido |
+  | Carlos Demo | 99100004 | ninguno | ninguna | «Ya soy cliente» + DNI desde un número no vinculado: cambio de teléfono |
+  | Elena Demo | 99100005 | ninguno (dada de baja) | ninguna | DNI de una clienta dada de baja |
+
+  El hilo del cliente nuevo (consulta, alta, aprobación, póliza y saldo) se prueba desde cualquier otro número. La primera póliza que se cargue desde el panel es POL-00007.
+- **Cómo se carga:** los dos números de WhatsApp de la demo se pasan por el entorno, sin guardarlos en el repo (solo dígitos, con el formato 54 + 9 + área + número). Si falta alguno, queda un número ficticio que no es de ningún WhatsApp y la carga lo avisa.
+
+  ```bash
+  docker compose exec backend npm run cargar-demo            # solo informa qué borraría
+  docker compose exec -e DEMO_TELEFONO_CLIENTE=549... -e DEMO_TELEFONO_COMPARTIDO=549... \
+    backend npm run cargar-demo -- --confirmar
+  docker compose restart backend
+  ```
+
+  Valida los números antes de borrar y hace el borrado y la carga en una transacción: si algo falla, la base queda como estaba. Se puede correr las veces que haga falta. No imprime DNI ni números completos.
+- **Cómo volver a los datos de la planilla:** `migrar-planilla` solo corre sobre una base sin clientes, así que hay que recrear la base. El volumen `seguros-castano_db_data` es solo de MySQL: la sesión de WhatsApp de WAHA está en `~/waha-sesion` y no se toca.
+
+  ```bash
+  docker compose stop backend db
+  docker compose rm -f db
+  docker volume rm seguros-castano_db_data
+  docker compose up -d
+  docker compose exec backend npm run migrar-planilla
+  docker compose exec backend npm run cargar-cuotas-ejemplo   # opcional
+  ```
 
 ## Usuarios
 

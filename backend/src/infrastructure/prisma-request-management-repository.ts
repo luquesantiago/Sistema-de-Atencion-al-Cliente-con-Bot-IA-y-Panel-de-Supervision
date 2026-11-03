@@ -3,6 +3,7 @@ import {
   RequestManagementError,
   type PageRequest,
   type PhoneChangeNotification,
+  type ProspectNotification,
   type PendingPhoneChange,
   type PendingProspect,
   type PhoneChangeDecisionInput,
@@ -134,7 +135,7 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
               id_usuario_asignado: true,
               fecha_toma: true,
               id_conversacion: true,
-              conversacion: { select: { telefono: { select: { id_telefono: true } } } },
+              conversacion: { select: { telefono: { select: { id_telefono: true, numero: true } } } },
             },
           },
         },
@@ -228,6 +229,7 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
         id: prospect.id_prospecto,
         decision: input.decision,
         casoId: prospect.caso.id_caso,
+        phone: prospect.caso.conversacion.telefono.numero,
         ...(customerId ? { clienteId: customerId } : {}),
       }
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
@@ -387,5 +389,41 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
       phone: request.caso.conversacion.telefono.numero,
       decision: request.estado_solicitud.nombre === 'aprobada' ? 'aprobar' : 'rechazar',
     }
+  }
+
+  // El aviso del alta aprobada queda en el caso del alta, como mensaje del asistente
+  // (RF-ATE-05), igual que el del cambio de teléfono.
+  public async recordProspectNotification(id: number, text: string, sentAt: Date): Promise<void> {
+    await this.prisma.$transaction(async (transaction) => {
+      const prospect = await transaction.prospecto.findUnique({
+        where: { id_prospecto: id },
+        select: { id_caso: true },
+      })
+      if (!prospect) throw new RequestManagementError(404, 'NOT_FOUND', 'No se encontró el prospecto.')
+      const origin = await transaction.origen_mensaje.findUnique({
+        where: { nombre: 'asistente' },
+        select: { id_origen_mensaje: true },
+      })
+      if (!origin) throw new Error('Falta el origen de mensaje asistente.')
+      await transaction.mensaje.create({
+        data: { id_caso: prospect.id_caso, id_origen_mensaje: origin.id_origen_mensaje, contenido: text, fecha_hora: sentAt },
+      })
+    })
+  }
+
+  public async getProspectNotification(id: number): Promise<ProspectNotification> {
+    const prospect = await this.prisma.prospecto.findUnique({
+      where: { id_prospecto: id },
+      select: {
+        id_prospecto: true,
+        estado_prospecto: { select: { nombre: true } },
+        caso: { select: { conversacion: { select: { telefono: { select: { numero: true } } } } } },
+      },
+    })
+    if (!prospect) throw new RequestManagementError(404, 'NOT_FOUND', 'No se encontró el prospecto.')
+    if (prospect.estado_prospecto.nombre !== 'confirmado') {
+      throw new RequestManagementError(409, 'CONFLICT', 'El alta no está aprobada: no hay un aviso de aprobación para enviar.')
+    }
+    return { id: prospect.id_prospecto, phone: prospect.caso.conversacion.telefono.numero }
   }
 }

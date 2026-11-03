@@ -6,6 +6,13 @@ import {
   type PolicyStatus,
   type Ramo,
 } from './customer.js'
+import {
+  installmentPlan,
+  monthlyDueDates,
+  overdueInstallments,
+  paidInstallmentsProblem,
+  type PlannedInstallment,
+} from './installments.js'
 import { RequestManagementError } from './request-management.js'
 
 // Ediciones de cartera desde el panel de supervisión (RF-CAR-01, RF-CAR-02,
@@ -25,6 +32,8 @@ const maxObservationsLength = 2_000
 // asegurada. En centavos enteros, para escribir sin punto decimal.
 const maxPremiumCents = 99_999_999_999_99
 const maxInsuredSumCents = 999_999_999_999_99
+// Una vigencia de más de 100 años no tiene sentido: es el techo de cuotas pagas declaradas.
+const maxPaidInstallments = 1_200
 
 export type CreateCustomerInput =
   | { kind: 'persona'; dni: string; lastName: string; firstName: string; phone?: string }
@@ -87,7 +96,10 @@ export type CreatePolicyInput = {
   // Fechas sin hora, aaaa-mm-dd. La vigencia siempre cierra.
   startDate: string
   expirationDate: string
-  premiumCents?: number | null
+  // Obligatoria en el alta: con ella se arma el plan de cuotas (RF-CAR-02).
+  premiumCents: number
+  // Cuántas de las cuotas ya vencidas al cargar están pagas. Solo hace falta si hay alguna.
+  paidInstallments?: number
   observations?: string | null
   // null o ausente: la póliza no asegura un bien (por ejemplo, vida).
   insuredItem?: InsuredItemInput | null
@@ -115,7 +127,8 @@ export interface CustomerEditRepository {
   deactivateCustomer(id: number): Promise<void>
   linkPhone(input: LinkPhoneInput): Promise<void>
   unlinkPhone(input: UnlinkPhoneInput): Promise<void>
-  createPolicy(input: CreatePolicyInput): Promise<number>
+  // Crea la póliza y sus cuotas en la misma transacción.
+  createPolicy(input: CreatePolicyInput, installments: PlannedInstallment[]): Promise<number>
   updatePolicy(input: UpdatePolicyInput): Promise<number>
   replaceCoverages(input: ReplaceCoveragesInput): Promise<number>
   listCatalogs(): Promise<Catalogs>
@@ -201,7 +214,7 @@ export function parseUnlinkPhone(customerId: number, phoneId: number): UnlinkPho
 export function parseCreatePolicy(customerId: number, value: unknown): CreatePolicyInput {
   const body = parseBody(value, [
     'number', 'companyId', 'ramo', 'status', 'currency',
-    'startDate', 'expirationDate', 'premiumCents', 'observations', 'insuredItem', 'coverages',
+    'startDate', 'expirationDate', 'premiumCents', 'paidInstallments', 'observations', 'insuredItem', 'coverages',
   ])
   // Se permiten en el listado para explicar el rechazo: si el navegador manda
   // uno de estos, el error tiene que decir que los fija el sistema.
@@ -226,6 +239,12 @@ export function parseCreatePolicy(customerId: number, value: unknown): CreatePol
   if (coverages.some((coverage) => coverage.id !== undefined)) {
     throw validationError('Las coberturas de una póliza nueva no pueden tener id.')
   }
+  // Sin prima no hay importe para las cuotas, y sin cuotas el asistente deriva el saldo.
+  if (body.premiumCents === undefined || body.premiumCents === null) {
+    throw validationError('La prima mensual es obligatoria para dar de alta una póliza.')
+  }
+  const premiumCents = parseCents(body.premiumCents, 'premiumCents', maxPremiumCents)
+  if (premiumCents === 0) throw validationError('La prima mensual tiene que ser mayor que cero.')
   const input: CreatePolicyInput = {
     customerId,
     ramo,
@@ -233,10 +252,11 @@ export function parseCreatePolicy(customerId: number, value: unknown): CreatePol
     currency,
     startDate,
     expirationDate,
+    premiumCents,
     coverages,
   }
-  if (body.premiumCents !== undefined && body.premiumCents !== null) {
-    input.premiumCents = parseCents(body.premiumCents, 'premiumCents', maxPremiumCents)
+  if (body.paidInstallments !== undefined && body.paidInstallments !== null) {
+    input.paidInstallments = parsePaidInstallments(body.paidInstallments)
   }
   if (body.observations !== undefined && body.observations !== null) {
     input.observations = parseName(body.observations, 'observations', maxObservationsLength)
@@ -250,6 +270,18 @@ export function parseCreatePolicy(customerId: number, value: unknown): CreatePol
     throw validationError('Las pólizas de vida no tienen bien asegurado.')
   }
   return input
+}
+
+// El plan de cuotas del alta (RF-CAR-02): las cuotas con vencimiento anterior a hoy en
+// Argentina son las vencidas, y de esas quedan pagas las que declara quien carga.
+export function createPolicyInstallments(input: CreatePolicyInput, today: string): PlannedInstallment[] {
+  const overdue = overdueInstallments(monthlyDueDates(input.startDate, input.expirationDate), today)
+  const problem = paidInstallmentsProblem(overdue, input.paidInstallments)
+  if (problem !== null) throw validationError(problem)
+  return installmentPlan(
+    { startDate: input.startDate, endDate: input.expirationDate, premiumCents: input.premiumCents },
+    input.paidInstallments ?? 0,
+  )
 }
 
 export function parseUpdatePolicy(id: number, value: unknown): UpdatePolicyInput {
@@ -436,6 +468,13 @@ function parseDateOnly(value: unknown, field: string): string {
 function parseCents(value: unknown, field: string, max: number): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > max) {
     throw validationError(`${field} debe ser un importe en centavos dentro del rango permitido.`)
+  }
+  return value
+}
+
+function parsePaidInstallments(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0 || value > maxPaidInstallments) {
+    throw validationError('paidInstallments debe ser una cantidad entera de cuotas, 0 o más.')
   }
   return value
 }
