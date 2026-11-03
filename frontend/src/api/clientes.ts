@@ -164,7 +164,10 @@ export type EntradaAltaPoliza = {
   /** Fechas sin hora, aaaa-mm-dd. */
   startDate: string
   expirationDate: string
-  premiumCents?: number | null
+  /** Obligatoria en el alta: con ella el sistema arma una cuota por mes de la vigencia. */
+  premiumCents: number
+  /** Cuántas de las cuotas ya vencidas al cargar están pagas; solo si hay alguna vencida. */
+  paidInstallments?: number
   observations?: string | null
   insuredItem?: DatoBienAsegurado | null
   coverages: EntradaCobertura[]

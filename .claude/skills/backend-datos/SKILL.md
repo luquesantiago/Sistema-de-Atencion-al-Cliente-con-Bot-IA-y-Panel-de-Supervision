@@ -82,4 +82,6 @@ docker compose exec backend npx prisma generate
 - Los CHECK de la base no aparecen en `schema.prisma` (Prisma no los representa): los sigue controlando MySQL.
 - Toda migración debe ser revisable y compatible con datos existentes o acompañarse de una estrategia de importación.
 - La importación histórica sigue `docs/migracion.md` y no modifica la planilla original. El Excel limpio está en `backend/planilla/`; el script lo lee desde ahí, dentro de `backend/`, porque el contenedor solo monta `./backend`. Los registros irresolubles (columna «migrar» = No, como las pólizas POL-00126 y POL-00131 del VW Gol) se omiten y quedan en la hoja Pendientes para carga manual.
+- La carga de la demo (`npm run cargar-demo -- --confirmar`, `backend/scripts/cargar-demo.ts`) borra la cartera y las conversaciones y carga clientes ficticios (`scripts/datos-demo.ts`); es una herramienta de demostración, no una baja de datos operativos. Los números de WhatsApp de la demo van por entorno (`DEMO_TELEFONO_CLIENTE`, `DEMO_TELEFONO_COMPARTIDO`), nunca en el repo. Cómo volver a la planilla: `docs/migracion.md`.
+- La regla del plan de cuotas está una sola vez, en `src/domain/installments.ts`: la usan el alta de póliza, las cuotas de ejemplo y la demo.
 - No almacenar secretos ni datos reales de clientes en fixtures, logs de desarrollo o migraciones.

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { Catalogos } from '../api/catalogos'
 import Dialogo from './Dialogo'
+import { cuotasVencidas, hoyEnArgentina, vencimientosMensuales } from '../cuotas'
 import type {
   DatoPoliza,
   EntradaAltaPoliza,
@@ -96,6 +97,8 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
   const [fechaInicio, setFechaInicio] = useState(poliza?.startDate ?? '')
   const [fechaVencimiento, setFechaVencimiento] = useState(poliza?.expirationDate ?? '')
   const [prima, setPrima] = useState(centosAPesos(poliza?.premiumCents ?? null))
+  // Solo en el alta: cuántas de las cuotas ya vencidas están pagas.
+  const [cuotasPagas, setCuotasPagas] = useState('')
   const [observaciones, setObservaciones] = useState(poliza?.observations ?? '')
   const [bien, setBien] = useState({
     conBien: poliza?.insuredItem !== null && poliza?.insuredItem !== undefined,
@@ -119,12 +122,17 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
   )
   const siguienteClave = useRef((poliza?.coverages.length ?? 0) + 1)
   const [errorLocal, setErrorLocal] = useState<string | null>(null)
-  const [campoConError, setCampoConError] = useState<'numero' | 'fechas' | 'prima' | 'bien' | null>(null)
+  const [campoConError, setCampoConError] = useState<'numero' | 'fechas' | 'prima' | 'pagas' | 'bien' | null>(null)
   const [coberturaConError, setCoberturaConError] = useState<{ indice: number; campo: 'plan' | 'suma' } | null>(null)
   const errorRef = useRef<HTMLParagraphElement>(null)
   const descripcionId = useId()
   const errorId = useId()
   const errorMostrado = errorLocal ?? error
+  // Con un inicio en el pasado, algunas cuotas ya vencieron: el sistema no
+  // supone si se pagaron, lo declara quien carga (la regla la decide el backend).
+  const vencidas = modo === 'alta'
+    ? cuotasVencidas(vencimientosMensuales(fechaInicio, fechaVencimiento), hoyEnArgentina())
+    : 0
   // Datos del bien que pide la categoría elegida; null si todavía no se eligió.
   const formatoBien = formatoDeBien(ramo)
   // Vida asegura a una persona, no a un bien: se desmarca sin guardar el dato.
@@ -159,6 +167,18 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
     if (prima.trim() && pesosACentos(prima) === null) {
       setErrorLocal('La cuota mensual tiene que ser un número mayor o igual a 0.')
       setCampoConError('prima')
+      return
+    }
+    const primaAlta = pesosACentos(prima)
+    if (modo === 'alta' && (primaAlta === null || primaAlta === 0)) {
+      setErrorLocal('Ingresá la cuota mensual: con ella se arman las cuotas de la póliza.')
+      setCampoConError('prima')
+      return
+    }
+    const pagas = Number(cuotasPagas)
+    if (vencidas > 0 && (!cuotasPagas.trim() || !Number.isInteger(pagas) || pagas < 0 || pagas > vencidas)) {
+      setErrorLocal(`Indicá cuántas de las ${vencidas} cuotas ya vencidas están pagas (de 0 a ${vencidas}).`)
+      setCampoConError('pagas')
       return
     }
     if (conBien && !bien.description.trim()) {
@@ -200,7 +220,7 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
           }
         : null,
     }
-    if (modo === 'alta') {
+    if (modo === 'alta' && primaAlta !== null) {
       onGuardar({
         ramo,
         status: estado,
@@ -208,10 +228,13 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
         startDate: fechaInicio,
         expirationDate: fechaVencimiento,
         ...datosOpcionales,
+        premiumCents: primaAlta,
+        ...(vencidas > 0 ? { paidInstallments: pagas } : {}),
         coverages: coberturasFinales,
       })
       return
     }
+    if (modo === 'alta') return
     const entrada: EntradaEdicionPoliza = {
       number: numero.trim(),
       ramo,
@@ -237,7 +260,7 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
       </h2>
       <p className="modal__descripcion" id={descripcionId}>
         {modo === 'alta'
-          ? 'La póliza queda en la ficha del cliente que ya está abierto. El número de póliza lo asigna el sistema y la compañía es la de la cartera.'
+          ? 'La póliza queda en la ficha del cliente que ya está abierto. El número de póliza lo asigna el sistema y la compañía es la de la cartera. Con la cuota mensual se registra una cuota por mes de la vigencia.'
           : 'Los cambios se aplican a la póliza de la cartera. Al guardar se pide confirmación con el resumen.'}
       </p>
 
@@ -368,9 +391,30 @@ export default function FormularioPoliza(props: FormularioPolizaProps) {
                 aria-invalid={campoConError === 'prima' || undefined}
                 aria-describedby={campoConError === 'prima' ? errorId : undefined}
                 placeholder="0.00"
+                required={modo === 'alta'}
               />
             </label>
           </div>
+          {modo === 'alta' && vencidas > 0 ? (
+            <label className="formulario__campo">
+              Cuotas ya pagas (de {vencidas} {vencidas === 1 ? 'vencida' : 'vencidas'})
+              <input
+                type="number"
+                min="0"
+                max={vencidas}
+                step="1"
+                inputMode="numeric"
+                value={cuotasPagas}
+                onChange={(evento) => {
+                  setCuotasPagas(evento.target.value)
+                  limpiarErrorLocal()
+                }}
+                aria-invalid={campoConError === 'pagas' || undefined}
+                aria-describedby={campoConError === 'pagas' ? errorId : undefined}
+                required
+              />
+            </label>
+          ) : null}
           <label className="formulario__campo">
             Observaciones
             <textarea

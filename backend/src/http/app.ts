@@ -101,6 +101,29 @@ export function createApp(
         decision: result.decision,
         casoId: result.casoId,
         ...(result.clienteId === undefined ? {} : { clienteId: result.clienteId }),
+        // Solo el alta aprobada se avisa al cliente (RF-ATE-05).
+        ...(result.notificationSent === undefined ? {} : { notificationSent: result.notificationSent }),
+        ...(result.notificationSent === false ? {
+          warning: 'El alta quedó registrada, pero no se pudo avisar al cliente por WhatsApp.',
+        } : {}),
+      })
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.post('/api/tramites/prospectos/:id/notificacion', async (request, response, next) => {
+    try {
+      if (request.body !== undefined && Object.keys(parseBody(request.body, [])).length > 0) {
+        throw new RequestManagementError(400, 'VALIDATION_ERROR', 'Este endpoint no acepta campos en el cuerpo.')
+      }
+      const result = await manageRequests.retryProspectNotification(parseId(request.params.id))
+      response.status(200).json({
+        id: result.id,
+        decision: result.decision,
+        notificationSent: result.notificationSent,
+        ...(result.notificationSent ? {} : {
+          warning: 'El alta está registrada, pero todavía no se pudo avisar al cliente por WhatsApp.',
+        }),
       })
     } catch (error) {
       handleRequestError(error, response, next)

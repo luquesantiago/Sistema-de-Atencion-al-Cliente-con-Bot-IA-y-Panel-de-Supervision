@@ -13,6 +13,7 @@ import {
   type UpdateCustomerInput,
   type UpdatePolicyInput,
 } from '../domain/customer-edits.js'
+import type { PlannedInstallment } from '../domain/installments.js'
 import { RequestManagementError } from '../domain/request-management.js'
 
 // El número de póliza es POL-<n> con 5 dígitos, como los de la cartera
@@ -118,7 +119,7 @@ export class PrismaCustomerEditRepository implements CustomerEditRepository {
     }))
   }
 
-  public async createPolicy(input: CreatePolicyInput): Promise<number> {
+  public async createPolicy(input: CreatePolicyInput, installments: PlannedInstallment[]): Promise<number> {
     return this.guard(() => this.prisma.$transaction(async (transaction) => {
       const customer = await transaction.cliente.findUnique({
         where: { id_cliente: input.customerId },
@@ -160,9 +161,7 @@ export class PrismaCustomerEditRepository implements CustomerEditRepository {
           moneda: { connect: { id_moneda: currency } },
           fecha_inicio: dateFromOnly(input.startDate),
           fecha_vencimiento: dateFromOnly(input.expirationDate),
-          prima_mensual: input.premiumCents === undefined || input.premiumCents === null
-            ? null
-            : centsToDecimal(input.premiumCents),
+          prima_mensual: centsToDecimal(input.premiumCents),
           observaciones: input.observations ?? null,
           ...(input.insuredItem === undefined || input.insuredItem === null
             ? {}
@@ -179,6 +178,8 @@ export class PrismaCustomerEditRepository implements CustomerEditRepository {
           },
         })
       }
+      // El plan de cuotas va en la misma transacción: sin cuotas la póliza no tiene saldo.
+      await transaction.cuota.createMany({ data: installmentRows(policy.id_poliza, installments) })
       return input.customerId
     }))
   }
@@ -414,6 +415,21 @@ async function currencyId(transaction: Transaction, currency: Currency): Promise
 }
 
 // Centavos enteros a DECIMAL(12,2) por texto, sin pasar por un flotante.
+// Una cuota paga lleva su vencimiento como fecha de pago: el pago real no se conoce
+// (supuesto documentado en docs/migracion.md, como en las cuotas de ejemplo).
+export function installmentRows(policyId: number, installments: PlannedInstallment[]) {
+  return installments.map((installment) => {
+    const dueDate = dateFromOnly(installment.dueDate)
+    return {
+      id_poliza: policyId,
+      numero_cuota: installment.number,
+      fecha_vencimiento: dueDate,
+      importe: centsToDecimal(installment.amountCents),
+      fecha_pago: installment.paid ? dueDate : null,
+    }
+  })
+}
+
 function centsToDecimal(cents: number): Prisma.Decimal {
   const text = `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`
   return new Prisma.Decimal(text)
