@@ -200,6 +200,7 @@ export class OpenAiCompatibleClient implements AiClient {
     if (rawField === dataChangeSentinel) return { field: null, value: null }
     const value = rawValue.trim()
     return { field: rawField, value: value.length > 0 ? value : null }
+}
   public async isThreat(text: string): Promise<boolean> {
     const schema: JsonSchema = {
       name: 'amenaza',

@@ -556,7 +556,11 @@ private async recordDecisionNotification(id: number, requestType: string, text: 
         throw new RequestManagementError(404, 'NOT_FOUND', `No se encontró la solicitud de ${requestType}.`)
       }
       
-      // (Asumo que acá tenés la consulta que busca el "origin" del mensaje)
+      const origin = await transaction.origen_mensaje.findUnique({
+        where: { nombre: 'asistente' },
+        select: { id_origen_mensaje: true },
+      })
+      if (!origin) throw new Error('Falta el origen de mensaje asistente.')
       
       await transaction.mensaje.create({
         data: { id_caso: request.id_caso, id_origen_mensaje: origin.id_origen_mensaje, contenido: text, fecha_hora: sentAt },
@@ -574,7 +578,11 @@ private async recordDecisionNotification(id: number, requestType: string, text: 
       })
       if (!prospect) throw new RequestManagementError(404, 'NOT_FOUND', 'No se encontró el prospecto.')
 
-      // (Acá también debería estar la consulta del "origin")
+      const origin = await transaction.origen_mensaje.findUnique({
+        where: { nombre: 'asistente' },
+        select: { id_origen_mensaje: true },
+      })
+      if (!origin) throw new Error('Falta el origen de mensaje asistente.')
 
       await transaction.mensaje.create({
         data: { id_caso: prospect.id_caso, id_origen_mensaje: origin.id_origen_mensaje, contenido: text, fecha_hora: sentAt },
@@ -597,11 +605,4 @@ private async recordDecisionNotification(id: number, requestType: string, text: 
     }
     return { id: prospect.id_prospecto, phone: prospect.caso.conversacion.telefono.numero }
   }
-      const origin = await transaction.origen_mensaje.findUnique({
-        where: { nombre: 'asistente' },
-        select: { id_origen_mensaje: true },
-      })
-      if (!origin) throw new Error('Falta el origen de mensaje asistente.')
-      await transaction.mensaje.create({
-
 }

@@ -110,6 +110,7 @@ public listPendingDataChanges(page: PageRequest): Promise<PendingDataChange[]> {
       notification.decision,
     )
     return { id: notification.id, decision: notification.decision, notificationSent }
+  }
   // Mismo patrón que el aviso del cambio de teléfono: el envío va después de la transacción,
   // así una falla de WhatsApp no deshace el alta.
   private async sendProspectNotification(id: number, phone: string) {
@@ -126,6 +127,7 @@ public listPendingDataChanges(page: PageRequest): Promise<PendingDataChange[]> {
     }
     return true
   }
+  
 
   private async sendPhoneChangeNotification(id: number, phone: string, decision: 'aprobar' | 'rechazar') {
     const text = decision === 'aprobar'
