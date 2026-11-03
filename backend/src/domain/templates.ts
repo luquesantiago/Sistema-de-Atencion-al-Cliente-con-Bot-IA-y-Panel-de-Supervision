@@ -89,7 +89,11 @@ export const prospectHandoffMessage =
   'Gracias por compartir sus datos y la foto de su DNI. Un miembro autorizado del equipo revisará la solicitud y se comunicará con usted para completar el alta.'
 
 export const phoneChangePendingMessage =
-  'Verificamos sus datos. La actualización de este número quedó pendiente de aprobación por un miembro del equipo; le informaremos la decisión por este WhatsApp.'
+  'Verificamos sus datos. La actualización de este número quedó pendiente de aprobación por un miembro del equipo; le informaremos la decisión por este WhatsApp. Una vez aprobada, podremos responder sus consultas sobre sus pólizas.'
+
+// Mientras la actualización sigue pendiente, el número todavía no identifica al cliente.
+export const phoneChangeStillPendingMessage =
+  'La actualización de este número sigue pendiente de aprobación por un miembro del equipo. Una vez aprobada, podremos responder sus consultas sobre sus pólizas; le informaremos la decisión por este WhatsApp.'
 
 // Respuesta fija a lo que no tiene que ver con la agencia, incluidas las preguntas sobre
 // cómo funciona el asistente: no deriva ni revela nada del sistema.

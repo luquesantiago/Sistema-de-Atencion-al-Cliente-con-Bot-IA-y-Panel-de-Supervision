@@ -26,6 +26,7 @@ import {
   notInsuranceAndNewCustomerOffer,
   notInsuranceMessage,
   phoneChangePendingMessage,
+  phoneChangeStillPendingMessage,
   prospectHandoffMessage,
   repeatedDniRequest,
   useNewPhoneRequest,
@@ -257,6 +258,41 @@ describe('número vinculado (RF-ATE-03, RF-CAR-03)', () => {
     await expect(send('¿me escuchan? 15/11/2026')).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
     expect(lastText()).toBe(repeatedDniRequest)
   })
+
+  it('desvinculado durante la conversación: el mensaje siguiente se atiende como el primero de un número no vinculado', async () => {
+    link(phone, ana)
+    ai.intents.set('¿cuándo vence?', 'vencimiento')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'ANSWER_SENT' })
+    customers.unlinkPhone(phone, ana.id)
+    ai.intents.set('¿y el estado?', 'estado de póliza')
+    await expect(send('¿y el estado?')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REQUESTED' })
+    expect(lastText()).toBe(customerStatusQuestion)
+    expect(store.snapshot().conversations).toHaveLength(1)
+
+    // Su DNI desde el número ya desvinculado pide el cambio de teléfono, como desde un número nuevo.
+    ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
+    await send('ya soy cliente')
+    await expect(send(ana.dni)).resolves.toEqual({ status: 'PHONE_CHANGE_PENDING', responseSent: true })
+    expect(store.snapshot().phoneChanges).toMatchObject([{ customerId: ana.id, phone, status: 'pendiente' }])
+  })
+
+  it('identificado por DNI en un número compartido: desvincular a otro cliente no corta la atención', async () => {
+    await identifyShared(ana)
+    customers.unlinkPhone(phone, bruno.id)
+    ai.intents.set('¿cuándo vence?', 'vencimiento')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'ANSWER_SENT' })
+    expect(lastText()).toContain('POL-90001')
+  })
+
+  it('identificado por DNI en un número compartido: si se lo desvincula, vuelve a identificarse', async () => {
+    await identifyShared(ana)
+    customers.unlinkPhone(phone, ana.id)
+    ai.intents.set('¿cuándo vence?', 'vencimiento')
+    // Queda vinculado solo a Bruno: como en una conversación nueva, el número lo identifica a él.
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'ANSWER_SENT' })
+    expect(lastText()).toContain('POL-90003')
+    expect(lastText()).not.toContain('POL-90001')
+  })
 })
 
 describe('otro DNI en una conversación identificada', () => {
@@ -414,17 +450,29 @@ describe('DNI no reconocido (RF-ATE-03)', () => {
 
 describe('cambio de teléfono (RF-CAR-05)', () => {
   async function requestFromUnlinked(query = '¿en qué estado está mi póliza?') {
+    return requestFromUnlinkedWith(query, 'estado de póliza')
+  }
+
+  async function requestFromUnlinkedWith(query: string, intent: Intent) {
     ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
-    ai.intents.set(query, 'estado de póliza')
+    ai.intents.set(query, intent)
     await send(query)
     await send('ya soy cliente')
     return send(ana.dni)
   }
 
-  it('desde un número no vinculado queda la solicitud en un caso propio, sigue atendiendo y no vincula el número', async () => {
-    await expect(requestFromUnlinked()).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING', answer: 'ANSWER_SENT' })
-    expect(whatsapp.textsTo(phone).slice(-2)[0]).toBe(phoneChangePendingMessage)
-    expect(lastText()).toContain('POL-90001 (auto): activa.')
+  function requestCaseId() {
+    const requestCase = store.snapshot().cases.find((item) => item.type === 'cambio de teléfono')
+    if (!requestCase) throw new Error('No hay caso de cambio de teléfono')
+    return requestCase.id
+  }
+
+  it('desde un número no vinculado queda la solicitud en un caso propio, sin responder la consulta ni vincular el número', async () => {
+    const result = await requestFromUnlinked()
+    expect(result).toEqual({ status: 'PHONE_CHANGE_PENDING', responseSent: true })
+    expect(lastText()).toBe(phoneChangePendingMessage)
+    expect(whatsapp.textsTo(phone).join('\n')).not.toContain('POL-90001')
+    expect(ai.rewritten).toEqual([])
     expect(await customers.linkedCustomerIds(phone)).toEqual([])
 
     const conversation = await openConversation()
@@ -432,31 +480,95 @@ describe('cambio de teléfono (RF-CAR-05)', () => {
     const requestCase = conversation.cases.find((item) => item.type === 'cambio de teléfono')
     expect(requestCase).toMatchObject({ handedOff: false, hasPending: true })
     expect(store.snapshot().phoneChanges).toMatchObject([{ customerId: ana.id, phone, status: 'pendiente', caseId: requestCase?.id }])
-    const queryCase = conversation.cases.find((item) => item.type === 'estado de póliza')
+    expect(conversation.cases.find((item) => item.type === 'estado de póliza')).toBeUndefined()
     expect(conversation.messages.filter((message) => message.caseId === requestCase?.id).map((message) => message.text))
       .toEqual([ana.dni, phoneChangePendingMessage])
-    expect(conversation.messages.find((message) => message.text.includes('POL-90001'))?.caseId).toBe(queryCase?.id)
-
-    ai.intents.set('gracias', 'saludo')
-    await expect(send('gracias')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
   })
 
-  it('sin consulta guardada manda el aviso y la bienvenida, sin repetir el Hola de la charla', async () => {
+  it('sin consulta guardada manda solo el aviso, sin la bienvenida', async () => {
     ai.customerStatuses.set('sí', 'EXISTING_CUSTOMER')
     await send('123')
     await send('sí')
-    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING', answer: 'WELCOME_SENT' })
-    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([phoneChangePendingMessage, welcomeMessage(ana, false)])
-    expect(lastText()).toContain('Gracias, Ana')
-    expect(lastText()).not.toContain('Hola')
+    await expect(send(ana.dni)).resolves.toEqual({ status: 'PHONE_CHANGE_PENDING', responseSent: true })
+    expect(lastText()).toBe(phoneChangePendingMessage)
+    expect(whatsapp.textsTo(phone).join('\n')).not.toContain('Ana')
   })
 
-  it('si ya hay una solicitud pendiente, no se crea otra', async () => {
+  it('la consulta guardada de un siniestro se deriva después del aviso', async () => {
+    ai.urgencies.set('choqué con el auto', null)
+    await expect(requestFromUnlinkedWith('choqué con el auto', 'siniestro'))
+      .resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING', answer: 'HANDOFF_SENT' })
+    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([phoneChangePendingMessage, handoffMessage])
+    const conversation = await openConversation()
+    expect(conversation.suspended).toBe(true)
+    expect(conversation.cases.find((item) => item.handedOff)?.type).toBe('siniestro')
+    expect(store.snapshot().phoneChanges).toMatchObject([{ status: 'pendiente' }])
+  })
+
+  it('mientras está pendiente, las consultas de la cartera reciben el aviso sin datos ni redacción', async () => {
+    await requestFromUnlinked()
+    ai.rewritten.length = 0
+    ai.intents.set('¿cuándo vence?', 'vencimiento')
+    ai.intents.set('gracias', 'saludo')
+    await expect(send('¿cuándo vence?')).resolves.toEqual({ status: 'PHONE_CHANGE_STILL_PENDING', responseSent: true })
+    expect(lastText()).toBe(phoneChangeStillPendingMessage)
+    await expect(send('gracias')).resolves.toMatchObject({ status: 'PHONE_CHANGE_STILL_PENDING' })
+    expect(ai.rewritten).toEqual([])
+    expect(whatsapp.textsTo(phone).join('\n')).not.toContain('POL-9000')
+
+    const conversation = await openConversation()
+    expect(conversation.suspended).toBe(false)
+    const requestCase = conversation.cases.find((item) => item.type === 'cambio de teléfono')
+    expect(conversation.messages.filter((message) => message.caseId === requestCase?.id).map((message) => message.text))
+      .toEqual([ana.dni, phoneChangePendingMessage])
+  })
+
+  it('mientras está pendiente, responde la información de la agencia', async () => {
+    await requestFromUnlinked()
+    ai.intents.set('¿dónde están?', 'información de la agencia')
+    await expect(send('¿dónde están?')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'información de la agencia' })
+    expect(lastText()).toContain('Ficticia 123')
+  })
+
+  it('mientras está pendiente, un reclamo se deriva', async () => {
+    await requestFromUnlinked()
+    ai.intents.set('quiero hacer un reclamo', 'reclamo')
+    await expect(send('quiero hacer un reclamo')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'intención: reclamo' })
+    expect(lastText()).toBe(handoffMessage)
+    expect((await openConversation()).suspended).toBe(true)
+  })
+
+  it('mientras está pendiente, si el proveedor de IA falla, manda el aviso', async () => {
+    await requestFromUnlinked()
+    ai.classifyError = new Error('Groq no respondió')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'PHONE_CHANGE_STILL_PENDING' })
+    expect(lastText()).toBe(phoneChangeStillPendingMessage)
+  })
+
+  it('aprobado en la misma conversación: el número ya identifica al cliente', async () => {
+    await requestFromUnlinked()
+    link(phone, ana)
+    store.closeCase(requestCaseId(), now)
+    ai.intents.set('¿cuándo vence?', 'vencimiento')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'vencimiento' })
+    expect(lastText()).toContain('POL-90001 (auto): vence el 15/03/2027.')
+  })
+
+  it('rechazado en la misma conversación: vuelve a preguntar si ya es cliente', async () => {
+    await requestFromUnlinked()
+    store.closeCase(requestCaseId(), now, 'rechazada')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'CUSTOMER_STATUS_REQUESTED' })
+    expect(lastText()).toBe(customerStatusQuestion)
+  })
+
+  it('si ya hay una solicitud pendiente, no se crea otra y en la conversación nueva sigue pendiente', async () => {
     await requestFromUnlinked()
     later(31)
     await expect(requestFromUnlinked('¿cuál es el estado?')).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING' })
-    expect(lastText()).toContain('POL-90001')
+    expect(lastText()).toBe(phoneChangePendingMessage)
     expect(store.snapshot().phoneChanges).toHaveLength(1)
+    ai.intents.set('¿cuándo vence?', 'vencimiento')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'PHONE_CHANGE_STILL_PENDING' })
   })
 
   it('el pedido desde un número vinculado pide escribir desde el nuevo, sin silenciar', async () => {
@@ -1054,7 +1166,7 @@ describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'no se entendió la consulta' })
   })
 
-  it('con la solicitud de cambio de teléfono pendiente, ni los mensajes ni la derivación van al caso de la solicitud', async () => {
+  it('con la solicitud de cambio de teléfono pendiente, no repregunta ni deriva, y los mensajes no van al caso de la solicitud', async () => {
     ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
     ai.intents.set('eso', 'no se entiende')
     await send('123')
@@ -1062,14 +1174,14 @@ describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
     await expect(send(ana.dni)).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING' })
     await send('eso')
     await send('eso')
-    await expect(send('eso')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'no se entendió la consulta' })
+    await expect(send('eso')).resolves.toMatchObject({ status: 'PHONE_CHANGE_STILL_PENDING' })
 
     const conversation = await openConversation()
     const requestCase = conversation.cases.find((item) => item.type === 'cambio de teléfono')
     expect(requestCase).toMatchObject({ handedOff: false, hasPending: true })
     expect(conversation.messages.filter((message) => message.caseId === requestCase?.id).map((message) => message.text))
       .not.toContain('eso')
-    expect(conversation.cases.find((item) => item.handedOff)?.type).toBeNull()
+    expect(conversation.cases.some((item) => item.handedOff)).toBe(false)
   })
 
   it.each(['¿cómo pago?', 'necesito una grúa'])('«%s», con «otra consulta», deriva', async (text) => {
@@ -1487,7 +1599,7 @@ describe('información de la agencia antes de identificarse (RF-ATE-06, RF-ATE-0
 
     ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
     await expect(send('ya soy cliente')).resolves.toMatchObject({ status: 'DNI_REQUESTED' })
-    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING', answer: 'WELCOME_SENT' })
+    await expect(send(ana.dni)).resolves.toEqual({ status: 'PHONE_CHANGE_PENDING', responseSent: true })
   })
 
   it('esperando la respuesta a si ya es cliente: la responde, repite la pregunta y la etapa no cambia', async () => {

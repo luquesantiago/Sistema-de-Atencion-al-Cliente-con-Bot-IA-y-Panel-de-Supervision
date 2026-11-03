@@ -106,6 +106,12 @@ export class InMemoryCustomerRepository implements CustomerRepository {
     this.links.push({ phone, customerId })
   }
 
+  // Lo que hace la desvinculación desde Base de Clientes o al aprobar un cambio de teléfono.
+  public unlinkPhone(phone: string, customerId: number): void {
+    const index = this.links.findIndex((link) => link.phone === phone && link.customerId === customerId)
+    if (index >= 0) this.links.splice(index, 1)
+  }
+
   // Vincula un teléfono con su id de teléfono. El mismo número puede estar en dos
   // clientes: así se prueba que la búsqueda lo devuelva a los dos (RF-CAR-03).
   public addPhoneLink(customerId: number, phoneId: number, number: string): void {
