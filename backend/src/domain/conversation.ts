@@ -1,4 +1,5 @@
 import type { ContextMessage } from './ai-client.js'
+import type { DataChangeTargetField } from './data-change.js'
 import { maskDni } from './dni.js'
 import type { Intent } from './intent.js'
 import type { RiskLevel } from './risk-level.js'
@@ -100,6 +101,9 @@ export type ConversationChanges = {
   prospect?: { case: CaseRef; name: string; dni: string }
   // Se crea solo si el cliente no tiene ya una solicitud pendiente para ese número.
   phoneChangeRequest?: { case: CaseRef; customerId: number; riskLevel: RiskLevel }
+  // Solicitud de cambio de nombre o apellido en Trámites (change cambio-datos-cliente): se
+  // crea solo si el cliente no tiene ya una pendiente para ese mismo dato. Sin handoff.
+  dataChangeRequest?: { case: CaseRef; customerId: number; field: DataChangeTargetField; value: string; riskLevel: RiskLevel }
 }
 
 export type SavedConversation = {

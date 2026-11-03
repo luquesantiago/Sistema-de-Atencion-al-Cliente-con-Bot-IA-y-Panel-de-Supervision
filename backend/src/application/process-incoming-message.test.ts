@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgencyInfo } from '../domain/agency-info.js'
-import type { AiClient, ContextMessage, CustomerStatus, IntentClassification, RewriteInput } from '../domain/ai-client.js'
+import type { AiClient, ContextMessage, CustomerStatus, DataChangeExtraction, DataChangeField, IntentClassification, RewriteInput } from '../domain/ai-client.js'
 import type { Customer, CustomerPolicy } from '../domain/customer.js'
 import type { Intent } from '../domain/intent.js'
 import type { Urgency } from '../domain/risk-level.js'
@@ -11,6 +11,8 @@ import {
   clarificationRequests,
   customerStatusQuestion,
   customerStatusRetryQuestion,
+  dataChangeFieldQuestion,
+  dataChangeValueQuestion,
   existingCustomerDniRequest,
   firstDniRequest,
   handoffMessage,
@@ -88,6 +90,10 @@ class FakeAi implements AiClient {
   public urgencies = new Map<string, Urgency | null>()
   public classifyError: Error | null = null
   public rewriteResult: ((input: RewriteInput) => string) | Error = (input) => input.template
+  // Extracción de cambio de datos por texto; sin entrada, no se sabe qué campo cambiar.
+  public dataChangeResults = new Map<string, DataChangeExtraction>()
+  public dataChangeError: Error | null = null
+  public readonly dataChangeCalls: Array<{ text: string; pendingField: DataChangeField | null }> = []
 
   public async classifyCustomerStatus(reply: string): Promise<CustomerStatus> {
     this.customerStatusClassified.push(reply)
@@ -101,6 +107,16 @@ class FakeAi implements AiClient {
     if (this.classifyError) throw this.classifyError
     const intent = this.decide?.(text, context) ?? this.intents.get(text) ?? 'otra consulta'
     return { intent, urgency: this.urgencies.get(text) ?? null }
+  }
+
+  public async extractDataChange(
+    text: string,
+    _context: readonly ContextMessage[],
+    pendingField: DataChangeField | null = null,
+  ): Promise<DataChangeExtraction> {
+    this.dataChangeCalls.push({ text, pendingField })
+    if (this.dataChangeError) throw this.dataChangeError
+    return this.dataChangeResults.get(text) ?? { field: null, value: null }
   }
 
   public async rewrite(input: RewriteInput): Promise<string> {
@@ -468,6 +484,152 @@ describe('cambio de teléfono (RF-CAR-05)', () => {
     expect((await openConversation()).suspended).toBe(false)
     ai.intents.set('¿cuándo vence?', 'vencimiento')
     await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'ANSWER_SENT' })
+  })
+})
+
+describe('cambio de datos', () => {
+  // Deja a Ana identificada por el número vinculado a un solo cliente.
+  async function identifyAna() {
+    link(phone, ana)
+    ai.intents.set('¿cuándo vence mi seguro?', 'vencimiento')
+    await send('¿cuándo vence mi seguro?')
+    ai.classified.length = 0
+    ai.rewritten.length = 0
+    ai.dataChangeCalls.length = 0
+  }
+
+  // Un mensaje que clasifica como cambio de datos con la extracción indicada.
+  async function sendDataChange(text: string, extraction: DataChangeExtraction = { field: null, value: null }) {
+    ai.intents.set(text, 'cambio de datos')
+    ai.dataChangeResults.set(text, extraction)
+    return send(text)
+  }
+
+  it('un pedido completo crea la solicitud en Trámites, avisa sin derivar y sigue atendiendo', async () => {
+    await identifyAna()
+    await expect(sendDataChange('quiero cambiar mi apellido a Gómez', { field: 'apellido', value: 'Gómez' }))
+      .resolves.toMatchObject({ status: 'DATA_CHANGE_NOTICE_SENT', responseSent: true })
+    expect(lastText()).toBe(approvalNotice)
+    expect(ai.rewritten).toEqual([])
+
+    const conversation = await openConversation()
+    expect(conversation).toMatchObject({ customerId: ana.id, suspended: false })
+    const requestCase = conversation.cases.find((item) => item.type === 'cambio de datos')
+    expect(requestCase).toMatchObject({ handedOff: false, hasPending: true })
+    expect(store.snapshot().dataChanges).toMatchObject([{
+      customerId: ana.id,
+      field: 'apellido',
+      value: 'Gómez',
+      status: 'pendiente',
+      caseId: requestCase?.id,
+    }])
+    expect(conversation.messages.filter((message) => message.caseId === requestCase?.id).map((message) => message.text))
+      .toContain('quiero cambiar mi apellido a Gómez')
+
+    // La conversación no queda en silencio: el asistente sigue respondiendo.
+    ai.intents.set('gracias', 'saludo')
+    await expect(send('gracias')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
+    expect((await openConversation()).suspended).toBe(false)
+  })
+
+  it('sin saber qué dato cambiar se lo pregunta, después pide el valor y recién ahí arma la solicitud', async () => {
+    await identifyAna()
+    await expect(sendDataChange('quiero hacer un cambio')).resolves.toMatchObject({ status: 'DATA_CHANGE_REQUESTED' })
+    expect(lastText()).toBe(dataChangeFieldQuestion(0))
+    expect(ai.dataChangeCalls.at(-1)).toMatchObject({ pendingField: null })
+
+    ai.dataChangeResults.set('mi nombre', { field: 'nombre', value: null })
+    await expect(send('mi nombre')).resolves.toMatchObject({ status: 'DATA_CHANGE_REQUESTED' })
+    expect(lastText()).toBe(dataChangeValueQuestion('nombre', 0))
+    expect(ai.dataChangeCalls.at(-1)).toMatchObject({ pendingField: null })
+    expect(store.snapshot().dataChanges).toHaveLength(0)
+
+    ai.dataChangeResults.set('Ana María', { field: 'nombre', value: 'Ana María' })
+    await expect(send('Ana María')).resolves.toMatchObject({ status: 'DATA_CHANGE_NOTICE_SENT' })
+    expect(ai.dataChangeCalls.at(-1)).toMatchObject({ pendingField: 'nombre' })
+    expect(lastText()).toBe(approvalNotice)
+    expect(store.snapshot().dataChanges).toMatchObject([{ field: 'nombre', value: 'Ana María', status: 'pendiente' }])
+  })
+
+  it('tres mensajes seguidos sin entender en el estado derivan con la plantilla habitual', async () => {
+    await identifyAna()
+    await sendDataChange('quiero hacer un cambio')
+
+    ai.intents.set('¿qué cosa?', 'cambio de datos')
+    await expect(send('¿qué cosa?')).resolves.toMatchObject({ status: 'DATA_CHANGE_REQUESTED' })
+    expect(lastText()).toBe(dataChangeFieldQuestion(1))
+
+    ai.intents.set('no sé qué decirle', 'cambio de datos')
+    await expect(send('no sé qué decirle')).resolves.toMatchObject({ status: 'DATA_CHANGE_REQUESTED' })
+    expect(lastText()).toBe(dataChangeFieldQuestion(2))
+
+    ai.intents.set('igual que antes', 'cambio de datos')
+    await expect(send('igual que antes')).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
+    expect(lastText()).toBe(handoffMessage)
+    expect((await openConversation()).suspended).toBe(true)
+    expect(store.snapshot().dataChanges).toHaveLength(0)
+  })
+
+  it('una consulta distinta en el estado sale del flujo y se responde con la clasificación ya hecha', async () => {
+    await identifyAna()
+    await sendDataChange('quiero hacer un cambio')
+    expect(ai.dataChangeCalls).toHaveLength(1)
+    const clasificaciones = ai.classified.length
+
+    ai.intents.set('¿cuándo vence mi póliza?', 'vencimiento')
+    await expect(send('¿cuándo vence mi póliza?')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'vencimiento' })
+    expect(lastText()).toContain('POL-90001')
+    // Una sola clasificación para ese mensaje: answerQuery no vuelve a preguntar al modelo.
+    expect(ai.classified).toHaveLength(clasificaciones + 1)
+
+    // La sesión quedó identificada: el próximo mensaje ya no pasa por la extracción.
+    const extracciones = ai.dataChangeCalls.length
+    ai.intents.set('gracias', 'saludo')
+    await expect(send('gracias')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
+    expect(ai.dataChangeCalls).toHaveLength(extracciones)
+    expect(store.snapshot().dataChanges).toHaveLength(0)
+  })
+
+  it('una falla del proveedor al extraer en el estado repregunta sin mencionarla y recién al tercero deriva', async () => {
+    await identifyAna()
+    await sendDataChange('quiero hacer un cambio')
+
+    ai.dataChangeError = new Error('el proveedor no respondió')
+    await expect(send('alguno')).resolves.toMatchObject({ status: 'DATA_CHANGE_REQUESTED' })
+    expect(lastText()).toBe(dataChangeFieldQuestion(1))
+    await expect(send('alguno más')).resolves.toMatchObject({ status: 'DATA_CHANGE_REQUESTED' })
+    expect(lastText()).toBe(dataChangeFieldQuestion(2))
+    await expect(send('y otra vez')).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
+    expect(lastText()).toBe(handoffMessage)
+    expect(whatsapp.textsTo(phone).join(' ')).not.toMatch(/proveedor|falla|error/i)
+    expect(store.snapshot().dataChanges).toHaveLength(0)
+  })
+
+  it('un teléfono pedido como dato pide escribir desde el nuevo, sin registrar solicitud', async () => {
+    await identifyAna()
+    await expect(sendDataChange('quiero cambiar mi teléfono', { field: 'telefono', value: '5491122334455' }))
+      .resolves.toMatchObject({ status: 'NEW_PHONE_REQUESTED', intent: 'cambio de teléfono' })
+    expect(lastText()).toBe(useNewPhoneRequest)
+    expect(store.snapshot().dataChanges).toHaveLength(0)
+    expect((await openConversation()).suspended).toBe(false)
+
+    ai.intents.set('gracias', 'saludo')
+    await expect(send('gracias')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'saludo' })
+  })
+
+  it('una sola solicitud pendiente por cliente y por dato; un campo distinto sí crea otra', async () => {
+    await identifyAna()
+    await sendDataChange('quiero cambiar mi apellido a Gómez', { field: 'apellido', value: 'Gómez' })
+
+    await expect(sendDataChange('otro pedido de apellido a Pérez', { field: 'apellido', value: 'Pérez' }))
+      .resolves.toMatchObject({ status: 'DATA_CHANGE_NOTICE_SENT' })
+    expect(store.snapshot().dataChanges).toHaveLength(1)
+    expect(store.snapshot().dataChanges[0]).toMatchObject({ field: 'apellido', value: 'Gómez' })
+
+    await expect(sendDataChange('ahora quiero cambiar mi nombre', { field: 'nombre', value: 'Ana María' }))
+      .resolves.toMatchObject({ status: 'DATA_CHANGE_NOTICE_SENT' })
+    expect(store.snapshot().dataChanges).toHaveLength(2)
+    expect(store.snapshot().dataChanges.map((request) => request.field)).toEqual(['apellido', 'nombre'])
   })
 })
 

@@ -37,6 +37,9 @@ export function queryTypeRiskLevel(type: QueryType | null): RiskLevel | null {
     case 'modificación':
       return 'medio'
     case 'cambio de teléfono':
+    // El cambio de datos personal también es un dato de cartera: nivel bajo, sin la
+    // alerta «Pedido de acción crítica» (mismo criterio que la regla 9).
+    case 'cambio de datos':
       return 'bajo'
     case 'saldo':
     case 'vencimiento':

@@ -1,4 +1,5 @@
 import type { Customer, CustomerPolicy } from './customer.js'
+import type { DataChangeTargetField } from './data-change.js'
 
 // Textos del asistente (design.md, decisión 4). Los fijos se envían tal cual; los de
 // póliza y la cortesía pasan por la redacción del modelo y por checkRewrite.
@@ -116,6 +117,32 @@ export function clarificationRequestFor(step: number): string {
 
 export const useNewPhoneRequest =
   'Para solicitar un cambio de teléfono, escríbanos desde el nuevo número. Así podremos verificarlo antes de iniciar el trámite.'
+
+// Preguntas del flujo de cambio de datos (change cambio-datos-cliente): una redacción
+// distinta por intento, en versión de usted y sin pasar por la redacción de la IA.
+export const dataChangeFieldQuestions = [
+  'Para procesar su pedido, ¿qué dato personal quiere cambiar: su nombre o su apellido?',
+  '¿Cuál de sus datos personales necesita actualizar: el nombre o el apellido?',
+  'Para ayudarlo con la actualización, indíqueme por favor qué dato quiere cambiar: su nombre o su apellido.',
+]
+
+// attempt 0 es la pregunta inicial y 1 y 2 las repreguntas; con un intento fuera del
+// catálogo se usa el último texto.
+export function dataChangeFieldQuestion(attempt: number): string {
+  return dataChangeFieldQuestions[attempt] ?? dataChangeFieldQuestions[dataChangeFieldQuestions.length - 1] ?? ''
+}
+
+const dataChangeValueQuestions = [
+  'Perfecto. ¿Cuál es el nuevo {field} que quiere tener registrado?',
+  '¿Me indica el nuevo {field} que desea registrar?',
+  'Para completar el cambio de {field}, necesito el nuevo dato. ¿Cuál sería?',
+]
+
+// Mismo criterio de intentos que la pregunta del campo.
+export function dataChangeValueQuestion(field: DataChangeTargetField, attempt: number): string {
+  const template = dataChangeValueQuestions[attempt] ?? dataChangeValueQuestions[dataChangeValueQuestions.length - 1] ?? ''
+  return template.replace('{field}', field)
+}
 
 export type Clock = () => Date
 

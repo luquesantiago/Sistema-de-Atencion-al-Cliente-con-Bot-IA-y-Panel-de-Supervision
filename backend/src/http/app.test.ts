@@ -1,7 +1,7 @@
 import { once } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AddressInfo } from 'node:net'
-import type { AiClient, CustomerStatus, RewriteInput } from '../domain/ai-client.js'
+import type { AiClient, CustomerStatus, DataChangeExtraction, RewriteInput } from '../domain/ai-client.js'
 import type { CustomerPolicy, CustomerRepository } from '../domain/customer.js'
 import type {
   Catalogs,
@@ -16,7 +16,10 @@ import type {
 } from '../domain/customer-edits.js'
 import {
   RequestManagementError,
+  type DataChangeDecisionInput,
+  type DecisionNotification,
   type PageRequest,
+  type PendingDataChange,
   type PendingPhoneChange,
   type PendingProspect,
   type PhoneChangeDecisionInput,
@@ -50,6 +53,9 @@ class FakeAi implements AiClient {
   }
   public async classifyIntent(_text: string) {
     return { intent: 'otra consulta' as const, urgency: null }
+  }
+  public async extractDataChange(_text: string): Promise<DataChangeExtraction> {
+    return { field: null, value: null }
   }
   public async rewrite(_input: RewriteInput): Promise<string> {
     return ''
@@ -125,10 +131,13 @@ class FakeWhatsApp implements WhatsAppClient {
 class FakeRequestRepository implements RequestManagementRepository {
   public readonly prospectPage: PageRequest[] = []
   public readonly phonePage: PageRequest[] = []
+  public readonly dataChangePage: PageRequest[] = []
   public readonly prospectDecisions: ProspectDecisionInput[] = []
   public readonly phoneDecisions: PhoneChangeDecisionInput[] = []
+  public readonly dataChangeDecisions: DataChangeDecisionInput[] = []
   public prospects: PendingProspect[] = []
   public phoneChanges: PendingPhoneChange[] = []
+  public dataChanges: PendingDataChange[] = []
 
   public async listPendingProspects(page: PageRequest): Promise<PendingProspect[]> {
     this.prospectPage.push(page)
@@ -138,6 +147,11 @@ class FakeRequestRepository implements RequestManagementRepository {
   public async listPendingPhoneChanges(page: PageRequest): Promise<PendingPhoneChange[]> {
     this.phonePage.push(page)
     return this.phoneChanges
+  }
+
+  public async listPendingDataChanges(page: PageRequest): Promise<PendingDataChange[]> {
+    this.dataChangePage.push(page)
+    return this.dataChanges
   }
 
   public async decideProspect(input: ProspectDecisionInput) {
@@ -150,13 +164,26 @@ class FakeRequestRepository implements RequestManagementRepository {
     return { id: input.id, decision: input.decision, phone: '5491100000000' }
   }
 
+  public async decideDataChange(input: DataChangeDecisionInput) {
+    this.dataChangeDecisions.push(input)
+    return { id: input.id, decision: input.decision, phone: '5491100000000' }
+  }
+
   public async getPhoneChangeNotification(id: number) {
+    return { id, decision: 'aprobar' as const, phone: '5491100000000' }
+  }
+
+  public async getDataChangeNotification(id: number): Promise<DecisionNotification> {
     return { id, decision: 'aprobar' as const, phone: '5491100000000' }
   }
 
   public readonly recordedNotifications: Array<{ id: number; text: string }> = []
 
   public async recordPhoneChangeNotification(id: number, text: string, _sentAt: Date): Promise<void> {
+    this.recordedNotifications.push({ id, text })
+  }
+
+  public async recordDataChangeNotification(id: number, text: string, _sentAt: Date): Promise<void> {
     this.recordedNotifications.push({ id, text })
   }
 }
@@ -417,6 +444,66 @@ describe('endpoints de trámites', () => {
     await expect(retry.json()).resolves.toMatchObject({ notificationSent: true })
     expect(repository.recordedNotifications).toHaveLength(1)
     expect(repository.recordedNotifications[0]?.id).toBe(12)
+  })
+
+  it('lista los cambios de datos pendientes con la paginación pedida', async () => {
+    repository.dataChanges = [{
+      id: 21,
+      caseId: 40,
+      customerName: 'Ana Ficticia',
+      customerDni: '99000001',
+      phone: '5491100000001',
+      field: 'apellido',
+      currentValue: 'Ficticia',
+      value: 'Gómez',
+      requestedAt: '2026-11-02T12:00:00.000Z',
+    }]
+
+    const response = await fetch(`${baseUrl}/api/tramites/cambios-datos?limit=10&offset=0`)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ items: repository.dataChanges, limit: 10, offset: 0 })
+    expect(repository.dataChangePage).toEqual([{ limit: 10, offset: 0 }])
+  })
+
+  it('la decisión no acepta el dato en la petición: el cambio sale del detalle que guardó el servidor', async () => {
+    const response = await fetch(`${baseUrl}/api/tramites/cambios-datos/21/decision`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'aprobar', fundamento: 'Identidad verificada', field: 'dni', value: '11111111' }),
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_ERROR' } })
+    expect(repository.dataChangeDecisions).toEqual([])
+  })
+
+  it('aprueba el cambio de datos, avisa por WhatsApp y reintenta el aviso si el envío falla', async () => {
+    const request = () => fetch(`${baseUrl}/api/tramites/cambios-datos/21/decision`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'aprobar', fundamento: 'Identidad verificada' }),
+    })
+
+    const response = await request()
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ id: 21, decision: 'aprobar', notificationSent: true })
+    expect(repository.dataChangeDecisions).toEqual([{ id: 21, decision: 'aprobar', fundamento: 'Identidad verificada' }])
+    expect(whatsapp.sent[0]?.text).toContain('cambio de datos fue aprobada')
+    expect(repository.recordedNotifications).toEqual([{ id: 21, text: whatsapp.sent[0]?.text }])
+
+    whatsapp.fail = true
+    const failed = await request()
+    await expect(failed.json()).resolves.toMatchObject({
+      id: 21,
+      decision: 'aprobar',
+      notificationSent: false,
+      warning: expect.any(String),
+    })
+
+    whatsapp.fail = false
+    const retry = await fetch(`${baseUrl}/api/tramites/cambios-datos/21/notificacion`, { method: 'POST' })
+    await expect(retry.json()).resolves.toEqual({ id: 21, decision: 'aprobar', notificationSent: true })
   })
 })
 
@@ -938,6 +1025,7 @@ describe('Bandeja de Atención', () => {
     assignee: null,
     prospectState: null,
     pendingPhoneChangeAt: null,
+    pendingDataChangeAt: null,
     lastMessage: { text: 'me cobraron de más', origin: 'cliente', at: new Date('2026-10-15T13:00:00.000Z') },
   }
   let inbox: FakeInbox
