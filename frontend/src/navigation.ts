@@ -11,8 +11,13 @@ export type DestinoBandeja = {
   clienteNombre?: string
 }
 
+/** Lo que se abre al llegar a Base de Clientes: la ficha de un cliente. */
+export type DestinoClientes = {
+  customerId: number
+}
+
 /** Datos que acompañan a una navegación del panel. */
-export type OpcionesNavegacion = { bandeja?: DestinoBandeja }
+export type OpcionesNavegacion = { bandeja?: DestinoBandeja; clientes?: DestinoClientes }
 
 export type Navegar = (destino: ModuloPanel, opciones?: OpcionesNavegacion) => void
 
