@@ -1,19 +1,8 @@
 import type { Prisma } from '../generated/prisma/client.js'
 
 // Tomar, cerrar y sacar del silencio, compartido por las decisiones de Trámites y la Bandeja
-// de Atención (change bandeja-atender-casos, decisión 4).
-
-type CaseClient = Pick<Prisma.TransactionClient, 'usuario'>
-
-// Quién actúa desde el panel mientras no haya autenticación: el usuario de prueba operador.
-export async function findTestOperatorId(client: CaseClient): Promise<number> {
-  const operator = await client.usuario.findFirst({
-    where: { nombre_usuario: 'operador', activo: true, rol: { is: { nombre: 'operador' } } },
-    select: { id_usuario: true },
-  })
-  if (!operator) throw new Error('No está configurado el usuario de prueba operador.')
-  return operator.id_usuario
-}
+// de Atención (change bandeja-atender-casos, decisión 4). Quién actúa es el usuario con la
+// sesión iniciada en el panel (change acceso-por-rol).
 
 // El responsable pasa a ser userId; fecha_toma registra la primera toma y no cambia.
 export async function takeCase(

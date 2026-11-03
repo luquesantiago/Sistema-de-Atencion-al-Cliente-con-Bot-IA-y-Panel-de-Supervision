@@ -118,6 +118,8 @@ class FakeAi implements AiClient {
     this.dataChangeCalls.push({ text, pendingField })
     if (this.dataChangeError) throw this.dataChangeError
     return this.dataChangeResults.get(text) ?? { field: null, value: null }
+  }
+
   public async isThreat(text: string): Promise<boolean> {
     return text.toLowerCase().includes('ignore') || text.toLowerCase().includes('prompt injection') || text.toLowerCase().includes('reveal all data')
   }

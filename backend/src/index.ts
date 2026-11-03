@@ -5,6 +5,7 @@ import { ManageCustomers } from './application/manage-customers.js'
 import { ManageCustomerEdits } from './application/manage-customer-edits.js'
 import { ManageInbox } from './application/manage-inbox.js'
 import { ManageRequests } from './application/manage-requests.js'
+import { ManageSession } from './application/manage-session.js'
 import { createApp } from './http/app.js'
 import { config } from './infrastructure/config.js'
 import { OpenAiCompatibleClient } from './infrastructure/openai-compatible-client.js'
@@ -12,8 +13,8 @@ import { PrismaAgencyInfoSource } from './infrastructure/prisma-agency-info.js'
 import { PrismaConversationStore } from './infrastructure/prisma-conversation-store.js'
 import { PrismaCustomerRepository } from './infrastructure/prisma-customer-repository.js'
 import { PrismaCustomerEditRepository } from './infrastructure/prisma-customer-edit-repository.js'
-import { findTestOperatorId } from './infrastructure/prisma-case-closing.js'
 import { PrismaInboxRepository } from './infrastructure/prisma-inbox-repository.js'
+import { PrismaPanelUserRepository } from './infrastructure/prisma-panel-user-repository.js'
 import { PrismaRequestManagementRepository } from './infrastructure/prisma-request-management-repository.js'
 import { PrismaDashboardMetricsRepository } from './infrastructure/prisma-dashboard-metrics-repository.js'
 import { WahaWhatsAppClient } from './infrastructure/waha-whatsapp-client.js'
@@ -42,12 +43,15 @@ const manageCustomers = new ManageCustomers(customerRepository)
 const manageCustomerEdits = new ManageCustomerEdits(new PrismaCustomerEditRepository(prisma), customerRepository)
 const manageInbox = new ManageInbox(new PrismaInboxRepository(prisma), whatsapp)
 const dashboardMetricsRepository = new PrismaDashboardMetricsRepository(prisma)
-// Quién actúa desde el panel: el usuario de prueba operador hasta el login del Parcial 2.
-const resolvePanelActor = async () => ({ userId: await findTestOperatorId(prisma) })
+// Quién actúa desde el panel: el usuario con la sesión iniciada (RF-SUP-07).
+const manageSession = new ManageSession(new PrismaPanelUserRepository(prisma), config.panelSessionSecret)
 
 createApp(processIncomingMessage, {
   secret: config.whatsappWebhookSecret,
   findPhoneByLid: (lid) => whatsapp.findPhoneByLid(lid),
-}, manageRequests, manageCustomers, manageCustomerEdits, manageInbox, resolvePanelActor, dashboardMetricsRepository).listen(config.port, () => {
+}, manageRequests, manageCustomers, manageCustomerEdits, manageInbox, {
+  manageSession,
+  secureCookies: config.secureCookies,
+}, dashboardMetricsRepository).listen(config.port, () => {
   console.log(`Backend listening on port ${config.port}`)
 })

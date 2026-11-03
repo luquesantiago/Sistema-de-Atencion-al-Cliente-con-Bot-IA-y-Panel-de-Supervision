@@ -108,7 +108,14 @@ Reglas del Parcial 1:
   - Las imágenes que manda el cliente (la foto del DNI y las que llegan en silencio) se ven en la conversación: la base guarda solo el id del mensaje de WhatsApp (`mensaje.id_imagen_whatsapp`) y el backend pide la imagen a WAHA en el momento, sin guardarla ni dejarla en caché. WAHA la deja 30 segundos en su `/tmp` (`WHATSAPP_FILES_LIFETIME`).
   - Base de Clientes → «Ir al chat»: cada cliente tiene el botón al lado de «Ver detalle». Si el cliente no tiene casos en la bandeja, el panel avisa ahí mismo; si tiene uno, abre esa conversación; si tiene varios chats, llega a la Bandeja filtrada por el cliente, con sus chats del más reciente al más viejo y un botón para ver toda la bandeja. Solo se consideran los casos de conversaciones identificadas con el cliente.
 - Los textos de las plantillas los propone la IA que programa, en el PR, con el tono de «Contexto funcional». El equipo los revisa ahí.
-- Login en Frontend: la interfaz incluye la pantalla de inicio de sesión con los usuarios de prueba (`admin` y `operador` / clave `1234`) para simular el acceso según el rol. El backend atribuye todo lo que se hace desde el panel al usuario de prueba `operador` y la autenticación real de servidor se integrará en el Parcial 2.
+- Acceso al panel (change `acceso-por-rol`, RF-SUP-07):
+  - El login verifica el usuario y la clave en el backend contra la tabla `usuario` (bcrypt, solo usuarios activos).
+  - Deja una cookie de sesión firmada: `sesion_panel`, `httpOnly`, `SameSite=Strict`, de 8 horas. La firma usa `PANEL_SESSION_SECRET`, obligatoria en el `.env`: sin ella el backend no arranca.
+  - Toda la API del panel exige la sesión y responde 401 sin ella. El webhook de WhatsApp y `/health` no la usan.
+  - El rol y el estado activo se leen de la base en cada pedido. Las rutas de administración (`requireRole('administrador')`) responden 403 al operador.
+  - Cinco intentos fallidos seguidos bloquean a ese usuario 15 minutos.
+  - Tomar, liberar, contestar y cerrar casos, y decidir trámites, quedan a nombre del usuario con la sesión iniciada, nunca de un dato que mande el navegador.
+  - La pantalla de inicio mantiene la pista de los usuarios de prueba (`admin` y `operador`, clave `1234`). `roberto` y `graciela` entran con `seguros1234` (`docs/migracion.md`, «Usuarios»).
 - El operador le contesta al cliente desde el panel: el mensaje sale por WhatsApp desde el número del asistente y queda guardado con origen «operador».
 - La migración de la planilla sigue `docs/migracion.md`. El Excel limpio está en `backend/planilla/` y se carga con `docker compose exec backend npm run migrar-planilla` (script `backend/scripts/migrar-planilla.ts`).
 - Para la demo, `docker compose exec backend npm run cargar-demo -- --confirmar` borra la cartera y las conversaciones y carga clientes ficticios con los casos límite del asistente; los números de WhatsApp de la demo se pasan con `DEMO_TELEFONO_CLIENTE` y `DEMO_TELEFONO_COMPARTIDO`. No reemplaza la migración: cómo volver a la planilla está en `docs/migracion.md` («Datos de demostración»).
