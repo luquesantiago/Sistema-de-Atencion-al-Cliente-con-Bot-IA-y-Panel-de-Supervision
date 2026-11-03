@@ -35,7 +35,7 @@ El sistema SHALL guardar cada mensaje de las conversaciones por WhatsApp que el 
 
 ### Requirement: Bandeja de atención de casos abiertos
 
-El sistema SHALL mostrar en la Bandeja de Atención del panel todos los casos sin cerrar (`fecha_cierre IS NULL`), incluidos los casos atendidos por el asistente que no están derivados ni tienen un pendiente operativo, ordenados primero por gravedad, después los que no tienen responsable y después por mayor tiempo de espera, con la gravedad escrita y no solo en color, el cliente, el tipo de consulta, el motivo de la derivación cuando exista, el último mensaje, el responsable y el estado de derivación, y actualizándose sola cada pocos segundos mientras está abierta (RF-SUP-02). La gravedad de un caso es la más grave entre el nivel de riesgo del caso, el de sus alertas sin atender y el que corresponde a su tipo de consulta según la regla de derivación; un caso sin ninguno de los tres se muestra «Sin nivel», después de los de nivel bajo. La espera se cuenta desde la derivación o, si el caso no se derivó, desde la solicitud pendiente. Las fechas se muestran en hora argentina. Desde la bandeja, un empleado puede tomar, contestar y cerrar casos según los requirements de `derivacion-seguimiento`; los casos no derivados se muestran en modo de solo lectura.
+El sistema SHALL mostrar en la Bandeja de Atención del panel una fila por cada conversación que tenga algún caso sin cerrar (`fecha_cierre IS NULL`), incluidos los casos atendidos por el asistente que no están derivados ni tienen un pendiente operativo; la fila representa al caso más relevante de esa conversación: el derivado si lo hay, si no el que tiene una solicitud de cambio de teléfono pendiente y, si no, el más reciente, y muestra los datos y permite las acciones de ese caso. Las filas se ordenan primero por gravedad, después los que no tienen responsable y después por mayor tiempo de espera, con la gravedad escrita y no solo en color, el cliente, el tipo de consulta, el motivo de la derivación cuando exista, el último mensaje, el responsable y el estado de derivación, y actualizándose sola cada pocos segundos mientras está abierta (RF-SUP-02). La gravedad de un caso es la más grave entre el nivel de riesgo del caso, el de sus alertas sin atender y el que corresponde a su tipo de consulta según la regla de derivación; un caso sin ninguno de los tres se muestra «Sin nivel», después de los de nivel bajo. La espera se cuenta desde la derivación o, si el caso no se derivó, desde la solicitud pendiente. Las fechas se muestran en hora argentina. Desde la bandeja, un empleado puede tomar, contestar y cerrar casos según los requirements de `derivacion-seguimiento`; los casos no derivados se muestran en modo de solo lectura.
 
 El sistema SHALL calcular `handedOff` como verdadero únicamente cuando `caso.fecha_derivacion IS NOT NULL`, y como falso cuando `caso.fecha_derivacion IS NULL` (RF-SUP-01, RF-SUP-02).
 
@@ -84,12 +84,24 @@ El sistema SHALL calcular `handedOff` como verdadero únicamente cuando `caso.fe
 - **THEN** la bandeja lo muestra con la etiqueta «Cambio de teléfono pendiente · se decide en Trámites», con nivel bajo y la espera contada desde la solicitud
 
 #### Scenario: Todos incluye casos derivados y no derivados
-- **WHEN** hay un caso abierto derivado y otro caso abierto atendido por el asistente sin derivación ni pendiente operativo
-- **THEN** la pestaña «Todos» muestra ambos casos
+- **WHEN** hay un caso abierto derivado en una conversación y otro caso abierto atendido por el asistente sin derivación ni pendiente operativo en otra conversación
+- **THEN** la pestaña «Todos» muestra las dos conversaciones
+
+#### Scenario: Una conversación con varias consultas es una sola fila
+- **WHEN** en una misma conversación el asistente respondió saldo, estado y vencimiento y los tres casos siguen sin cerrar
+- **THEN** la bandeja muestra una sola fila para esa conversación, con el caso de vencimiento, que es el más reciente, y el total cuenta una conversación
+
+#### Scenario: El caso derivado representa a su conversación
+- **WHEN** una conversación tiene un caso de saldo respondido por el asistente y, después, un caso de siniestro derivado, los dos sin cerrar
+- **THEN** la bandeja muestra una sola fila con el caso de siniestro, su gravedad y sus acciones, y la pestaña «Derivados» la incluye
+
+#### Scenario: El detalle de cualquier caso abierto sigue disponible
+- **WHEN** se pide el detalle de un caso abierto que no es el que representa a su conversación
+- **THEN** el panel muestra la conversación completa de ese caso
 
 #### Scenario: Derivados solo incluye casos derivados
 - **WHEN** hay casos abiertos con y sin fecha de derivación
-- **THEN** la pestaña «Derivados» muestra únicamente los casos cuyo `handedOff` es verdadero
+- **THEN** la pestaña «Derivados» muestra únicamente las filas cuyo caso tiene `handedOff` verdadero
 
 #### Scenario: Un caso cerrado no aparece
 - **WHEN** un caso tiene `fecha_cierre` no nula
@@ -124,8 +136,8 @@ El sistema SHALL calcular `handedOff` como verdadero únicamente cuando `caso.fe
 - **THEN** a los pocos segundos la bandeja muestra el caso nuevo en su lugar del orden y el detalle muestra el mensaje nuevo, sin que el usuario recargue la página ni pierda el caso elegido
 
 #### Scenario: El orden vale para todas las páginas
-- **WHEN** hay más casos que los que entran en una página
-- **THEN** la primera página tiene los más graves de toda la bandeja, no los más graves de una parte
+- **WHEN** hay más conversaciones que las que entran en una página
+- **THEN** la primera página tiene las más graves de toda la bandeja, no las más graves de una parte
 
 #### Scenario: Paginación
 - **WHEN** el panel pide la bandeja con un límite fuera de 1 a 100 o un desplazamiento negativo
