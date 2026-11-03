@@ -24,6 +24,13 @@ export type PendingPhoneChange = {
 
 export type RequestDecision = 'aprobar' | 'rechazar'
 
+// Quién decide: el usuario con la sesión iniciada en el panel, nunca un dato del cuerpo del
+// pedido (RF-SUP-07, RF-APR-03).
+export type DecisionActor = {
+  userId: number
+  username: string
+}
+
 type ProspectDecisionBase = {
   id: number
   fundamento: string
@@ -70,8 +77,8 @@ export type PhoneChangeNotification = {
 export interface RequestManagementRepository {
   listPendingProspects(page: PageRequest): Promise<PendingProspect[]>
   listPendingPhoneChanges(page: PageRequest): Promise<PendingPhoneChange[]>
-  decideProspect(input: ProspectDecisionInput): Promise<ProspectDecisionResult>
-  decidePhoneChange(input: PhoneChangeDecisionInput): Promise<PhoneChangeDecisionResult>
+  decideProspect(input: ProspectDecisionInput, actor: DecisionActor): Promise<ProspectDecisionResult>
+  decidePhoneChange(input: PhoneChangeDecisionInput, actor: DecisionActor): Promise<PhoneChangeDecisionResult>
   getPhoneChangeNotification(id: number): Promise<PhoneChangeNotification>
   recordPhoneChangeNotification(id: number, text: string, sentAt: Date): Promise<void>
   // 404 si el prospecto no existe y 409 si no está confirmado: solo el alta aprobada se avisa.
@@ -81,9 +88,19 @@ export interface RequestManagementRepository {
 
 export class RequestManagementError extends Error {
   public constructor(
-    public readonly statusCode: 400 | 404 | 409 | 502,
+    public readonly statusCode: 400 | 401 | 403 | 404 | 409 | 429 | 502,
     // WHATSAPP_ERROR e IMAGE_UNAVAILABLE: la Bandeja de Atención (change bandeja-atender-casos).
-    public readonly code: 'VALIDATION_ERROR' | 'NOT_FOUND' | 'CONFLICT' | 'WHATSAPP_ERROR' | 'IMAGE_UNAVAILABLE',
+    // UNAUTHORIZED, FORBIDDEN, INVALID_CREDENTIALS y TOO_MANY_ATTEMPTS: la sesión del panel (change acceso-por-rol).
+    public readonly code:
+      | 'VALIDATION_ERROR'
+      | 'NOT_FOUND'
+      | 'CONFLICT'
+      | 'WHATSAPP_ERROR'
+      | 'IMAGE_UNAVAILABLE'
+      | 'UNAUTHORIZED'
+      | 'FORBIDDEN'
+      | 'INVALID_CREDENTIALS'
+      | 'TOO_MANY_ATTEMPTS',
     message: string,
   ) {
     super(message)

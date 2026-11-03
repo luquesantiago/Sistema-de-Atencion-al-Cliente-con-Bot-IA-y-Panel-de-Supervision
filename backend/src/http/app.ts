@@ -3,19 +3,52 @@ import { ManageCustomers } from '../application/manage-customers.js'
 import { ManageCustomerEdits } from '../application/manage-customer-edits.js'
 import { ManageInbox } from '../application/manage-inbox.js'
 import { ManageRequests } from '../application/manage-requests.js'
-import type { PanelActor } from '../domain/case-actions.js'
+import type { ManageSession } from '../application/manage-session.js'
 import type { ProcessIncomingMessage } from '../application/process-incoming-message.js'
 import {
   RequestManagementError,
   type PhoneChangeDecisionInput,
   type ProspectDecisionInput,
 } from '../domain/request-management.js'
+import { sessionDurationMs, type PanelRole, type PanelUser } from '../domain/session.js'
 import { KeyedQueue } from '../infrastructure/keyed-queue.js'
 import { isValidWebhookSecret, maskPhoneForLog, messageKeyForLog, parseWahaWebhook } from '../infrastructure/waha-webhook.js'
 
 export type WhatsAppWebhookOptions = {
   secret: string
   findPhoneByLid: (lid: string) => Promise<string | null>
+}
+
+// Sesión del panel (RF-SUP-07; change acceso-por-rol). secureCookies: la cookie lleva Secure
+// solo en producción, porque en desarrollo el panel corre por HTTP.
+export type PanelSessionOptions = {
+  manageSession: ManageSession
+  secureCookies: boolean
+}
+
+declare global {
+  namespace Express {
+    interface Locals {
+      // Lo deja requireSession: el usuario de la sesión, leído de la base en este pedido.
+      panelUser?: PanelUser
+    }
+  }
+}
+
+const sessionCookie = 'sesion_panel'
+const maxUsernameLength = 50
+const maxPasswordLength = 200
+
+// Solo el administrador (configuración y métricas). Va después de requireSession, que deja el
+// usuario con el rol que tiene en la base en este pedido.
+export function requireRole(role: PanelRole): RequestHandler {
+  return (_request, response, next) => {
+    if (currentPanelUser(response).role !== role) {
+      response.status(403).json({ error: { code: 'FORBIDDEN', message: 'Tu perfil no tiene permiso para esta acción.' } })
+      return
+    }
+    next()
+  }
 }
 
 export function createApp(
@@ -25,8 +58,7 @@ export function createApp(
   manageCustomers: ManageCustomers,
   manageCustomerEdits: ManageCustomerEdits,
   manageInbox: ManageInbox,
-  // Mientras no haya autenticación, el usuario de prueba operador (change bandeja-atender-casos, decisión 1).
-  resolvePanelActor: () => Promise<PanelActor>,
+  panelSession: PanelSessionOptions,
 ) {
   const app = express()
   const senders = new KeyedQueue()
@@ -74,6 +106,55 @@ export function createApp(
   app.use(express.json({ limit: '32kb' }))
 
   app.get('/health', (_request, response) => response.status(200).json({ status: 'ok' }))
+
+  // Sesión del panel: login, sesión actual y cierre. Son las únicas rutas de /api sin sesión.
+  const cookieOptions = {
+    httpOnly: true,
+    sameSite: 'strict' as const,
+    path: '/api',
+    secure: panelSession.secureCookies,
+  }
+  app.post('/api/sesion', async (request, response, next) => {
+    try {
+      const body = parseBody(request.body, ['usuario', 'clave'])
+      const username = parseString(body.usuario, 'usuario')
+      const password = parseString(body.clave, 'clave')
+      if (username.length > maxUsernameLength || password.length > maxPasswordLength) {
+        throw new RequestManagementError(400, 'VALIDATION_ERROR', 'El usuario o la clave son demasiado largos.')
+      }
+      const result = await panelSession.manageSession.login(username, password)
+      response.cookie(sessionCookie, result.token, { ...cookieOptions, maxAge: sessionDurationMs })
+      response.status(200).json(sessionBody(result.user))
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.get('/api/sesion', async (request, response) => {
+    const user = await panelSession.manageSession.currentUser(readCookie(request.get('Cookie'), sessionCookie))
+    if (!user) {
+      response.clearCookie(sessionCookie, cookieOptions)
+      response.status(401).json(unauthorizedBody)
+      return
+    }
+    response.status(200).json(sessionBody(user))
+  })
+  app.post('/api/sesion/cierre', (_request, response) => {
+    response.clearCookie(sessionCookie, cookieOptions)
+    response.status(204).end()
+  })
+
+  // Todo el resto de /api exige una sesión válida de un usuario activo (RF-SUP-07).
+  const requireSession: RequestHandler = async (request, response, next) => {
+    const user = await panelSession.manageSession.currentUser(readCookie(request.get('Cookie'), sessionCookie))
+    if (!user) {
+      response.status(401).json(unauthorizedBody)
+      return
+    }
+    response.locals.panelUser = user
+    next()
+  }
+  app.use('/api', requireSession)
+
   app.get('/api/tramites/prospectos', async (request, response, next) => {
     try {
       const page = parsePage(request.query.limit, request.query.offset)
@@ -95,7 +176,7 @@ export function createApp(
   app.post('/api/tramites/prospectos/:id/decision', async (request, response, next) => {
     try {
       const input = parseProspectDecision(request.params.id, request.body)
-      const result = await manageRequests.decideProspect(input)
+      const result = await manageRequests.decideProspect(input, currentPanelUser(response))
       response.status(200).json({
         id: result.id,
         decision: result.decision,
@@ -132,7 +213,7 @@ export function createApp(
   app.post('/api/tramites/cambios-telefono/:id/decision', async (request, response, next) => {
     try {
       const input = parsePhoneChangeDecision(request.params.id, request.body)
-      const result = await manageRequests.decidePhoneChange(input)
+      const result = await manageRequests.decidePhoneChange(input, currentPanelUser(response))
       response.status(200).json({
         id: result.id,
         decision: result.decision,
@@ -191,14 +272,13 @@ export function createApp(
       handleRequestError(error, response, next)
     }
   })
-  // Bandeja de Atención. El actor lo resuelve el backend, nunca el cuerpo del pedido.
-  // Bandeja de Atención (RF-SUP-01, RF-SUP-02, RF-DER-02, RF-DER-03, RF-SUP-04). Quién actúa lo
-  // resuelve resolvePanelActor: nunca sale del cuerpo del pedido.
+  // Bandeja de Atención (RF-SUP-01, RF-SUP-02, RF-DER-02, RF-DER-03, RF-SUP-04). Quién actúa sale
+  // de la sesión: nunca del cuerpo del pedido.
   app.get('/api/bandeja', async (request, response, next) => {
     try {
       const page = parsePage(request.query.limit, request.query.offset)
       const customerId = parseCustomerId(request.query.customerId)
-      const result = await manageInbox.listCases(page, await resolvePanelActor(), customerId)
+      const result = await manageInbox.listCases(page, currentPanelUser(response), customerId)
       response.status(200).json({ items: result.items, total: result.total, ...page })
     } catch (error) {
       handleRequestError(error, response, next)
@@ -216,7 +296,7 @@ export function createApp(
   })
   app.get('/api/bandeja/:idCaso', async (request, response, next) => {
     try {
-      response.status(200).json(await manageInbox.findCase(request.params.idCaso, await resolvePanelActor()))
+      response.status(200).json(await manageInbox.findCase(request.params.idCaso, currentPanelUser(response)))
     } catch (error) {
       handleRequestError(error, response, next)
     }
@@ -232,7 +312,7 @@ export function createApp(
   app.post('/api/bandeja/:idCaso/toma', async (request, response, next) => {
     try {
       if (request.body !== undefined) parseBody(request.body, [])
-      response.status(200).json(await manageInbox.take(request.params.idCaso, await resolvePanelActor()))
+      response.status(200).json(await manageInbox.take(request.params.idCaso, currentPanelUser(response)))
     } catch (error) {
       handleRequestError(error, response, next)
     }
@@ -240,7 +320,7 @@ export function createApp(
   app.post('/api/bandeja/:idCaso/liberacion', async (request, response, next) => {
     try {
       if (request.body !== undefined) parseBody(request.body, [])
-      response.status(200).json(await manageInbox.release(request.params.idCaso, await resolvePanelActor()))
+      response.status(200).json(await manageInbox.release(request.params.idCaso, currentPanelUser(response)))
     } catch (error) {
       handleRequestError(error, response, next)
     }
@@ -256,7 +336,7 @@ export function createApp(
   app.post('/api/bandeja/:idCaso/respuestas', async (request, response, next) => {
     try {
       const body = parseBody(request.body, ['texto'])
-      const result = await manageInbox.reply(request.params.idCaso, await resolvePanelActor(), body.texto)
+      const result = await manageInbox.reply(request.params.idCaso, currentPanelUser(response), body.texto)
       response.status(result.saved ? 201 : 200).json(result)
     } catch (error) {
       handleRequestError(error, response, next)
@@ -271,7 +351,7 @@ export function createApp(
       if (body.alertasRevisadas !== undefined && typeof body.alertasRevisadas !== 'boolean') {
         throw new RequestManagementError(400, 'VALIDATION_ERROR', 'alertasRevisadas debe ser verdadero o falso.')
       }
-      const result = await manageInbox.close(request.params.idCaso, await resolvePanelActor(), {
+      const result = await manageInbox.close(request.params.idCaso, currentPanelUser(response), {
         reason: typeof body.motivo === 'string' ? body.motivo : null,
         alertsReviewed: body.alertasRevisadas === true,
       })
@@ -353,6 +433,34 @@ export function createApp(
   }
   app.use(errorHandler)
   return app
+}
+
+const unauthorizedBody = { error: { code: 'UNAUTHORIZED', message: 'Iniciá sesión para continuar.' } }
+
+// Lo que el panel necesita del usuario: nunca el hash de la clave.
+function sessionBody(user: PanelUser) {
+  return { id: user.userId, usuario: user.username, nombre: user.name, apellido: user.lastName, rol: user.role }
+}
+
+// Siempre después de requireSession: una ruta de /api sin usuario es un error del servidor.
+function currentPanelUser(response: Response): PanelUser {
+  const user = response.locals.panelUser
+  if (!user) throw new Error('La ruta no pasó por requireSession.')
+  return user
+}
+
+function readCookie(header: string | undefined, name: string): string | undefined {
+  if (!header) return undefined
+  for (const part of header.split(';')) {
+    const separator = part.indexOf('=')
+    if (separator === -1 || part.slice(0, separator).trim() !== name) continue
+    try {
+      return decodeURIComponent(part.slice(separator + 1).trim())
+    } catch {
+      return undefined
+    }
+  }
+  return undefined
 }
 
 function parsePage(limitValue: unknown, offsetValue: unknown): { limit: number; offset: number } {

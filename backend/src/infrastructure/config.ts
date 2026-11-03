@@ -19,4 +19,7 @@ export const config = {
   whatsappApiUrl: requiredEnvironment('WHATSAPP_API_URL'),
   whatsappApiKey: requiredEnvironment('WHATSAPP_API_KEY'),
   whatsappWebhookSecret: requiredEnvironment('WHATSAPP_WEBHOOK_SECRET'),
+  panelSessionSecret: requiredEnvironment('PANEL_SESSION_SECRET'),
+  // La cookie de sesión lleva Secure solo en producción: en desarrollo el panel corre por HTTP.
+  secureCookies: process.env.NODE_ENV === 'production',
 }

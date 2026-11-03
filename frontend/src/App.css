@@ -968,9 +968,25 @@
   font-weight: 600;
 }
 
-/* Ranura de estado de servidor para el auth real del Parcial 2 */
+/* Error que devuelve el backend al iniciar sesión: va arriba del botón, no debajo de un campo. */
+.login__error--servidor {
+  margin: 0 0 12px;
+}
+
+/* Estado del servidor: mientras se verifica la sesión al recargar. */
+.login__estado {
+  margin-top: 12px;
+  font-size: 0.875rem;
+  color: rgba(247, 244, 239, 0.72);
+}
+
 .login__estado:empty {
   display: none;
+}
+
+.login__formulario input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .login__boton {
@@ -988,6 +1004,15 @@
 
 .login__boton:hover {
   background: var(--color-accent-light);
+}
+
+.login__boton[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login__boton[disabled]:hover {
+  background: var(--color-sidebar-text);
 }
 
 .login__boton:focus-visible {
