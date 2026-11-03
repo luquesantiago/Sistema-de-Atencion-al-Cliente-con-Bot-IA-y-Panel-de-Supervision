@@ -58,6 +58,9 @@ class FakeAi implements AiClient {
   public async extractDataChange(_text: string): Promise<DataChangeExtraction> {
     return { field: null, value: null }
   }
+  public async isThreat(_text: string): Promise<boolean> {
+    return false
+  }
   public async rewrite(_input: RewriteInput): Promise<string> {
     return ''
   }
