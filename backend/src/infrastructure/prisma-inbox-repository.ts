@@ -296,10 +296,28 @@ const pendingPhoneChangeJoin = Prisma.sql`
       GROUP BY s.id_caso
     ) sol ON sol.id_caso = c.id_caso`
 
-// Todos los casos sin cerrar. caseId restringe a un caso, para el detalle. customerId
-// restringe a los casos de la conversación identificada con ese cliente.
+// Una fila por conversación (change bandeja-una-fila-por-conversacion): de los casos sin
+// cerrar de cada conversación queda el derivado; si no hay, el que tiene un cambio de
+// teléfono pendiente; si no, el más reciente, que tiene el último mensaje de la charla.
+const representativeCase = Prisma.sql`
+    AND c.id_caso = (
+      SELECT c2.id_caso FROM caso c2
+      WHERE c2.id_conversacion = c.id_conversacion AND c2.fecha_cierre IS NULL
+      ORDER BY c2.fecha_derivacion IS NULL,
+        NOT EXISTS (
+          SELECT 1 FROM solicitud_accion s2
+          JOIN estado_solicitud es2 ON es2.id_estado_solicitud = s2.id_estado_solicitud
+          JOIN tipo_accion ta2 ON ta2.id_tipo_accion = s2.id_tipo_accion
+          WHERE s2.id_caso = c2.id_caso AND es2.nombre = 'pendiente' AND ta2.nombre = 'cambio de teléfono'
+        ),
+        c2.id_caso DESC
+      LIMIT 1)`
+
+// Los casos sin cerrar. El listado deja un caso por conversación; caseId restringe a un caso,
+// para el detalle, que puede pedir cualquier caso abierto. customerId restringe a los casos
+// de la conversación identificada con ese cliente.
 function inboxWhere(caseId?: number, customerId?: number): Prisma.Sql {
-  const onlyCase = caseId === undefined ? Prisma.empty : Prisma.sql`AND c.id_caso = ${caseId}`
+  const onlyCase = caseId === undefined ? representativeCase : Prisma.sql`AND c.id_caso = ${caseId}`
   const onlyCustomer = customerId === undefined ? Prisma.empty : Prisma.sql`AND conv.id_cliente = ${customerId}`
   return Prisma.sql`WHERE c.fecha_cierre IS NULL ${onlyCase} ${onlyCustomer}`
 }
