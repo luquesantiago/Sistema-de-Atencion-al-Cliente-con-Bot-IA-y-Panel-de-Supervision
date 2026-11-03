@@ -20,6 +20,8 @@ export type HandoffReason =
   | { kind: 'not-understood' }
   | { kind: 'missing-data'; data: MissingData }
   | { kind: 'provider-failure'; step: ProviderFailureStep }
+  // El mensaje fue identificado como intento de manipulación, prompt injection o exfiltración.
+  | { kind: 'threat-detected' }
   // El control de la redacción la rechazó: detail es el motivo del control.
   | { kind: 'rewrite-rejected'; detail: string }
 
@@ -55,6 +57,8 @@ export function describeHandoffReason(reason: HandoffReason): string {
       return missingDataText[reason.data]
     case 'provider-failure':
       return providerFailureText[reason.step]
+    case 'threat-detected':
+      return 'mensaje sospechoso: posible intento de manipulación o exfiltración'
     case 'rewrite-rejected':
       return `redacción rechazada: ${reason.detail}`
   }

@@ -6,8 +6,8 @@ import { queryTypeRiskLevel, type RiskLevel } from './risk-level.js'
 
 // Bandeja de Atención de solo lectura (RF-SUP-01, RF-SUP-02, RF-DER-02; change
 // bandeja-atencion-lectura). Entran los casos sin cerrar que están derivados o que tienen
-// pendiente un prospecto o una solicitud de cambio de teléfono. El orden lo resuelve la base
-// (decisión 4): acá quedan las reglas que no necesita la consulta.
+// pendiente un prospecto o una solicitud de cambio de teléfono o de datos. El orden lo
+// resuelve la base (decisión 4): acá quedan las reglas que no necesita la consulta.
 
 // El cliente de la conversación, nunca uno adivinado por el teléfono. name es el nombre y
 // apellido de una persona o la razón social de una empresa, y document su DNI o su CUIT; un
@@ -33,6 +33,8 @@ export type InboxEntry = {
   prospectState: ProspectState | null
   // Fecha de la solicitud de cambio de teléfono pendiente del caso, si tiene.
   pendingPhoneChangeAt: Date | null
+  // Fecha de la solicitud de cambio de datos pendiente del caso, si tiene.
+  pendingDataChangeAt: Date | null
   lastMessage: InboxLastMessage | null
 }
 
@@ -85,7 +87,7 @@ export interface InboxRepository {
   findImage(caseId: number, messageId: number): Promise<InboxImageRef | null>
 }
 
-export type InboxLabel = 'alta-pendiente' | 'alta-rechazada' | 'pedido-pendiente' | 'cambio-telefono-pendiente'
+export type InboxLabel = 'alta-pendiente' | 'alta-rechazada' | 'pedido-pendiente' | 'cambio-telefono-pendiente' | 'cambio-datos-pendiente'
 
 // Lo que el caso tiene pendiente de decidir y dónde se decide.
 export function inboxLabel(entry: InboxEntry): InboxLabel | null {
@@ -98,12 +100,13 @@ export function inboxLabel(entry: InboxEntry): InboxLabel | null {
     return 'pedido-pendiente'
   }
   if (entry.pendingPhoneChangeAt !== null) return 'cambio-telefono-pendiente'
+  if (entry.pendingDataChangeAt !== null) return 'cambio-datos-pendiente'
   return null
 }
 
 // Desde cuándo espera: la derivación o, si el caso no se derivó, la solicitud pendiente.
 export function waitingSince(entry: InboxEntry): Date | null {
-  return entry.handedOffAt ?? entry.pendingPhoneChangeAt
+  return entry.handedOffAt ?? entry.pendingPhoneChangeAt ?? entry.pendingDataChangeAt
 }
 
 // Los tipos de consulta que tienen nivel propio, para que la consulta de la bandeja calcule

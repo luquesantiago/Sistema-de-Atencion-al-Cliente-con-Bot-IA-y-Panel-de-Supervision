@@ -137,6 +137,19 @@ function BadgePrioridad({ caso }: { caso: CasoBandeja }) {
   )
 }
 
+function esPosibleAmenaza(caso: CasoBandeja): boolean {
+  return (
+    caso.handedOff &&
+    caso.handoffReason !== null &&
+    /sospechoso|amenaza|prompt|manipul|exfiltr|injection/i.test(caso.handoffReason)
+  )
+}
+
+function BadgeAmenaza({ caso }: { caso: CasoBandeja }) {
+  if (!esPosibleAmenaza(caso)) return null
+  return <span className="badge-amenaza">Posible amenaza</span>
+}
+
 function detalleAlerta(caso: CasoBandeja): string {
   switch (caso.label) {
     case 'alta-pendiente':
@@ -147,6 +160,8 @@ function detalleAlerta(caso: CasoBandeja): string {
       return 'Pedido pendiente de aprobación'
     case 'cambio-telefono-pendiente':
       return 'Cambio de teléfono pendiente de aprobación'
+    case 'cambio-datos-pendiente':
+      return 'Cambio de datos pendiente de aprobación'
   }
   switch (caso.queryType) {
     case 'siniestro':
@@ -756,6 +771,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
                 </span>
                 <span className="tarjeta-caso__chips">
                   <BadgePrioridad caso={caso} />
+                  <BadgeAmenaza caso={caso} />
                 </span>
               </span>
             </button>

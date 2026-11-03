@@ -22,6 +22,22 @@ export type PendingPhoneChange = {
   requestedAt: string
 }
 
+// El dato que se quiere cambiar y el valor nuevo, leídos del detalle de la solicitud
+// (formato fijo de dataChangeDetalle). currentValue es lo que vale hoy en la cartera, para
+// que el operador compare antes de decidir.
+export type PendingDataChange = {
+  id: number
+  caseId: number
+  customerName: string
+  customerDni: string
+  /** Número de WhatsApp de la conversación, a donde sale el aviso de la decisión. */
+  phone: string
+  field: 'nombre' | 'apellido'
+  currentValue: string
+  value: string
+  requestedAt: string
+}
+
 export type RequestDecision = 'aprobar' | 'rechazar'
 
 type ProspectDecisionBase = {
@@ -39,6 +55,13 @@ export type PhoneChangeDecisionInput = {
   decision: RequestDecision
   fundamento: string
   telefonosADesvincular: number[]
+}
+
+// El dato y el valor salen del detalle de la solicitud: la decisión solo aprueba o rechaza.
+export type DataChangeDecisionInput = {
+  id: number
+  decision: RequestDecision
+  fundamento: string
 }
 
 export type DecisionResult = {
@@ -61,19 +84,30 @@ export type PhoneChangeDecisionResult = DecisionResult & {
   phone: string
 }
 
+export type DataChangeDecisionResult = DecisionResult & {
+  phone: string
+}
+
 export type PhoneChangeNotification = {
   id: number
   phone: string
   decision: RequestDecision
 }
 
+// El aviso de una decisión de Trámites al cliente por WhatsApp, de cualquier trámite.
+export type DecisionNotification = PhoneChangeNotification
+
 export interface RequestManagementRepository {
   listPendingProspects(page: PageRequest): Promise<PendingProspect[]>
   listPendingPhoneChanges(page: PageRequest): Promise<PendingPhoneChange[]>
+  listPendingDataChanges(page: PageRequest): Promise<PendingDataChange[]>
   decideProspect(input: ProspectDecisionInput): Promise<ProspectDecisionResult>
   decidePhoneChange(input: PhoneChangeDecisionInput): Promise<PhoneChangeDecisionResult>
+  decideDataChange(input: DataChangeDecisionInput): Promise<DataChangeDecisionResult>
   getPhoneChangeNotification(id: number): Promise<PhoneChangeNotification>
   recordPhoneChangeNotification(id: number, text: string, sentAt: Date): Promise<void>
+  getDataChangeNotification(id: number): Promise<DecisionNotification>
+  recordDataChangeNotification(id: number, text: string, sentAt: Date): Promise<void>
   // 404 si el prospecto no existe y 409 si no está confirmado: solo el alta aprobada se avisa.
   getProspectNotification(id: number): Promise<ProspectNotification>
   recordProspectNotification(id: number, text: string, sentAt: Date): Promise<void>

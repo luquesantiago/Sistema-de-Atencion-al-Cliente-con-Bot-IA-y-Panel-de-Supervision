@@ -13,6 +13,10 @@ export const intents = [
   'reclamo',
   'saludo',
   'cambio de teléfono',
+  // Quiere cambiar un dato personal registrado (nombre o apellido): el asistente arma una
+  // solicitud pendiente en Trámites sin derivar la conversación. El cambio de teléfono
+  // sigue siendo la opción de arriba.
+  'cambio de datos',
   'información de la agencia',
   'no es de seguros',
   // Quiere ser cliente o contratar un seguro: arranca el alta, que antes empezaba sola.
@@ -46,6 +50,9 @@ export type IntentAction =
   | { kind: 'my-data' }
   // Consulta el listado de sus pólizas: se lo muestra si está identificado.
   | { kind: 'my-policies' }
+  // Quiere cambiar un dato personal registrado: el código extrae el campo y el valor y
+  // decide el destino (preguntar, teléfono o solicitud en Trámites).
+  | { kind: 'data-change' }
 
 export function isIntent(value: unknown): value is Intent {
   return typeof value === 'string' && intents.some((intent) => intent === value)
@@ -69,6 +76,8 @@ export function actionForIntent(intent: Intent): IntentAction {
       return { kind: 'my-data' }
     case 'mis pólizas':
       return { kind: 'my-policies' }
+    case 'cambio de datos':
+      return { kind: 'data-change' }
     case 'información de la agencia':
       return { kind: 'answer', template: 'agency' }
     case 'baja':

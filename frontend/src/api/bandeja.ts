@@ -14,7 +14,12 @@ import { ErrorDeApi, leer } from './respuesta'
 export type Gravedad = 'crítico' | 'alto' | 'medio' | 'bajo'
 
 /** Lo que el caso tiene pendiente de decidir. */
-export type EtiquetaBandeja = 'alta-pendiente' | 'alta-rechazada' | 'pedido-pendiente' | 'cambio-telefono-pendiente'
+export type EtiquetaBandeja =
+  | 'alta-pendiente'
+  | 'alta-rechazada'
+  | 'pedido-pendiente'
+  | 'cambio-telefono-pendiente'
+  | 'cambio-datos-pendiente'
 
 export type OrigenMensaje = 'cliente' | 'asistente' | 'operador'
 
