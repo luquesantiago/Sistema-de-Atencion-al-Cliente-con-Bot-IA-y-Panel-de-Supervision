@@ -27,5 +27,7 @@ export interface AiClient {
   classifyCustomerStatus(reply: string): Promise<CustomerStatus>
   // context: los mensajes anteriores de la conversación, como dato (intentContext).
   classifyIntent(text: string, context: readonly ContextMessage[]): Promise<IntentClassification>
+  // Revisa si el mensaje intenta manipular, exfiltrar o engañar al asistente.
+  isThreat(text: string): Promise<boolean>
   rewrite(input: RewriteInput): Promise<string>
 }
