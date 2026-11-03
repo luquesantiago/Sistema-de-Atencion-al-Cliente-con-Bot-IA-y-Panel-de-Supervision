@@ -3,6 +3,7 @@ import { PrismaClient } from './generated/prisma/client.js'
 import { ProcessIncomingMessage } from './application/process-incoming-message.js'
 import { ManageCustomers } from './application/manage-customers.js'
 import { ManageCustomerEdits } from './application/manage-customer-edits.js'
+import { ManageAgencySettings } from './application/manage-agency-settings.js'
 import { ManageInbox } from './application/manage-inbox.js'
 import { ManageRequests } from './application/manage-requests.js'
 import { ManageSession } from './application/manage-session.js'
@@ -30,10 +31,11 @@ const adapter = new PrismaMariaDb({
 const prisma = new PrismaClient({ adapter })
 const whatsapp = new WahaWhatsAppClient(config.whatsappApiUrl, config.whatsappApiKey)
 const customerRepository = new PrismaCustomerRepository(prisma)
+const agencyInfo = new PrismaAgencyInfoSource(prisma)
 const processIncomingMessage = new ProcessIncomingMessage(
  customerRepository,
   new PrismaConversationStore(prisma),
-  new PrismaAgencyInfoSource(prisma),
+  agencyInfo,
   new OpenAiCompatibleClient(config.aiApiUrl, config.aiApiKey, config.aiModel),
   whatsapp,
   () => new Date(),
@@ -49,7 +51,7 @@ const manageSession = new ManageSession(new PrismaPanelUserRepository(prisma), c
 createApp(processIncomingMessage, {
   secret: config.whatsappWebhookSecret,
   findPhoneByLid: (lid) => whatsapp.findPhoneByLid(lid),
-}, manageRequests, manageCustomers, manageCustomerEdits, manageInbox, {
+}, manageRequests, manageCustomers, manageCustomerEdits, manageInbox, new ManageAgencySettings(agencyInfo), {
   manageSession,
   secureCookies: config.secureCookies,
 }, dashboardMetricsRepository).listen(config.port, () => {

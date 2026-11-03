@@ -1,4 +1,5 @@
 import express, { type ErrorRequestHandler, type NextFunction, type RequestHandler, type Response } from 'express'
+import type { ManageAgencySettings } from '../application/manage-agency-settings.js'
 import { ManageCustomers } from '../application/manage-customers.js'
 import { ManageCustomerEdits } from '../application/manage-customer-edits.js'
 import { ManageInbox } from '../application/manage-inbox.js'
@@ -60,6 +61,7 @@ export function createApp(
   manageCustomers: ManageCustomers,
   manageCustomerEdits: ManageCustomerEdits,
   manageInbox: ManageInbox,
+  manageAgencySettings: ManageAgencySettings,
   panelSession: PanelSessionOptions,
   dashboardMetricsRepository?: DashboardMetricsRepository,
 ) {
@@ -467,6 +469,30 @@ export function createApp(
     try {
       const detail = await manageCustomerEdits.replaceCoverages(request.params.id, request.body)
       response.status(200).json(detail)
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  // Configuración de la información de la agencia: solo el administrador (RF-SUP-07, RF-ATE-06).
+  const administrator = requireRole('administrador')
+  app.get('/api/configuracion/agencia', administrator, async (_request, response, next) => {
+    try {
+      response.status(200).json(await manageAgencySettings.get())
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.put('/api/configuracion/agencia', administrator, async (request, response, next) => {
+    try {
+      response.status(200).json(await manageAgencySettings.save(request.body))
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  // Lo que contestaría el asistente con un borrador: no guarda nada.
+  app.post('/api/configuracion/agencia/vista-previa', administrator, async (request, response, next) => {
+    try {
+      response.status(200).json(await manageAgencySettings.preview(request.body))
     } catch (error) {
       handleRequestError(error, response, next)
     }

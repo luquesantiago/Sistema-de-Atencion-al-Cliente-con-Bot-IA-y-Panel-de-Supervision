@@ -244,11 +244,25 @@ export function IconoReloj({ className }: IconoProps) {
   )
 }
 
+export function IconoConfiguracion({ className }: IconoProps) {
+  return (
+    <PanelIcono className={className}>
+      <path d="M4 7h9" />
+      <path d="M17 7h3" />
+      <circle cx="15" cy="7" r="2" />
+      <path d="M4 17h3" />
+      <path d="M11 17h9" />
+      <circle cx="9" cy="17" r="2" />
+    </PanelIcono>
+  )
+}
+
 const ICONOS: Record<ModuloPanel, (props: IconoProps) => ReactNode> = {
   dashboard: IconoDashboard,
   bandeja: IconoBandeja,
   tramites: IconoTramites,
   clientes: IconoClientes,
+  configuracion: IconoConfiguracion,
 }
 
 export function IconoModulo({

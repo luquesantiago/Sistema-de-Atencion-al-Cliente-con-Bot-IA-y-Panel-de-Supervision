@@ -30,12 +30,13 @@ describe('queryTypeRiskLevel', () => {
     ['cobertura', 'medio'],
     ['baja', 'medio'],
     ['modificación', 'medio'],
+    ['asistencia mecánica', 'medio'],
     ['cambio de teléfono', 'bajo'],
   ])('%s → %s', (type, level) => {
     expect(queryTypeRiskLevel(type)).toBe(level)
   })
 
-  it.each<QueryType | null>(['saldo', 'vencimiento', 'estado de póliza', 'saludo', 'información de la agencia', null])(
+  it.each<QueryType | null>(['saldo', 'vencimiento', 'estado de póliza', 'saludo', 'información de la agencia', 'medios de pago', null])(
     '%s no tiene nivel propio',
     (type) => {
       expect(queryTypeRiskLevel(type)).toBeNull()
@@ -105,6 +106,27 @@ describe('handoffRiskLevel', () => {
       caseType: 'vencimiento',
       urgency: null,
     })).toBe('medio')
+  })
+
+  it('un pedido de grúa queda medio, con el número cargado o sin él', () => {
+    expect(handoffRiskLevel({
+      reason: { kind: 'intent', intent: 'asistencia mecánica' },
+      caseType: 'asistencia mecánica',
+      urgency: null,
+    })).toBe('medio')
+    expect(handoffRiskLevel({
+      reason: { kind: 'missing-data', data: 'assistance-phone' },
+      caseType: 'asistencia mecánica',
+      urgency: null,
+    })).toBe('medio')
+  })
+
+  it('medios de pago sin cargar, derivado por dato ausente, queda bajo', () => {
+    expect(handoffRiskLevel({
+      reason: { kind: 'missing-data', data: 'payment-methods' },
+      caseType: 'medios de pago',
+      urgency: null,
+    })).toBe('bajo')
   })
 
   it('el cliente nuevo, sin tipo de consulta, queda medio', () => {

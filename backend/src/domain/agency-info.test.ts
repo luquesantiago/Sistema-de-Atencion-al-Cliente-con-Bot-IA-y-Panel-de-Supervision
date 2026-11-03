@@ -10,6 +10,10 @@ const today: AgencyInfo = {
   plans: ['terceros', 'todo riesgo', 'terceros incompletos', 'riesgos incompletos'],
   address: 'Ficticia 123',
   phone: '11 7816-8015',
+  assistancePhone: null,
+  email: null,
+  web: null,
+  paymentMethods: null,
   hours: weekdays('09:00', '18:00'),
 }
 
@@ -37,6 +41,26 @@ describe('agencyInfoAnswer', () => {
 
   it('una hora con minutos se muestra con los minutos', () => {
     expect(agencyInfoAnswer({ ...today, hours: weekdays('09:30', '18:00') })?.template).toContain('de lunes a viernes, de 9:30 a 18 h.')
+  })
+
+  it('con el email y la web cargados los suma al texto y a los datos que se conservan', () => {
+    const answer = agencyInfoAnswer({ ...today, email: 'contacto@ejemplo.com', web: 'https://ejemplo.com' })
+    expect(answer?.template).toContain(
+      'Nuestra oficina está en Ficticia 123 y nuestro teléfono es 11 7816-8015. ' +
+      'Nuestro email es contacto@ejemplo.com y nuestra web es https://ejemplo.com. Nuestro horario',
+    )
+    expect(answer?.literals).toEqual(expect.arrayContaining(['contacto@ejemplo.com', 'https://ejemplo.com']))
+  })
+
+  it('con solo el email o solo la web menciona el que está', () => {
+    expect(agencyInfoAnswer({ ...today, email: 'contacto@ejemplo.com' })?.template).toContain('Nuestro email es contacto@ejemplo.com. Nuestro horario')
+    expect(agencyInfoAnswer({ ...today, web: 'https://ejemplo.com' })?.template).toContain('Nuestra web es https://ejemplo.com. Nuestro horario')
+  })
+
+  it('sin email ni web no los menciona y responde igual', () => {
+    const answer = agencyInfoAnswer(today)
+    expect(answer?.template).not.toMatch(/email|web/)
+    expect(answer?.literals).toHaveLength(14)
   })
 
   it.each<[string, Partial<AgencyInfo>]>([

@@ -32,9 +32,17 @@ import {
 import type { WhatsAppClient, WhatsAppImage } from '../domain/whatsapp-client.js'
 import { ManageCustomers } from '../application/manage-customers.js'
 import { ManageCustomerEdits } from '../application/manage-customer-edits.js'
+import { ManageAgencySettings } from '../application/manage-agency-settings.js'
 import { ManageInbox } from '../application/manage-inbox.js'
 import { ManageSession } from '../application/manage-session.js'
 import { sessionDurationMs, signSession, type PanelUserRepository, type StoredPanelUser } from '../domain/session.js'
+import {
+  agencyTextFields,
+  settingDescription,
+  type AgencySettings,
+  type AgencySettingsRepository,
+  type StoredAgencySettings,
+} from '../domain/agency-settings.js'
 import { decideClose, type CloseInput, type PanelActor } from '../domain/case-actions.js'
 import type {
   CloseOutcome,
@@ -115,6 +123,45 @@ class FakeInbox implements InboxRepository {
 
   public async findImage(): Promise<InboxImageRef | null> {
     return this.image
+  }
+}
+
+// Configuración de la agencia en memoria, con los datos de ejemplo de la migración. Cuenta las
+// lecturas para probar que un pedido rechazado no lee nada.
+class FakeAgencySettings implements AgencySettingsRepository {
+  public reads = 0
+  public readonly saved: AgencySettings[] = []
+  public state: StoredAgencySettings = {
+    texts: {
+      address: { value: 'Ficticia 123', description: 'Dato de ejemplo, la agencia no lo informó: dirección' },
+      phone: { value: '11 7816-8015', description: 'Dato de ejemplo, la agencia no lo informó: teléfono' },
+      assistancePhone: { value: null, description: 'Sin informar por la agencia: teléfono de grúa' },
+      email: { value: null, description: 'Sin informar por la agencia: email' },
+      web: { value: null, description: 'Sin informar por la agencia: web' },
+      paymentMethods: { value: null, description: 'Sin informar por la agencia: medios de pago' },
+    },
+    hours: [1, 2, 3, 4, 5].map((day) => ({ day, opens: '09:00', closes: '18:00' })),
+    ramos: [{ id: 1, name: 'auto', active: true }, { id: 2, name: 'moto', active: true }],
+    plans: [{ id: 1, name: 'terceros', active: true }, { id: 2, name: 'todo riesgo', active: true }],
+  }
+
+  public async readSettings(): Promise<StoredAgencySettings> {
+    this.reads += 1
+    return structuredClone(this.state)
+  }
+
+  public async saveSettings(settings: AgencySettings): Promise<void> {
+    this.saved.push(settings)
+    const texts = { ...this.state.texts }
+    for (const field of agencyTextFields) {
+      texts[field] = { value: settings[field], description: settingDescription(field, this.state.texts[field], settings[field]) }
+    }
+    this.state = {
+      texts,
+      hours: settings.hours,
+      ramos: this.state.ramos.map((item) => ({ ...item, active: settings.activeRamoIds.includes(item.id) })),
+      plans: this.state.plans.map((item) => ({ ...item, active: settings.activePlanIds.includes(item.id) })),
+    }
   }
 }
 
@@ -349,7 +396,7 @@ describe('endpoints de trámites', () => {
     repository = new FakeRequestRepository()
     whatsapp = new FakeWhatsApp()
     const customers: CustomerRepository = new InMemoryCustomerRepository([])
-    const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, hours: [] })
+    const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, assistancePhone: null, email: null, web: null, paymentMethods: null, hours: [] })
     const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), agency, new FakeAi(), whatsapp)
     const app = createApp(
       assistant,
@@ -358,6 +405,7 @@ describe('endpoints de trámites', () => {
       new ManageCustomers(customers),
       new ManageCustomerEdits(new FakeCustomerEditRepository(), customers),
       new ManageInbox(new FakeInbox(), whatsapp),
+      new ManageAgencySettings(new FakeAgencySettings()),
       panelSession(),
     )
     server = app.listen(0)
@@ -682,7 +730,7 @@ describe('endpoints de clientes', () => {
 
     edits = new FakeCustomerEditRepository()
     const whatsapp = new FakeWhatsApp()
-    const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, hours: [] })
+    const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, assistancePhone: null, email: null, web: null, paymentMethods: null, hours: [] })
     const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), agency, new FakeAi(), whatsapp)
     const app = createApp(
       assistant,
@@ -692,6 +740,7 @@ describe('endpoints de clientes', () => {
       // Mismo día que el inicio de las altas de prueba: ninguna cuota vencida.
       new ManageCustomerEdits(edits, customers, () => new Date('2026-10-01T15:00:00Z')),
       new ManageInbox(new FakeInbox(), whatsapp),
+      new ManageAgencySettings(new FakeAgencySettings()),
       panelSession(),
     )
     server = app.listen(0)
@@ -1227,7 +1276,7 @@ describe('Bandeja de Atención', () => {
   beforeEach(async () => {
     const customers: CustomerRepository = new InMemoryCustomerRepository([])
     whatsapp = new FakeWhatsApp()
-    const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, hours: [] })
+    const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, assistancePhone: null, email: null, web: null, paymentMethods: null, hours: [] })
     const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), agency, new FakeAi(), whatsapp)
     inbox = new FakeInbox([reclamo, { ...reclamo, caseId: 13, severity: null }], {
       entry: reclamo,
@@ -1260,6 +1309,7 @@ describe('Bandeja de Atención', () => {
       new ManageCustomers(customers),
       new ManageCustomerEdits(new FakeCustomerEditRepository(), customers),
       new ManageInbox(inbox, whatsapp),
+      new ManageAgencySettings(new FakeAgencySettings()),
       panelSession(),
     )
     server = app.listen(0)
@@ -1432,7 +1482,7 @@ describe('sesión del panel', () => {
   beforeEach(async () => {
     const customers: CustomerRepository = new InMemoryCustomerRepository([])
     const whatsapp = new FakeWhatsApp()
-    const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, hours: [] })
+    const agency = new InMemoryAgencyInfoSource({ ramos: [], plans: [], address: null, phone: null, assistancePhone: null, email: null, web: null, paymentMethods: null, hours: [] })
     const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), agency, new FakeAi(), whatsapp)
     users = new FakePanelUsers()
     // Datos ficticios.
@@ -1471,6 +1521,7 @@ describe('sesión del panel', () => {
       new ManageCustomers(customers),
       new ManageCustomerEdits(new FakeCustomerEditRepository(), customers),
       new ManageInbox(inbox, whatsapp),
+      new ManageAgencySettings(new FakeAgencySettings()),
       panelSession(users),
     )
     // Una ruta de administración de prueba: este change no agrega ninguna real.
@@ -1629,5 +1680,136 @@ describe('sesión del panel', () => {
 
   it('/health sigue sin sesión', async () => {
     expect((await fetch(`${baseUrl}/health`)).status).toBe(200)
+  })
+})
+
+describe('Configuración de la agencia (RF-SUP-07, RF-ATE-06)', () => {
+  let server: ReturnType<ReturnType<typeof createApp>['listen']>
+  let baseUrl: string
+  let settings: FakeAgencySettings
+
+  // Datos ficticios, no de la agencia.
+  const draft = {
+    address: 'Calle Ficticia 456',
+    phone: '11 4000-0000',
+    assistancePhone: '0800 555 0000',
+    email: 'contacto@ejemplo.com',
+    web: null,
+    paymentMethods: 'Transferencia. Alias: EJEMPLO.ALIAS',
+    hours: [
+      { day: 1, opens: '09:00', closes: '18:00' },
+      { day: 6, opens: '09:00', closes: '13:00' },
+    ],
+    activeRamoIds: [1],
+    activePlanIds: [1, 2],
+  }
+
+  beforeEach(async () => {
+    const customers: CustomerRepository = new InMemoryCustomerRepository([])
+    const whatsapp = new FakeWhatsApp()
+    const agency = new InMemoryAgencyInfoSource({
+      ramos: [], plans: [], address: null, phone: null, assistancePhone: null, email: null, web: null, paymentMethods: null, hours: [],
+    })
+    const assistant = new ProcessIncomingMessage(customers, new InMemoryConversationStore(), agency, new FakeAi(), whatsapp)
+    settings = new FakeAgencySettings()
+    const app = createApp(
+      assistant,
+      { secret: 'test', findPhoneByLid: async () => null },
+      new ManageRequests(new FakeRequestRepository(), whatsapp),
+      new ManageCustomers(customers),
+      new ManageCustomerEdits(new FakeCustomerEditRepository(), customers),
+      new ManageInbox(new FakeInbox(), whatsapp),
+      new ManageAgencySettings(settings),
+      panelSession(),
+    )
+    server = app.listen(0)
+    await once(server, 'listening')
+    const address = server.address() as AddressInfo
+    baseUrl = `http://127.0.0.1:${address.port}`
+  })
+
+  afterEach(async () => {
+    server.close()
+    await once(server, 'close')
+  })
+
+  const admin = sessionCookie(11)
+  function call(path: string, method: string, body?: unknown, cookie: string | null = admin) {
+    return fetch(`${baseUrl}/api/configuracion/agencia${path}`, {
+      method,
+      headers: {
+        ...(cookie ? { Cookie: cookie } : {}),
+        ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    })
+  }
+
+  it('el administrador lee los datos con las marcas y la vista previa', async () => {
+    const response = await call('', 'GET')
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body).toMatchObject({
+      address: 'Ficticia 123',
+      assistancePhone: null,
+      marks: { address: 'example', phone: 'example', assistancePhone: 'missing', email: 'missing', web: 'missing', paymentMethods: 'missing' },
+      ramos: [{ id: 1, name: 'auto', active: true }, { id: 2, name: 'moto', active: true }],
+      preview: { agencyInfo: expect.stringContaining('Nuestra oficina está en Ficticia 123'), assistance: null, paymentMethods: null },
+    })
+  })
+
+  it('el administrador guarda: los datos cambiados dejan de ser de ejemplo y la vista previa los usa', async () => {
+    const response = await call('', 'PUT', draft)
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(settings.saved).toHaveLength(1)
+    expect(body).toMatchObject({
+      marks: { address: null, phone: null, assistancePhone: null, web: 'missing' },
+      ramos: [{ id: 1, name: 'auto', active: true }, { id: 2, name: 'moto', active: false }],
+      preview: {
+        agencyInfo: expect.stringMatching(/seguros de auto\..*y los sábados, de 9 a 13 h/),
+        assistance: expect.stringContaining('comuníquese al 0800 555 0000'),
+        paymentMethods: 'Estos son los medios de pago de Seguros Castaño: Transferencia. Alias: EJEMPLO.ALIAS',
+      },
+    })
+  })
+
+  it.each<[string, Record<string, unknown>]>([
+    ['sin dirección', { address: '' }],
+    ['horario invertido', { hours: [{ day: 1, opens: '18:00', closes: '09:00' }] }],
+    ['un ramo que no existe', { activeRamoIds: [99] }],
+    ['sin planes activos', { activePlanIds: [] }],
+  ])('un dato inválido (%s) da 400 y no guarda nada', async (_caso, cambio) => {
+    const response = await call('', 'PUT', { ...draft, ...cambio })
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_ERROR' } })
+    expect(settings.saved).toEqual([])
+  })
+
+  it('la vista previa arma los textos del borrador sin guardar nada', async () => {
+    const response = await call('/vista-previa', 'POST', draft)
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({
+      agencyInfo: expect.stringContaining('Calle Ficticia 456'),
+      assistance: expect.stringContaining('0800 555 0000'),
+    })
+    expect(settings.saved).toEqual([])
+    expect(settings.state.texts.address.value).toBe('Ficticia 123')
+  })
+
+  it.each<[string, string, unknown]>([
+    ['', 'GET', undefined],
+    ['', 'PUT', draft],
+    ['/vista-previa', 'POST', draft],
+  ])('un operador recibe 403 en %s %s sin leer ni modificar nada', async (path, method, body) => {
+    const response = await call(path, method, body, sessionCookie(10))
+    expect(response.status).toBe(403)
+    expect(settings.reads).toBe(0)
+    expect(settings.saved).toEqual([])
+  })
+
+  it('sin sesión da 401', async () => {
+    expect((await call('', 'GET', undefined, null)).status).toBe(401)
+    expect(settings.reads).toBe(0)
   })
 })

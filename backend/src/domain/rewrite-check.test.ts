@@ -54,6 +54,10 @@ describe('checkRewrite con la información de la agencia', () => {
     plans: ['terceros', 'todo riesgo', 'terceros incompletos', 'riesgos incompletos'],
     address: 'Ficticia 123',
     phone: '11 7816-8015',
+    assistancePhone: null,
+    email: null,
+    web: null,
+    paymentMethods: null,
     hours: [1, 2, 3, 4, 5].map((day) => ({ day, opens: '09:00', closes: '18:00' })),
   })
   if (!answer) throw new Error('Faltan datos de la agencia en la prueba')

@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard'
 import BandejaAtencion from './pages/BandejaAtencion'
 import TramitesAprobar from './pages/TramitesAprobar'
 import BaseClientes from './pages/BaseClientes'
+import Configuracion from './pages/Configuracion'
 import Login from './pages/Login'
 import { EVENTO_SESION_VENCIDA } from './api/respuesta'
 import { cerrarSesion, obtenerSesion } from './api/sesion'
@@ -29,6 +30,7 @@ const PAGINAS: Record<Exclude<ModuloPanel, 'dashboard'>, ComponentType<PropsPagi
   bandeja: BandejaAtencion,
   tramites: TramitesAprobar,
   clientes: BaseClientes,
+  configuracion: Configuracion,
 }
 
 // El administrador entra al Dashboard; el operador, que no lo ve, a la Bandeja.

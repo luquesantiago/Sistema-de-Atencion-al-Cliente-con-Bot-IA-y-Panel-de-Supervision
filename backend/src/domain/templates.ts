@@ -8,6 +8,19 @@ import type { DataChangeTargetField } from './data-change.js'
 export const handoffMessage =
   'Su pregunta será derivada a un miembro de nuestro equipo especializado, quien podrá ayudarlo con mayor detalle.'
 
+// Pedido de grúa o asistencia con el teléfono cargado: en el mismo mensaje, el teléfono y el
+// aviso de la derivación (change configuracion-agencia). Texto fijo: el teléfono sale tal
+// cual lo cargó el administrador, sin redacción del proveedor de IA.
+export function assistanceMessage(phone: string): string {
+  return `Para una grúa o asistencia mecánica, comuníquese al ${phone}. Además, su pedido será derivado a un miembro de nuestro equipo, quien hará el seguimiento.`
+}
+
+// Medios de pago cargados por el administrador: van tal cual, para que un CBU o un alias no
+// cambien. Solo se informan: los pagos siguen fuera del sistema.
+export function paymentMethodsMessage(paymentMethods: string): string {
+  return `Estos son los medios de pago de Seguros Castaño: ${paymentMethods}`
+}
+
 export const approvalNotice =
   'Recibimos su pedido. Un miembro de nuestro equipo lo va a revisar y se va a comunicar con usted.'
 

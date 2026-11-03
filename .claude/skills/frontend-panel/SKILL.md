@@ -1,13 +1,13 @@
 ---
 name: frontend-panel
-description: Guía visual y de UX del panel de supervisión (Dashboard, Bandeja de Atención, Trámites por Aprobar, Base de Clientes). Cubre colores, estados, accesibilidad y responsive. Usar al construir o modificar pantallas, componentes, tablas, modales o el login del frontend.
+description: Guía visual y de UX del panel de supervisión (Dashboard, Bandeja de Atención, Trámites por Aprobar, Base de Clientes, Configuración). Cubre colores, estados, accesibilidad y responsive. Usar al construir o modificar pantallas, componentes, tablas, modales o el login del frontend.
 ---
 
 # Skill: Frontend del panel
 
 ## Cuándo usarla
 
-Usar al construir Dashboard, Bandeja de Atención, Trámites por Aprobar, Base de Clientes, login, modales, tablas, estados o componentes compartidos.
+Usar al construir Dashboard, Bandeja de Atención, Trámites por Aprobar, Base de Clientes, Configuración, login, modales, tablas, estados o componentes compartidos.
 
 ## Dirección visual
 
@@ -40,6 +40,7 @@ Pantallas que necesita el flujo (ver «Parcial 1: alcance y flujo» en AGENTS.md
 
 - Bandeja de Atención con los casos derivados: tomar el caso, ver la conversación completa, contestarle al cliente (el mensaje sale por WhatsApp) y cerrarlo.
 - Trámites por Aprobar con los pedidos de cambio de teléfono: el número nuevo, los números actuales del cliente para elegir cuáles se desvinculan (puede no elegir ninguno), el fundamento (obligatorio: lo exige la base) y los botones de aprobar y rechazar.
+- Configuración (solo administrador, `pages/Configuracion.tsx`): los datos de la agencia por secciones, con las marcas «Dato de ejemplo» y «Sin cargar», la vista previa de lo que contesta el asistente (se pide al backend sin guardar) y la confirmación campo por campo con `ConfirmarCambio`. `MODULOS_ADMINISTRADOR` en `navigation.ts` dice qué módulos se ocultan al operador.
 - Pantalla de ingreso contra la API (`api/sesion.ts`). Al recargar, el panel recupera la sesión con `GET /api/sesion`, y ante un 401 de cualquier otra ruta (`sesion-vencida`) vuelve al ingreso. El menú oculta lo que el rol no permite, pero la barrera es el backend.
 
 El mock (`Propuesta-Comercial-y-Tecnica.pdf`) no está en el repo. Si se toman ideas de él, no copiar lo que choca con lo acordado: «Cambio de Contrato» (en el DER es «modificación de póliza»), «Pendiente de firma» (el estado es «pendiente»), aprobar o rechazar sin fundamento, la bandeja sin responsable ni tiempo de espera, mensajes que prometen tiempos («a la brevedad»), el semáforo de 3 colores (el DER tiene 4 niveles de riesgo) y datos inventados en las fichas.
