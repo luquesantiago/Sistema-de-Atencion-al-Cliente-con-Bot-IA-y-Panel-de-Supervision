@@ -1,3 +1,4 @@
+import type { DataChangeTargetField } from '../domain/data-change.js'
 import type {
   CaseRef,
   ConversationChanges,
@@ -45,6 +46,14 @@ export type StoredPhoneChange = {
   phone: string
   status: 'pendiente' | 'aprobada' | 'rechazada'
 }
+export type StoredDataChange = {
+  id: number
+  caseId: number
+  customerId: number
+  field: DataChangeTargetField
+  value: string
+  status: 'pendiente' | 'aprobada' | 'rechazada'
+}
 
 export type ConversationState = {
   nextId: number
@@ -54,6 +63,7 @@ export type ConversationState = {
   replies: StoredReply[]
   prospects: StoredProspect[]
   phoneChanges: StoredPhoneChange[]
+  dataChanges: StoredDataChange[]
 }
 
 export class InMemoryConversationStore implements ConversationStore {
@@ -65,6 +75,7 @@ export class InMemoryConversationStore implements ConversationStore {
     replies: [],
     prospects: [],
     phoneChanges: [],
+    dataChanges: [],
   }
   public failNextRead = false
   public failNextSave = false
@@ -91,7 +102,8 @@ export class InMemoryConversationStore implements ConversationStore {
         handedOff: item.handedOffAt !== null,
         closedAt: item.closedAt,
         hasPending: item.unattendedAlert ||
-          this.state.phoneChanges.some((request) => request.caseId === item.id && request.status === 'pendiente'),
+          this.state.phoneChanges.some((request) => request.caseId === item.id && request.status === 'pendiente') ||
+          this.state.dataChanges.some((request) => request.caseId === item.id && request.status === 'pendiente'),
       })),
       messages: this.state.messages
         .filter((message) => caseIds.has(message.caseId))
@@ -254,6 +266,17 @@ function apply(state: ConversationState, changes: ConversationChanges): SavedCon
       const target = caseOf(ref)
       target.riskLevel = riskLevel
       state.phoneChanges.push({ id: newId(), caseId: target.id, customerId, phone: changes.phone, status: 'pendiente' })
+    }
+  }
+  if (changes.dataChangeRequest) {
+    const { case: ref, customerId, field, value, riskLevel } = changes.dataChangeRequest
+    // Una sola solicitud pendiente por cliente y por dato (change cambio-datos-cliente).
+    const pending = state.dataChanges.some((request) =>
+      request.customerId === customerId && request.field === field && request.status === 'pendiente')
+    if (!pending) {
+      const target = caseOf(ref)
+      target.riskLevel = riskLevel
+      state.dataChanges.push({ id: newId(), caseId: target.id, customerId, field, value, status: 'pendiente' })
     }
   }
 

@@ -147,6 +147,8 @@ function detalleAlerta(caso: CasoBandeja): string {
       return 'Pedido pendiente de aprobación'
     case 'cambio-telefono-pendiente':
       return 'Cambio de teléfono pendiente de aprobación'
+    case 'cambio-datos-pendiente':
+      return 'Cambio de datos pendiente de aprobación'
   }
   switch (caso.queryType) {
     case 'siniestro':

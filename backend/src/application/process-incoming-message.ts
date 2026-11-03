@@ -1,5 +1,5 @@
 import { agencyInfoAnswer, type AgencyInfoAnswer, type AgencyInfoSource } from '../domain/agency-info.js'
-import type { AiClient, CustomerStatus } from '../domain/ai-client.js'
+import type { AiClient, ContextMessage, CustomerStatus, DataChangeExtraction } from '../domain/ai-client.js'
 import { balanceTemplate } from '../domain/balance.js'
 import {
   caseForMessage,
@@ -20,6 +20,7 @@ import {
   type Settings,
 } from '../domain/conversation.js'
 import type { Customer, CustomerRepository } from '../domain/customer.js'
+import { routeDataChange, type DataChangeRoute, type DataChangeTargetField } from '../domain/data-change.js'
 import { findDni, maskDni } from '../domain/dni.js'
 import { describeHandoffReason, type HandoffReason } from '../domain/handoff.js'
 import { actionForIntent, clarificationStep, type AnswerTemplate, type Intent } from '../domain/intent.js'
@@ -35,6 +36,8 @@ import {
   courtesyTemplate,
   customerDataTemplate,
   customerPoliciesTemplate,
+  dataChangeFieldQuestion,
+  dataChangeValueQuestion,
   existingCustomerDniRequest,
   expirationsTemplate,
   firstDniRequest,
@@ -91,6 +94,10 @@ type Stage =
   // revalidated: la identificación se hizo con el cliente inactivo (por DNI después de la
   // baja): no se vuelve a reiniciar la sesión en cada mensaje.
   | { stage: 'identified'; customerId: number; notUnderstood: number; revalidated: boolean }
+  // Pidiendo los datos de un cambio de nombre o apellido (change cambio-datos-cliente).
+  // pendingField: el dato que se pidió, null si todavía no se sabe cuál; notUnderstood:
+  // repreguntas seguidas; revalidated, lo mismo que en identified.
+  | { stage: 'data_change_requested'; customerId: number; pendingField: DataChangeTargetField | null; notUnderstood: number; revalidated: boolean }
 
 type IdentifiedStage = Extract<Stage, { stage: 'identified' }>
 
@@ -116,6 +123,10 @@ export type ProcessResult =
   | { status: 'CLARIFICATION_REQUESTED'; responseSent: true }
   | { status: 'AGENCY_INFO_SENT'; responseSent: true }
   | { status: 'APPROVAL_NOTICE_SENT'; intent: Intent; responseSent: true }
+// Pregunta del flujo de cambio de datos enviada (campo o valor que falta).
+  | { status: 'DATA_CHANGE_REQUESTED'; responseSent: true }
+  // Solicitud de cambio de datos creada en Trámites, con el aviso al cliente (sin derivar).
+  | { status: 'DATA_CHANGE_NOTICE_SENT'; responseSent: true }
   | { status: 'HANDOFF_SENT'; reason: string; responseSent: boolean }
   | { status: 'NOT_INSURANCE_REPLIED'; responseSent: true }
   | { status: 'IGNORED_MEDIA'; responseSent: false }
@@ -267,7 +278,7 @@ export class ProcessIncomingMessage {
     // mensaje empieza un chat nuevo, que vuelve a pedir la identificación. Si la etapa ya se
     // revalidó (DNI después de la baja) o el cliente está activo, se reutiliza la lectura.
     let known: Customer | undefined
-    if (conversation && stage?.stage === 'identified' && !stage.revalidated) {
+    if (conversation && (stage?.stage === 'identified' || stage?.stage === 'data_change_requested') && !stage.revalidated) {
       const current = await this.customers.findById(stage.customerId)
       if (current && !current.active) {
         closePrevious = { conversationId: conversation.id, ...endByDeactivation(conversation, at) }
@@ -325,6 +336,8 @@ export class ProcessIncomingMessage {
           return this.start(turn, text, settings)
         }
         return this.answerIdentified(turn, stage, text, known)
+      case 'data_change_requested':
+        return this.continueDataChange(turn, stage, text, known)
     }
   }
 
@@ -703,6 +716,9 @@ export class ProcessIncomingMessage {
     query: { text: string; answers: QueryRef; caseId?: number },
     welcomeIfUnrelated: boolean,
     notUnderstood: number,
+    // La intención ya elegida (el flujo de cambio de datos que salió de su estado): si
+    // viene, no se vuelve a clasificar el mensaje.
+    classified: { intent: Intent; urgency: Urgency | null } | null = null,
   ): Promise<ProcessResult> {
     const question = maskDni(query.text)
     const caseFor = (intent: Intent): CaseRef => {
@@ -716,22 +732,26 @@ export class ProcessIncomingMessage {
     const context = intentContext(turn.conversation, query.answers === 'incoming' ? undefined : query.answers.existing)
     let intent: Intent
     let urgency: Urgency | null
-    try {
-      ({ intent, urgency } = await this.ai.classifyIntent(question, context))
-    } catch {
-      // No se pudo decidir la intención: se repregunta como si no se entendiera, sin derivar de
-      // entrada. Recién con las repreguntas agotadas se deriva por falla del proveedor.
-      const step = clarificationStep(notUnderstood)
-      const ref = caseFor('otra consulta')
-      if (step.kind === 'handoff') return this.handoffIn(turn, ref, { kind: 'provider-failure', step: 'intent' }, query.answers)
-      turn.reply(ref, clarificationRequestFor(step.notUnderstood), query.answers)
-      turn.nextStage = () => ({
-        stage: 'identified',
-        customerId: customer.id,
-        notUnderstood: step.notUnderstood,
-        revalidated: !customer.active,
-      })
-      return { status: 'CLARIFICATION_REQUESTED', responseSent: true }
+    if (classified) {
+      ({ intent, urgency } = classified)
+    } else {
+      try {
+        ({ intent, urgency } = await this.ai.classifyIntent(question, context))
+      } catch {
+        // No se pudo decidir la intención: se repregunta como si no se entendiera, sin derivar de
+        // entrada. Recién con las repreguntas agotadas se deriva por falla del proveedor.
+        const step = clarificationStep(notUnderstood)
+        const ref = caseFor('otra consulta')
+        if (step.kind === 'handoff') return this.handoffIn(turn, ref, { kind: 'provider-failure', step: 'intent' }, query.answers)
+        turn.reply(ref, clarificationRequestFor(step.notUnderstood), query.answers)
+        turn.nextStage = () => ({
+          stage: 'identified',
+          customerId: customer.id,
+          notUnderstood: step.notUnderstood,
+          revalidated: !customer.active,
+        })
+        return { status: 'CLARIFICATION_REQUESTED', responseSent: true }
+      }
     }
 
     const action = actionForIntent(intent)
@@ -789,9 +809,150 @@ export class ProcessIncomingMessage {
         turn.changes.handoff = handoffOf(ref, { kind: 'approval', intent }, { intent })
         turn.reply(ref, approvalNotice, query.answers)
         return { status: 'APPROVAL_NOTICE_SENT', intent, responseSent: true }
+      case 'data-change':
+        // Quiere cambiar un dato personal: el modelo extrae campo y valor y el código
+        // decide el destino (change cambio-datos-cliente).
+        return this.startDataChange(turn, ref, customer, question, query.answers, context)
       case 'answer':
         return this.sendRewrittenAnswer(turn, ref, customer, question, query.answers, intent, action.template)
     }
+  }
+
+  // Arranca un pedido de cambio de nombre o apellido: el modelo solo extrae campo y valor,
+  // y el código decide si pide el dato que falta, si es un teléfono (regla 9) o si arma la
+  // solicitud de Trámites (change cambio-datos-cliente).
+  private async startDataChange(
+    turn: Turn,
+    ref: CaseRef,
+    customer: Customer,
+    question: string,
+    answers: QueryRef,
+    context: readonly ContextMessage[],
+  ): Promise<ProcessResult> {
+    let route: DataChangeRoute
+    try {
+      route = routeDataChange(await this.ai.extractDataChange(question, context))
+    } catch {
+      // Falla del proveedor al extraer: se pide el dato como si se hubiera entendido la
+      // consulta, sin mencionar la falla; si vuelve a fallar, se deriva desde el estado.
+      route = { kind: 'ask-field' }
+    }
+    return this.applyDataChange(turn, ref, customer, route, null, 0, answers)
+  }
+
+  // El asistente ya preguntó qué dato o qué valor hace falta y el cliente volvió a escribir.
+  private async continueDataChange(
+    turn: Turn,
+    stage: Extract<Stage, { stage: 'data_change_requested' }>,
+    text: string,
+    known?: Customer,
+  ): Promise<ProcessResult> {
+    const customer = known ?? await this.customers.findById(stage.customerId)
+    if (!customer) {
+      // La fila ya no existe: se deriva, como en la sesión identificada. La baja lógica no
+      // llega acá (reinicia la sesión).
+      turn.nextStage = () => ({ ...stage, notUnderstood: 0 })
+      return this.handoffUntyped(turn, { kind: 'customer-missing' })
+    }
+    // Por defecto la sesión vuelve a la identificada: los caminos que siguen en el flujo lo
+    // pisan con dataChangeStage.
+    turn.nextStage = () => identifiedStageOf(customer)
+    const question = maskDni(text)
+    const ref = turn.caseFor({ kind: 'intent', intent: 'cambio de datos' })
+    if (!turn.hasIncomingCase) turn.receiveIn(ref)
+    const context = intentContext(turn.conversation)
+
+    let extraction: DataChangeExtraction
+    try {
+      extraction = await this.ai.extractDataChange(question, context, stage.pendingField)
+    } catch {
+      return this.reaskDataChange(turn, ref, customer, stage.pendingField, stage.notUnderstood, { kind: 'provider-failure', step: 'intent' }, 'incoming')
+    }
+
+    const route = routeDataChange(extraction)
+    if (route.kind !== 'ask-field') return this.applyDataChange(turn, ref, customer, route, stage.pendingField, stage.notUnderstood, 'incoming')
+
+    // No se pudo extraer el campo: ¿sigue siendo un cambio de datos o es otra consulta?
+    let intent: Intent
+    let urgency: Urgency | null
+    try {
+      ({ intent, urgency } = await this.ai.classifyIntent(question, context))
+    } catch {
+      return this.reaskDataChange(turn, ref, customer, stage.pendingField, stage.notUnderstood, { kind: 'provider-failure', step: 'intent' }, 'incoming')
+    }
+    if (intent !== 'cambio de datos') {
+      // Otra consulta: se sale del estado y se procesa con la clasificación ya hecha.
+      return this.answerQuery(turn, customer, { text, answers: 'incoming' }, false, stage.notUnderstood, { intent, urgency })
+    }
+    return this.reaskDataChange(turn, ref, customer, stage.pendingField, stage.notUnderstood, { kind: 'not-understood' }, 'incoming')
+  }
+
+  // Aplica el ruteo de un pedido de cambio de datos: crea la solicitud, pide el dato que
+  // falta o usa la lógica del cambio de teléfono (regla 9).
+  private applyDataChange(
+    turn: Turn,
+    ref: CaseRef,
+    customer: Customer,
+    route: DataChangeRoute,
+    pendingField: DataChangeTargetField | null,
+    notUnderstood: number,
+    answers: QueryRef,
+  ): ProcessResult {
+    switch (route.kind) {
+      case 'phone':
+        // Un teléfono no se cambia por este flujo: se pide escribir desde el número nuevo
+        // y no se registra ninguna solicitud (regla 9).
+        turn.reply(ref, useNewPhoneRequest, answers)
+        turn.nextStage = () => identifiedStageOf(customer)
+        return { status: 'NEW_PHONE_REQUESTED', intent: 'cambio de teléfono', responseSent: true }
+      case 'create':
+        // La solicitud queda en el caso de la consulta, sin derivar ni silenciar la
+        // conversación: el aviso es el de todo trámite pendiente.
+        turn.changes.dataChangeRequest = {
+          case: ref,
+          customerId: customer.id,
+          field: route.field,
+          value: route.value,
+          riskLevel: queryTypeRiskLevel('cambio de datos') ?? 'bajo',
+        }
+        turn.reply(ref, approvalNotice, answers)
+        turn.nextStage = () => identifiedStageOf(customer)
+        return { status: 'DATA_CHANGE_NOTICE_SENT', responseSent: true }
+      case 'ask-value':
+        if (pendingField !== null) {
+          // Ya se pidió un dato y la respuesta vino sin el valor: se repregunta.
+          return this.reaskDataChange(turn, ref, customer, route.field, notUnderstood, { kind: 'not-understood' }, answers)
+        }
+        // Progreso: se sabe el campo y se pide el valor, sin contar un intento de más.
+        turn.reply(ref, dataChangeValueQuestion(route.field, 0), answers)
+        turn.nextStage = () => dataChangeStage(customer, route.field, notUnderstood)
+        return { status: 'DATA_CHANGE_REQUESTED', responseSent: true }
+      case 'ask-field':
+        turn.reply(ref, dataChangeFieldQuestion(0), answers)
+        turn.nextStage = () => dataChangeStage(customer, null, notUnderstood)
+        return { status: 'DATA_CHANGE_REQUESTED', responseSent: true }
+    }
+  }
+
+  // Repregunta el dato que falta con una redacción distinta por intento; con las
+  // repreguntas agotadas se deriva con `reason`, sin que el cliente vea la falla.
+  private reaskDataChange(
+    turn: Turn,
+    ref: CaseRef,
+    customer: Customer,
+    missing: DataChangeTargetField | null,
+    notUnderstood: number,
+    reason: HandoffReason,
+    answers: QueryRef,
+  ): ProcessResult {
+    const step = clarificationStep(notUnderstood)
+    if (step.kind === 'handoff') return this.handoffIn(turn, ref, reason, answers, { intent: 'cambio de datos' })
+    const question = missing === null
+      ? dataChangeFieldQuestion(step.notUnderstood)
+      : dataChangeValueQuestion(missing, step.notUnderstood)
+    turn.reply(ref, question, answers)
+    turn.nextStage = () => dataChangeStage(customer, missing, step.notUnderstood)
+    return { status: 'DATA_CHANGE_REQUESTED', responseSent: true }
   }
 
   private async sendRewrittenAnswer(
@@ -974,6 +1135,16 @@ function handoffOf(ref: CaseRef, reason: HandoffReason, query: ClassifiedQuery |
 
 function identificationOf(stage: Identification): Identification {
   return { linkedIds: stage.linkedIds, pending: stage.pending, unrecognizedDnis: stage.unrecognizedDnis }
+}
+
+// La sesión del flujo de cambio de datos, con el dato que se pidió (change cambio-datos-cliente).
+function dataChangeStage(customer: Customer, pendingField: DataChangeTargetField | null, notUnderstood: number): Stage {
+  return { stage: 'data_change_requested', customerId: customer.id, pendingField, notUnderstood, revalidated: !customer.active }
+}
+
+// La sesión identificada que retoma después de un pedido de cambio de datos.
+function identifiedStageOf(customer: Customer): Stage {
+  return { stage: 'identified', customerId: customer.id, notUnderstood: 0, revalidated: !customer.active }
 }
 
 // La consulta guardada en este mismo mensaje pasa a ser el mensaje que se guardó.
