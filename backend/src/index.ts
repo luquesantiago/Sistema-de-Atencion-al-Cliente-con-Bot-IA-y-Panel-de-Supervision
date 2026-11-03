@@ -15,6 +15,7 @@ import { PrismaCustomerEditRepository } from './infrastructure/prisma-customer-e
 import { findTestOperatorId } from './infrastructure/prisma-case-closing.js'
 import { PrismaInboxRepository } from './infrastructure/prisma-inbox-repository.js'
 import { PrismaRequestManagementRepository } from './infrastructure/prisma-request-management-repository.js'
+import { PrismaDashboardMetricsRepository } from './infrastructure/prisma-dashboard-metrics-repository.js'
 import { WahaWhatsAppClient } from './infrastructure/waha-whatsapp-client.js'
 
 const adapter = new PrismaMariaDb({
@@ -40,12 +41,13 @@ const manageRequests = new ManageRequests(new PrismaRequestManagementRepository(
 const manageCustomers = new ManageCustomers(customerRepository)
 const manageCustomerEdits = new ManageCustomerEdits(new PrismaCustomerEditRepository(prisma), customerRepository)
 const manageInbox = new ManageInbox(new PrismaInboxRepository(prisma), whatsapp)
+const dashboardMetricsRepository = new PrismaDashboardMetricsRepository(prisma)
 // Quién actúa desde el panel: el usuario de prueba operador hasta el login del Parcial 2.
 const resolvePanelActor = async () => ({ userId: await findTestOperatorId(prisma) })
 
 createApp(processIncomingMessage, {
   secret: config.whatsappWebhookSecret,
   findPhoneByLid: (lid) => whatsapp.findPhoneByLid(lid),
-}, manageRequests, manageCustomers, manageCustomerEdits, manageInbox, resolvePanelActor).listen(config.port, () => {
+}, manageRequests, manageCustomers, manageCustomerEdits, manageInbox, resolvePanelActor, dashboardMetricsRepository).listen(config.port, () => {
   console.log(`Backend listening on port ${config.port}`)
 })

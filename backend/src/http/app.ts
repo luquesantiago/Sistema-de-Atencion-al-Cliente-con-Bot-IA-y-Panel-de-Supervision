@@ -13,6 +13,7 @@ import {
 } from '../domain/request-management.js'
 import { KeyedQueue } from '../infrastructure/keyed-queue.js'
 import { isValidWebhookSecret, maskPhoneForLog, messageKeyForLog, parseWahaWebhook } from '../infrastructure/waha-webhook.js'
+import type { DashboardMetricsRepository } from '../domain/dashboard-metrics.js'
 
 export type WhatsAppWebhookOptions = {
   secret: string
@@ -28,6 +29,7 @@ export function createApp(
   manageInbox: ManageInbox,
   // Mientras no haya autenticación, el usuario de prueba operador (change bandeja-atender-casos, decisión 1).
   resolvePanelActor: () => Promise<PanelActor>,
+  dashboardMetricsRepository?: DashboardMetricsRepository,
 ) {
   const app = express()
   const senders = new KeyedQueue()
@@ -231,6 +233,28 @@ export function createApp(
   app.get('/api/catalogos', async (_request, response, next) => {
     try {
       response.status(200).json(await manageCustomerEdits.listCatalogs())
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.get('/api/dashboard/metrics', async (_request, response, next) => {
+    try {
+      if (!dashboardMetricsRepository) {
+        response.status(503).json({
+          error: { code: 'SERVICE_UNAVAILABLE', message: 'Las métricas del Dashboard no están disponibles.' },
+        })
+        return
+      }
+      const tramitesPorAprobar = await dashboardMetricsRepository.countPendingProcedures()
+      const alertasRiesgoAbiertas = await dashboardMetricsRepository.countOpenRiskAlerts()
+      const resumenOperativo = await dashboardMetricsRepository.getOperationalSummary(new Date())
+      response.status(200).json({
+        casosDerivadosSinTomar: 0,
+        respuestasRetenidas: 0,
+        tramitesPorAprobar,
+        alertasRiesgoAbiertas,
+        ...resumenOperativo,
+      })
     } catch (error) {
       handleRequestError(error, response, next)
     }
