@@ -31,6 +31,17 @@
   --color-success-border: #a9d8bd;
   --color-warning-border: #f3d89a;
   --color-danger-border: #f5c2c2;
+  --color-dashboard-heading: #3a0d1a;
+  --color-dashboard-muted: #6b3a48;
+  --color-dashboard-label: #4a1626;
+  --color-dashboard-chart-wine: #7a1f35;
+  --color-dashboard-chart-rose: #c24468;
+  --color-dashboard-wine-soft: rgba(122, 31, 53, 0.08);
+  --color-dashboard-wine-border: rgba(122, 31, 53, 0.14);
+  --color-dashboard-wine-base: rgba(122, 31, 53, 0.32);
+  --color-dashboard-wine-shadow: rgba(122, 31, 53, 0.16);
+  --color-dashboard-wine-tint: rgba(122, 31, 53, 0.06);
+  --color-dashboard-rose-tint: rgba(194, 68, 104, 0.08);
   --nav-overlay: rgba(247, 244, 239, 0.15);
   --nav-hover: rgba(247, 244, 239, 0.22);
   --nav-borde: rgba(247, 244, 239, 0.14);
@@ -137,4 +148,3 @@ h2 {
     scroll-behavior: auto !important;
   }
 }
-

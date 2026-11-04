@@ -40,6 +40,11 @@ Todos los valores de este documento se centralizan en `:root`. Los componentes d
 
   /* Derivados de la paleta para superficies que la guía no nombra */
   --color-danger-hover: #8F1D17;
+  --color-dashboard-heading: #3A0D1A;
+  --color-dashboard-muted: #6B3A48;
+  --color-dashboard-label: #4A1626;
+  --color-dashboard-chart-wine: #7A1F35;
+  --color-dashboard-chart-rose: #C24468;
   --nav-overlay: rgba(247, 244, 239, 0.15);
   --nav-borde: rgba(247, 244, 239, 0.14);
   --nav-texto: rgba(247, 244, 239, 0.78);
