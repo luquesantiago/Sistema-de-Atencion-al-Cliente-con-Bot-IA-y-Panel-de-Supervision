@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MODULOS, type ModuloPanel } from '../navigation'
+import { MODULOS, MODULOS_ADMINISTRADOR, type ModuloPanel } from '../navigation'
 import {
   IconoCerrar,
   IconoEscudo,
@@ -113,7 +113,7 @@ export default function Sidebar({
   const modulosVisibles =
     usuario.rol === 'administrador'
       ? MODULOS
-      : MODULOS.filter((modulo) => modulo.id !== 'dashboard')
+      : MODULOS.filter((modulo) => !MODULOS_ADMINISTRADOR.includes(modulo.id))
 
   return (
     <>

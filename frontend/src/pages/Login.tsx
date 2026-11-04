@@ -1,33 +1,48 @@
 import { useState, type FormEvent } from 'react'
-import { crearUsuario, type UsuarioPanel } from '../usuario'
+import { ErrorDeApi } from '../api/respuesta'
+import { iniciarSesion } from '../api/sesion'
+import { usuarioDesdeSesion, type UsuarioPanel } from '../usuario'
 
 interface LoginProps {
   onIngresar: (usuario: UsuarioPanel) => void
+  /** Mientras el panel consulta si ya hay una sesión abierta. */
+  verificando?: boolean
+  /** La sesión anterior venció o se cerró en el servidor. */
+  sesionVencida?: boolean
 }
 
-export default function Login({ onIngresar }: LoginProps) {
+export default function Login({ onIngresar, verificando = false, sesionVencida = false }: LoginProps) {
   const [nombreUsuario, setNombreUsuario] = useState('')
   const [contrasena, setContrasena] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [errorUsuario, setErrorUsuario] = useState('')
   const [errorContrasena, setErrorContrasena] = useState('')
+  const [errorServidor, setErrorServidor] = useState('')
+  const [enviando, setEnviando] = useState(false)
 
-  function manejarEnvio(evento: FormEvent<HTMLFormElement>) {
+  // El usuario y la clave se verifican en el backend; acá solo se pide que no estén vacíos.
+  async function manejarEnvio(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault()
-    const usuarioNormalizado = nombreUsuario.trim().toLocaleLowerCase('es-AR')
-    const usuarioValido = usuarioNormalizado === 'admin' || usuarioNormalizado === 'operador'
-    const contrasenaValida = contrasena === '1234'
+    if (enviando || verificando) return
+    const usuarioVacio = nombreUsuario.trim() === ''
+    const contrasenaVacia = contrasena === ''
+    setErrorUsuario(usuarioVacio ? 'Ingresá tu usuario.' : '')
+    setErrorContrasena(contrasenaVacia ? 'Ingresá tu contraseña.' : '')
+    setErrorServidor('')
+    if (usuarioVacio || contrasenaVacia) return
 
-    setErrorUsuario(
-      usuarioValido ? '' : 'Usuario incorrecto. Ingresá admin u operador.',
-    )
-    setErrorContrasena(
-      contrasenaValida ? '' : 'Contraseña incorrecta. La clave de prueba es 1234.',
-    )
-
-    if (!usuarioValido || !contrasenaValida) return
-
-    onIngresar(crearUsuario(usuarioNormalizado))
+    setEnviando(true)
+    try {
+      onIngresar(usuarioDesdeSesion(await iniciarSesion(nombreUsuario, contrasena)))
+    } catch (error) {
+      setErrorServidor(
+        error instanceof ErrorDeApi && error.status !== 500
+          ? error.message
+          : 'No se pudo conectar con el servidor. Probá de nuevo en unos minutos.',
+      )
+      setContrasena('')
+      setEnviando(false)
+    }
   }
 
   return (
@@ -58,9 +73,11 @@ export default function Login({ onIngresar }: LoginProps) {
             value={nombreUsuario}
             aria-invalid={errorUsuario !== ''}
             aria-describedby={errorUsuario ? 'usuario-error' : undefined}
+            disabled={verificando}
             onChange={(evento) => {
               setNombreUsuario(evento.target.value)
               setErrorUsuario('')
+              setErrorServidor('')
             }}
           />
           <datalist id="usuarios-disponibles">
@@ -80,9 +97,11 @@ export default function Login({ onIngresar }: LoginProps) {
               value={contrasena}
               aria-invalid={errorContrasena !== ''}
               aria-describedby={errorContrasena ? 'contrasena-error' : undefined}
+              disabled={verificando}
               onChange={(evento) => {
                 setContrasena(evento.target.value)
                 setErrorContrasena('')
+                setErrorServidor('')
               }}
             />
             <button
@@ -111,8 +130,16 @@ export default function Login({ onIngresar }: LoginProps) {
           </div>
           {errorContrasena && <p className="login__error" id="contrasena-error" role="alert">{errorContrasena}</p>}
 
-          <button className="login__boton" type="submit">Ingresar al Panel</button>
-          <div className="login__estado" role="status" aria-live="polite" />
+          {errorServidor && <p className="login__error login__error--servidor" role="alert">{errorServidor}</p>}
+
+          <button className="login__boton" type="submit" disabled={enviando || verificando}>
+            {enviando ? 'Ingresando…' : 'Ingresar al Panel'}
+          </button>
+          <div className="login__estado" role="status" aria-live="polite">
+            {verificando
+              ? 'Verificando la sesión…'
+              : sesionVencida && !errorServidor ? 'Tu sesión terminó. Volvé a ingresar para seguir.' : ''}
+          </div>
         </form>
       </div>
 

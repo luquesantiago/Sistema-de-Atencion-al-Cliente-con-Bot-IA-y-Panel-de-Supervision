@@ -978,7 +978,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
 
         {caso?.phoneBlocked ? (
           <p className="chat__bloqueo" role="status">
-            Número bloqueado en el panel: los mensajes entrantes se descartan y no se permiten respuestas desde la Bandeja.
+            Número bloqueado en el panel: los mensajes entrantes se descartan y no se permiten respuestas desde la Bandeja. 
           </p>
         ) : null}
 

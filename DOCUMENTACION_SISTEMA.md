@@ -2,10 +2,10 @@
 
 ## Sistema de Atención al Cliente con Bot IA y Panel de Supervisión
 
-**Cliente:** Seguros Castaño<br>
-**Materia:** Prácticas Pre Profesionales 1 — UNLa, 2026<br>
-**Caso:** 8 — Grupo 11<br>
-**Repositorio:** `luquesantiago/Sistema-de-Atencion-al-Cliente-con-Bot-IA-y-Panel-de-Supervision`
+**Cliente:** Seguros Castaño  
+**Materia:** Prácticas Pre Profesionales 1 — UNLa, 2026  
+**Caso:** 8 — Grupo 11  
+**Repositorio:** `luquesantiago/Sistema-de-Atencion-al-Cliente-con-Bot-IA-y-Panel-de-Supervision`  
 **Documento generado:** 22/10/2026
 
 ---

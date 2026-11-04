@@ -1,6 +1,8 @@
 // Información de la agencia que el asistente responde en cualquier momento (RF-ATE-06): los
-// ramos y los planes activos, la dirección, el teléfono y el horario de atención. No es de
-// ningún cliente (change asistente-informacion-general, decisión 3).
+// ramos y los planes activos, la dirección, el teléfono, el email y la web si están cargados,
+// y el horario de atención. No es de ningún cliente (change asistente-informacion-general,
+// decisión 3). El teléfono de grúa y los medios de pago van en sus propios textos fijos
+// (change configuracion-agencia).
 
 // Un día con atención, como en horario_atencion: 1 = lunes … 7 = domingo, y las horas de
 // Argentina en HH:MM.
@@ -13,6 +15,11 @@ export type AgencyInfo = {
   // null si falta el parámetro o está vacío.
   address: string | null
   phone: string | null
+  // Opcionales: la agencia todavía no los informó y arrancan vacíos.
+  assistancePhone: string | null
+  email: string | null
+  web: string | null
+  paymentMethods: string | null
   hours: OpeningHours[]
 }
 
@@ -73,15 +80,32 @@ function hourSegments(hours: readonly OpeningHours[]): HoursSegment[] {
 // La plantilla de la información de la agencia, o null si falta un dato: en ese caso se
 // deriva (RF-ATE-02).
 export function agencyInfoAnswer(info: AgencyInfo): AgencyInfoAnswer | null {
-  const { ramos, plans, address, phone, hours } = info
+  const { ramos, plans, address, phone, email, web, hours } = info
   if (ramos.length === 0 || plans.length === 0 || hours.length === 0 || !address || !phone) return null
   const segments = hourSegments(hours)
   const template = [
     `Seguros Castaño ofrece seguros de ${listOf(ramos)}.`,
     `Los planes disponibles son ${listOf(plans)}.`,
     `Nuestra oficina está en ${address} y nuestro teléfono es ${phone}.`,
+    ...onlineContact(email, web),
     `Nuestro horario de atención es ${listOf(segments.map((segment) => segment.text))}.`,
   ].join(' ')
-  const literals = [...ramos, ...plans, address, phone, ...segments.flatMap((segment) => [segment.days, segment.hours])]
+  const literals = [
+    ...ramos,
+    ...plans,
+    address,
+    phone,
+    ...(email ? [email] : []),
+    ...(web ? [web] : []),
+    ...segments.flatMap((segment) => [segment.days, segment.hours]),
+  ]
   return { template, literals }
+}
+
+// El email y la web solo se mencionan si están cargados; si faltan, la respuesta sale igual.
+function onlineContact(email: string | null, web: string | null): string[] {
+  if (email && web) return [`Nuestro email es ${email} y nuestra web es ${web}.`]
+  if (email) return [`Nuestro email es ${email}.`]
+  if (web) return [`Nuestra web es ${web}.`]
+  return []
 }

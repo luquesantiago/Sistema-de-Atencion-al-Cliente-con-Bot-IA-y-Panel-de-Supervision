@@ -30,6 +30,7 @@ import { handoffRiskLevel, queryTypeRiskLevel, type RiskLevel, type Urgency } fr
 import {
   approvalNotice,
   anotherQueryQuestion,
+  assistanceMessage,
   clarificationRequestFor,
   customerStatusQuestion,
   customerStatusRetryQuestion,
@@ -53,6 +54,7 @@ import {
   notIdentifiedPoliciesNotice,
   notInsuranceAndNewCustomerOffer,
   notInsuranceMessage,
+  paymentMethodsMessage,
   phoneChangePendingMessage,
   phoneChangeStillPendingMessage,
   prospectHandoffMessage,
@@ -122,6 +124,9 @@ export type ProcessResult =
   | { status: 'ANSWER_SENT'; intent: Intent; responseSent: true }
   | { status: 'CLARIFICATION_REQUESTED'; responseSent: true }
   | { status: 'AGENCY_INFO_SENT'; responseSent: true }
+  // Los medios de pago antes de identificarse o en la oferta al cliente nuevo, con la
+  // pregunta pendiente en el mismo turno (change configuracion-agencia).
+  | { status: 'PAYMENT_METHODS_SENT'; responseSent: true }
   | { status: 'APPROVAL_NOTICE_SENT'; intent: Intent; responseSent: true }
 // Pregunta del flujo de cambio de datos enviada (campo o valor que falta).
   | { status: 'DATA_CHANGE_REQUESTED'; responseSent: true }
@@ -371,9 +376,9 @@ export class ProcessIncomingMessage {
     return { status: 'PHONE_CHANGE_STILL_PENDING', responseSent: true }
   }
 
-  // La información de la agencia no es de ningún cliente (RF-ATE-06) y el siniestro o el
-  // reclamo no esperan a la aprobación: se derivan. Con otra intención no responde nada y
-  // devuelve la intención; si el proveedor de IA falla, devuelve null.
+  // La información de la agencia y los medios de pago no son de ningún cliente (RF-ATE-06) y
+  // el siniestro, el reclamo y la grúa no esperan a la aprobación: se derivan. Con otra
+  // intención no responde nada y devuelve la intención; si el proveedor de IA falla, devuelve null.
   private async answerWhilePhoneChangePending(
     turn: Turn,
     query: PendingQuery,
@@ -387,7 +392,9 @@ export class ProcessIncomingMessage {
     } catch {
       return { intent: null }
     }
-    if (intent !== 'información de la agencia' && intent !== 'siniestro' && intent !== 'reclamo') return { intent }
+    if (!['información de la agencia', 'medios de pago', 'asistencia mecánica', 'siniestro', 'reclamo'].includes(intent)) {
+      return { intent }
+    }
 
     const caseId = existing === undefined ? undefined : turn.caseOfMessage(existing)
     const ref = turn.caseFor({ kind: 'intent', intent, ...(caseId === undefined ? {} : { caseId }) })
@@ -395,6 +402,8 @@ export class ProcessIncomingMessage {
     if (intent === 'información de la agencia') {
       return { result: await this.sendAgencyInfo(turn, ref, question, query.answers, intent) }
     }
+    if (intent === 'medios de pago') return { result: await this.sendPaymentMethods(turn, ref, query.answers, intent) }
+    if (intent === 'asistencia mecánica') return { result: await this.handoffAssistance(turn, ref, query.answers, intent, urgency) }
     return { result: this.handoffIn(turn, ref, { kind: 'intent', intent }, query.answers, { intent, urgency }) }
   }
 
@@ -514,6 +523,25 @@ export class ProcessIncomingMessage {
         turn.reply(ref, newCustomerQueryOffer)
         turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
         return { status: 'AGENCY_INFO_SENT', responseSent: true }
+      }
+      case 'medios de pago': {
+        const ref = turn.caseFor({ kind: 'identifying' })
+        turn.receiveIn(ref)
+        const result = await this.sendPaymentMethods(turn, ref, 'incoming', intent)
+        if (result.status !== 'ANSWER_SENT') {
+          turn.nextStage = () => ({ stage: 'unidentified' })
+          return result
+        }
+        turn.reply(ref, newCustomerQueryOffer)
+        turn.nextStage = () => ({ stage: 'awaiting_new_customer_query', notUnderstood: 0, ...identification })
+        return { status: 'PAYMENT_METHODS_SENT', responseSent: true }
+      }
+      case 'asistencia mecánica': {
+        // Quien pide una grúa no espera a ser cliente: recibe el teléfono y se deriva.
+        const ref = turn.caseFor({ kind: 'identifying' })
+        turn.receiveIn(ref)
+        turn.nextStage = () => ({ stage: 'unidentified' })
+        return this.handoffAssistance(turn, ref, 'incoming', intent, null)
       }
       case 'no es de seguros':
         this.replyIdentifying(turn, notInsuranceAndNewCustomerOffer)
@@ -782,6 +810,10 @@ export class ProcessIncomingMessage {
       case 'register':
         // Un cliente identificado que pide contratar: ya es cliente, no hay alta que hacer.
         return this.handoffIn(turn, ref, { kind: 'intent', intent }, query.answers, { intent, urgency })
+      case 'assistance':
+        return this.handoffAssistance(turn, ref, query.answers, intent, urgency)
+      case 'payment-methods':
+        return this.sendPaymentMethods(turn, ref, query.answers, intent)
       case 'my-data': {
         // Los datos personales salen de la cartera y no pasan por la redacción del
         // proveedor de IA: tienen que llegar tal cual. Al final, en el mismo mensaje, se
@@ -999,6 +1031,32 @@ export class ProcessIncomingMessage {
     return this.sendRewritten(turn, ref, answer, question, answers, intent)
   }
 
+  // Los medios de pago que cargó el administrador, en un texto fijo y sin derivar (change
+  // configuracion-agencia). Sin cargar, se deriva por dato ausente.
+  private async sendPaymentMethods(turn: Turn, ref: CaseRef, answers: QueryRef, intent: Intent): Promise<ProcessResult> {
+    const { paymentMethods } = await this.agency.read()
+    if (!paymentMethods) return this.handoffIn(turn, ref, { kind: 'missing-data', data: 'payment-methods' }, answers, { intent })
+    turn.reply(ref, paymentMethodsMessage(paymentMethods), answers)
+    return { status: 'ANSWER_SENT', intent, responseSent: true }
+  }
+
+  // Pedido de grúa o asistencia: siempre se deriva para el seguimiento. Con el teléfono
+  // cargado, el mensaje de la derivación es el texto fijo con ese teléfono; sin cargar, el
+  // mensaje de derivación habitual (change configuracion-agencia).
+  private async handoffAssistance(
+    turn: Turn,
+    ref: CaseRef,
+    answers: QueryRef,
+    intent: Intent,
+    urgency: Urgency | null,
+  ): Promise<ProcessResult> {
+    const { assistancePhone } = await this.agency.read()
+    if (!assistancePhone) {
+      return this.handoffIn(turn, ref, { kind: 'missing-data', data: 'assistance-phone' }, answers, { intent, urgency })
+    }
+    return this.handoffIn(turn, ref, { kind: 'intent', intent }, answers, { intent, urgency }, assistanceMessage(assistancePhone))
+  }
+
   private async sendRewritten(
     turn: Turn,
     ref: CaseRef,
@@ -1047,12 +1105,13 @@ export class ProcessIncomingMessage {
     }
   }
 
-  // Antes de identificarse, un mensaje sin DNI puede pedir la información de la agencia, que
-  // no es de ningún cliente (RF-ATE-06), o sus propios datos o sus pólizas, de los que todavía
-  // no hay ningunos porque no se identificó: en el primer caso se responde la información y
-  // en los otros dos se avisa que no se identificó, siempre junto con la pregunta pendiente en
-  // el mismo mensaje, sin cambiar la etapa ni contar un intento de DNI. Con otra intención, o si
-  // el proveedor de IA falla, devuelve null y la identificación sigue igual.
+  // Antes de identificarse, un mensaje sin DNI puede pedir la información de la agencia o los
+  // medios de pago, que no son de ningún cliente (RF-ATE-06), o sus propios datos o sus
+  // pólizas, de los que todavía no hay ningunos porque no se identificó: en los primeros se
+  // responde la información y en los otros dos se avisa que no se identificó, siempre junto
+  // con la pregunta pendiente, sin cambiar la etapa ni contar un intento de DNI. Un pedido de
+  // grúa no espera a la identificación: recibe el teléfono y se deriva. Con otra intención, o
+  // si el proveedor de IA falla, devuelve null y la identificación sigue igual.
   private async replyBeforeIdentifying(turn: Turn, text: string, followUp: string, stay: Stage): Promise<ProcessResult | null> {
     if (findDni(text)) return null
     const question = maskDni(text)
@@ -1071,11 +1130,19 @@ export class ProcessIncomingMessage {
       turn.nextStage = () => stay
       return { status: 'IDENTIFICATION_REQUIRED', responseSent: true }
     }
-    if (intent !== 'información de la agencia') return null
+    if (intent === 'asistencia mecánica') {
+      const ref = turn.caseFor({ kind: 'identifying' })
+      turn.receiveIn(ref)
+      turn.nextStage = () => ({ stage: 'unidentified' })
+      return this.handoffAssistance(turn, ref, 'incoming', intent, null)
+    }
+    if (intent !== 'información de la agencia' && intent !== 'medios de pago') return null
 
     const ref = turn.caseFor({ kind: 'identifying' })
     turn.receiveIn(ref)
-    const result = await this.sendAgencyInfo(turn, ref, question, 'incoming', intent)
+    const result = intent === 'medios de pago'
+      ? await this.sendPaymentMethods(turn, ref, 'incoming', intent)
+      : await this.sendAgencyInfo(turn, ref, question, 'incoming', intent)
     if (result.status !== 'ANSWER_SENT') {
       // Se derivó: al volver a atender, la identificación empieza de nuevo.
       turn.nextStage = () => ({ stage: 'unidentified' })
@@ -1083,7 +1150,7 @@ export class ProcessIncomingMessage {
     }
     turn.reply(ref, followUp)
     turn.nextStage = () => stay
-    return { status: 'AGENCY_INFO_SENT', responseSent: true }
+    return { status: intent === 'medios de pago' ? 'PAYMENT_METHODS_SENT' : 'AGENCY_INFO_SENT', responseSent: true }
   }
 
   // Respuesta mientras la persona se identifica: va al caso actual, con el mensaje.
@@ -1108,16 +1175,18 @@ export class ProcessIncomingMessage {
   }
 
   // query: la consulta que se deriva, con la intención elegida y, si hubo, la urgencia.
+  // text: el mensaje de la derivación; el de la grúa suma el teléfono de asistencia.
   private handoffIn(
     turn: Turn,
     ref: CaseRef,
     reason: HandoffReason,
     answers: QueryRef = 'incoming',
     query: ClassifiedQuery | null = null,
+    text: string = handoffMessage,
   ): ProcessResult {
     const handoff = handoffOf(ref, reason, query)
     turn.changes.handoff = handoff
-    turn.reply(ref, handoffMessage, answers)
+    turn.reply(ref, text, answers)
     return { status: 'HANDOFF_SENT', reason: handoff.reason, responseSent: true }
   }
 

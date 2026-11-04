@@ -1185,9 +1185,25 @@
   font-weight: 600;
 }
 
-/* Ranura de estado de servidor para el auth real del Parcial 2 */
+/* Error que devuelve el backend al iniciar sesión: va arriba del botón, no debajo de un campo. */
+.login__error--servidor {
+  margin: 0 0 12px;
+}
+
+/* Estado del servidor: mientras se verifica la sesión al recargar. */
+.login__estado {
+  margin-top: 12px;
+  font-size: 0.875rem;
+  color: rgba(247, 244, 239, 0.72);
+}
+
 .login__estado:empty {
   display: none;
+}
+
+.login__formulario input:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .login__boton {
@@ -1205,6 +1221,15 @@
 
 .login__boton:hover {
   background: var(--color-accent-light);
+}
+
+.login__boton[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login__boton[disabled]:hover {
+  background: var(--color-sidebar-text);
 }
 
 .login__boton:focus-visible {
@@ -3576,6 +3601,123 @@
 .detalle-panel__cerrar,
 .detalle-panel__telefono-quitar {
   transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+/* Configuración de la agencia (change configuracion-agencia): formulario por secciones y
+   vista previa al costado. Panel de datos sólido, sin cristal (design.md §5). */
+
+.configuracion {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.configuracion__formulario {
+  gap: 16px;
+}
+
+.configuracion__etiqueta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+
+.configuracion__dia {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-height: 44px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--color-accent-light);
+}
+
+.configuracion__dia:last-child {
+  border-bottom: none;
+}
+
+.configuracion__dia > .formulario__opcion {
+  min-width: 110px;
+}
+
+.configuracion__horas {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.configuracion__catalogos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.configuracion__catalogo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.configuracion__catalogo .formulario__opcion {
+  min-height: 32px;
+}
+
+.configuracion__vista-previa {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 1.25rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-soft);
+}
+
+.configuracion__titulo {
+  font-size: 1.05rem;
+}
+
+.configuracion__bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-top: 1px solid var(--color-accent-light);
+}
+
+.configuracion__bloque-titulo {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* El texto como lo recibe el cliente por WhatsApp, con sus renglones. */
+.configuracion__mensaje {
+  padding: 10px 12px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-accent-light);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 1024px) {
+  .configuracion {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+
+  .configuracion__vista-previa {
+    position: sticky;
+    top: 24px;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
