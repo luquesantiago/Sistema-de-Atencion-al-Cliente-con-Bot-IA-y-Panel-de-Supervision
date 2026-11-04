@@ -551,6 +551,14 @@
   align-items: flex-start;
   gap: 0;
   position: relative;
+  min-height: 220px;
+}
+
+.tarjeta--kpi .tarjeta__nota--pie {
+  width: 100%;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(122, 31, 53, 0.1);
 }
 
 .tarjeta__accion-kpi {

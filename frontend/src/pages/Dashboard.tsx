@@ -160,7 +160,7 @@ export default function Dashboard({
             <span className="tarjeta__valor tarjeta__valor--kpi">
               {cargandoMetricas ? '…' : (metricas?.casosDerivadosSinTomar ?? '—')}
             </span>
-            <span className="tarjeta__nota">Casos derivados abiertos sin responsable.</span>
+            <span className="tarjeta__nota tarjeta__nota--pie">Casos derivados abiertos sin responsable.</span>
           </article>
 
           <article className="tarjeta tarjeta--kpi">
@@ -187,7 +187,7 @@ export default function Dashboard({
               </button>
             </div>
             {cargandoMetricas ? (
-              <span className="tarjeta__nota">Cargando distribución…</span>
+              <span className="tarjeta__nota tarjeta__nota--pie">Cargando distribución…</span>
             ) : distribucion?.total ? (
               <div className="kpi-respuestas__contenido">
                 <div
@@ -215,7 +215,7 @@ export default function Dashboard({
                 </dl>
               </div>
             ) : (
-              <span className="tarjeta__nota">Sin respuestas registradas en este período.</span>
+              <span className="tarjeta__nota tarjeta__nota--pie">Sin respuestas registradas en este período.</span>
             )}
           </article>
 
@@ -227,7 +227,7 @@ export default function Dashboard({
             <span className="tarjeta__valor tarjeta__valor--kpi">
               {cargandoMetricas ? '…' : (metricas?.tramitesPorAprobar ?? '—')}
             </span>
-            <span className="tarjeta__nota">Bajas, contrato y alta de conductor.</span>
+            <span className="tarjeta__nota tarjeta__nota--pie">Bajas, contrato y alta de conductor.</span>
           </article>
 
           <article className="tarjeta tarjeta--kpi">
@@ -238,7 +238,7 @@ export default function Dashboard({
             <span className="tarjeta__valor tarjeta__valor--kpi">
               {cargandoMetricas ? '…' : (metricas?.alertasRiesgoAbiertas ?? '—')}
             </span>
-            <span className="tarjeta__nota">Gravedad y motivo, no solo color.</span>
+            <span className="tarjeta__nota tarjeta__nota--pie">Gravedad y motivo, no solo color.</span>
           </article>
         </div>
       </section>
