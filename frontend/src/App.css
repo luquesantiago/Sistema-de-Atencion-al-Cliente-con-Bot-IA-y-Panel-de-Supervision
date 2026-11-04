@@ -396,6 +396,10 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  background: #fdf9fa;
 }
 
 .pagina {
@@ -3874,14 +3878,7 @@
   text-align: center;
 }
 
-/* Tratamiento visual acotado al Dashboard; el resto del panel conserva su fondo. */
-
-.panel__principal--dashboard {
-  position: relative;
-  min-height: 100svh;
-  overflow: hidden;
-  background: #fdf9fa;
-}
+/* Fondo operativo compartido por todos los módulos. */
 
 .dashboard-manchas {
   position: absolute;
@@ -3902,7 +3899,7 @@
   right: -40px;
   width: 600px;
   height: 600px;
-  background: rgba(194, 68, 104, 0.34);
+  background: rgba(194, 68, 104, 0.212);
   filter: blur(90px);
 }
 
@@ -3911,7 +3908,7 @@
   left: -100px;
   width: 620px;
   height: 620px;
-  background: rgba(122, 31, 53, 0.26);
+  background: rgba(122, 31, 54, 0.181);
   filter: blur(100px);
 }
 
@@ -3920,12 +3917,12 @@
   left: 52%;
   width: 420px;
   height: 420px;
-  background: rgba(255, 150, 175, 0.38);
+  background: rgba(255, 150, 174, 0.267);
   filter: blur(90px);
   transform: translate(-50%, -50%);
 }
 
-.panel__principal--dashboard > .pagina {
+.panel__principal > .pagina {
   position: relative;
   z-index: 1;
 }
@@ -3953,10 +3950,16 @@
   color: #4a1626;
 }
 
-.panel__principal--dashboard .tarjeta--kpi,
-.panel__principal--dashboard .panel-dashboard {
-  position: relative;
-  z-index: 1;
+.tarjeta--kpi,
+.panel-dashboard,
+.operativo,
+.bandeja__lista,
+.bandeja__chat,
+.detalle-panel,
+.tarjeta-caso,
+.tramites-lista-panel,
+.tramites-detalle-panel,
+.tramite-card {
   border: 1px solid rgba(255, 255, 255, 0.95);
   border-radius: 26px;
   background: rgba(255, 255, 255, 0.7);
@@ -3967,8 +3970,16 @@
 }
 
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .panel__principal--dashboard .tarjeta--kpi,
-  .panel__principal--dashboard .panel-dashboard {
+  .tarjeta--kpi,
+  .panel-dashboard,
+  .operativo,
+  .bandeja__lista,
+  .bandeja__chat,
+  .detalle-panel,
+  .tarjeta-caso,
+  .tramites-lista-panel,
+  .tramites-detalle-panel,
+  .tramite-card {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.38) 100%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     backdrop-filter: blur(24px) saturate(180%);

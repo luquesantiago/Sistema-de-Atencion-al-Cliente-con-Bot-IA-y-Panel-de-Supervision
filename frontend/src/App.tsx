@@ -190,13 +190,11 @@ function App() {
           className={`panel__principal${activo === 'dashboard' ? ' panel__principal--dashboard' : ''}`}
           id="contenido"
         >
-          {activo === 'dashboard' ? (
-            <div className="dashboard-manchas" aria-hidden="true">
-              <span className="dashboard-mancha dashboard-mancha--superior" />
-              <span className="dashboard-mancha dashboard-mancha--inferior" />
-              <span className="dashboard-mancha dashboard-mancha--centro" />
-            </div>
-          ) : null}
+          <div className="dashboard-manchas" aria-hidden="true">
+            <span className="dashboard-mancha dashboard-mancha--superior" />
+            <span className="dashboard-mancha dashboard-mancha--inferior" />
+            <span className="dashboard-mancha dashboard-mancha--centro" />
+          </div>
           {Pagina === undefined
             ? (
               <Dashboard
