@@ -142,31 +142,11 @@ export default function Dashboard({
 
       <section aria-label="Indicadores del día">
         <div className="tarjetas tarjetas--kpi">
-          <article className="tarjeta tarjeta--kpi">
-            <span className="tarjeta__icono tarjeta__icono--rose" aria-hidden="true">
-              <IconoCampana />
-            </span>
-            <button
-              className="tarjeta__accion-kpi"
-              type="button"
-              aria-label="Ir a casos derivados sin tomar en Bandeja de Atención"
-              title="Ir a Sin tomar"
-              onClick={() => onNavegar('bandeja', { bandeja: { vista: 'sin-tomar' } })}
-            >
-              <IconoIrBandeja />
-            </button>
-            <span className="tarjeta__etiqueta">Casos derivados sin tomar</span>
-            <span className="tarjeta__valor tarjeta__valor--kpi">
-              {cargandoMetricas ? '…' : (metricas?.casosDerivadosSinTomar ?? '—')}
-            </span>
-            <span className="tarjeta__nota tarjeta__nota--pie">Casos derivados abiertos sin responsable.</span>
-          </article>
-
           <article className="tarjeta tarjeta--kpi tarjeta--kpi-resumen">
             <span className="tarjeta__icono tarjeta__icono--pink" aria-hidden="true">
               <IconoPausa />
             </span>
-            <span className="tarjeta__etiqueta">Resumen operativo</span>
+            <span className="tarjeta__etiqueta">Resumen operativo del día</span>
             {cargandoMetricas ? (
               <span className="tarjeta__nota tarjeta__nota--pie">Cargando resumen diario…</span>
             ) : (
@@ -194,6 +174,26 @@ export default function Dashboard({
                 </div>
               </>
             )}
+          </article>
+
+          <article className="tarjeta tarjeta--kpi">
+            <span className="tarjeta__icono tarjeta__icono--rose" aria-hidden="true">
+              <IconoCampana />
+            </span>
+            <button
+              className="tarjeta__accion-kpi"
+              type="button"
+              aria-label="Ir a casos derivados sin tomar en Bandeja de Atención"
+              title="Ir a Sin tomar"
+              onClick={() => onNavegar('bandeja', { bandeja: { vista: 'sin-tomar' } })}
+            >
+              <IconoIrBandeja />
+            </button>
+            <span className="tarjeta__etiqueta">Casos derivados sin tomar</span>
+            <span className="tarjeta__valor tarjeta__valor--kpi">
+              {cargandoMetricas ? '…' : (metricas?.casosDerivadosSinTomar ?? '—')}
+            </span>
+            <span className="tarjeta__nota tarjeta__nota--pie">Casos derivados abiertos sin responsable.</span>
           </article>
 
           <article className="tarjeta tarjeta--kpi">
@@ -298,7 +298,6 @@ export default function Dashboard({
             <div className="panel-respuestas__encabezado">
               <div>
                 <h2 id="resumen-operativo-titulo">Resumen operativo</h2>
-                <p className="panel-dashboard__nota">Distribución de respuestas atendidas.</p>
               </div>
               <div className="panel-respuestas__periodos" role="group" aria-label="Período de distribución">
                 <button
