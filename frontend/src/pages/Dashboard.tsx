@@ -1,4 +1,4 @@
-import type { Modulo, ModuloPanel } from '../navigation'
+import type { Modulo, Navegar } from '../navigation'
 import type { RolUsuario } from '../usuario'
 import PageHeader from '../components/PageHeader'
 import EstadoPanel from '../components/EstadoPanel'
@@ -6,9 +6,14 @@ import {
   IconoAlerta,
   IconoArchivoCheck,
   IconoCampana,
+  IconoIrBandeja,
   IconoPausa,
 } from '../components/iconos'
-import type { DashboardHourlyVolume, DashboardMetrics } from '../api/dashboard'
+import type {
+  DashboardHourlyVolume,
+  DashboardMetrics,
+  DashboardResponsePeriod,
+} from '../api/dashboard'
 
 const GRAFICO_ANCHO = 500
 const GRAFICO_ALTO = 150
@@ -68,10 +73,12 @@ function pasoEtiquetas(cantidad: number): number {
 interface DashboardProps {
   modulo: Modulo
   rol: RolUsuario
-  onNavegar: (modulo: ModuloPanel) => void
+  onNavegar: Navegar
   metricas: DashboardMetrics | null
   cargandoMetricas: boolean
   errorMetricas: string | null
+  periodoRespuestas: DashboardResponsePeriod
+  onCambiarPeriodoRespuestas: (periodo: DashboardResponsePeriod) => void
 }
 
 export default function Dashboard({
@@ -81,6 +88,8 @@ export default function Dashboard({
   metricas,
   cargandoMetricas,
   errorMetricas,
+  periodoRespuestas,
+  onCambiarPeriodoRespuestas,
 }: DashboardProps) {
   if (rol === 'operador') {
     return (
@@ -123,7 +132,9 @@ export default function Dashboard({
   const casosCerrados = metricas?.casosCerrados ?? '—'
   const resueltosPorBot = metricas?.resueltosPorBot ?? '—'
   const tasaAutomatizacion = Math.round(metricas?.tasaAutomatizacion ?? 0)
-  const estadoAutomatizacion = tasaAutomatizacion >= 60 ? 'Óptimo' : 'Moderado'
+  const distribucion = metricas?.distribucionRespuestas
+  const porcentajeIA = distribucion?.porcentajes.IA ?? 0
+  const porcentajeOperador = distribucion?.porcentajes.operador ?? 0
 
   return (
     <div className="pagina">
@@ -131,22 +142,58 @@ export default function Dashboard({
 
       <section aria-label="Indicadores del día">
         <div className="tarjetas tarjetas--kpi">
+          <article className="tarjeta tarjeta--kpi tarjeta--kpi-resumen">
+            <span className="tarjeta__icono tarjeta__icono--pink" aria-hidden="true">
+              <IconoPausa />
+            </span>
+            <span className="tarjeta__etiqueta">Resumen operativo del día</span>
+            {cargandoMetricas ? (
+              <span className="tarjeta__nota tarjeta__nota--pie">Cargando resumen diario…</span>
+            ) : (
+              <>
+                <dl className="kpi-resumen">
+                  <div>
+                    <dt>Consultas</dt>
+                    <dd key={`consultas-${consultasHoy}`}>{consultasHoy}</dd>
+                  </div>
+                  <div>
+                    <dt>Cerrados</dt>
+                    <dd key={`cerrados-${casosCerrados}`}>{casosCerrados}</dd>
+                  </div>
+                  <div>
+                    <dt>Resueltos por IA</dt>
+                    <dd key={`ia-${resueltosPorBot}`}>{resueltosPorBot}</dd>
+                  </div>
+                  <div>
+                    <dt>Automatización</dt>
+                    <dd key={`automatizacion-${tasaAutomatizacion}`}>{tasaAutomatizacion}%</dd>
+                  </div>
+                </dl>
+                <div className="kpi-resumen__barra" aria-label={`Automatización ${tasaAutomatizacion}%`}>
+                  <span style={{ width: `${tasaAutomatizacion}%` }} />
+                </div>
+              </>
+            )}
+          </article>
+
           <article className="tarjeta tarjeta--kpi">
             <span className="tarjeta__icono tarjeta__icono--rose" aria-hidden="true">
               <IconoCampana />
             </span>
+            <button
+              className="tarjeta__accion-kpi"
+              type="button"
+              aria-label="Ir a casos derivados sin tomar en Bandeja de Atención"
+              title="Ir a Sin tomar"
+              onClick={() => onNavegar('bandeja', { bandeja: { vista: 'sin-tomar' } })}
+            >
+              <IconoIrBandeja />
+            </button>
             <span className="tarjeta__etiqueta">Casos derivados sin tomar</span>
-            <span className="tarjeta__valor tarjeta__valor--kpi">—</span>
-            <span className="tarjeta__nota">60 minutos para alertar, valor provisional.</span>
-          </article>
-
-          <article className="tarjeta tarjeta--kpi">
-            <span className="tarjeta__icono tarjeta__icono--pink" aria-hidden="true">
-              <IconoPausa />
+            <span key={`sin-tomar-${metricas?.casosDerivadosSinTomar ?? 'cargando'}`} className="tarjeta__valor tarjeta__valor--kpi">
+              {cargandoMetricas ? '…' : (metricas?.casosDerivadosSinTomar ?? '—')}
             </span>
-            <span className="tarjeta__etiqueta">Respuestas retenidas</span>
-            <span className="tarjeta__valor tarjeta__valor--kpi">—</span>
-            <span className="tarjeta__nota">Se retienen y derivan, nunca se envían.</span>
+            <span className="tarjeta__nota tarjeta__nota--pie">Casos derivados abiertos sin responsable.</span>
           </article>
 
           <article className="tarjeta tarjeta--kpi">
@@ -154,10 +201,10 @@ export default function Dashboard({
               <IconoArchivoCheck />
             </span>
             <span className="tarjeta__etiqueta">Trámites por aprobar</span>
-            <span className="tarjeta__valor tarjeta__valor--kpi">
+            <span key={`tramites-${metricas?.tramitesPorAprobar ?? 'cargando'}`} className="tarjeta__valor tarjeta__valor--kpi">
               {cargandoMetricas ? '…' : (metricas?.tramitesPorAprobar ?? '—')}
             </span>
-            <span className="tarjeta__nota">Bajas, contrato y alta de conductor.</span>
+            <span className="tarjeta__nota tarjeta__nota--pie">Bajas, contrato y alta de conductor.</span>
           </article>
 
           <article className="tarjeta tarjeta--kpi">
@@ -165,10 +212,10 @@ export default function Dashboard({
               <IconoAlerta />
             </span>
             <span className="tarjeta__etiqueta">Alertas de riesgo abiertas</span>
-            <span className="tarjeta__valor tarjeta__valor--kpi">
+            <span key={`alertas-${metricas?.alertasRiesgoAbiertas ?? 'cargando'}`} className="tarjeta__valor tarjeta__valor--kpi">
               {cargandoMetricas ? '…' : (metricas?.alertasRiesgoAbiertas ?? '—')}
             </span>
-            <span className="tarjeta__nota">Gravedad y motivo, no solo color.</span>
+            <span className="tarjeta__nota tarjeta__nota--pie">Gravedad y motivo, no solo color.</span>
           </article>
         </div>
       </section>
@@ -248,44 +295,64 @@ export default function Dashboard({
             className="panel-dashboard panel-dashboard--resumen"
             aria-labelledby="resumen-operativo-titulo"
           >
-            <h2 id="resumen-operativo-titulo">Resumen operativo</h2>
-            <dl className="resumen-operativo">
-              <div className="resumen-operativo__fila">
-                <dt>Consultas de hoy</dt>
-                <dd>{consultasHoy}</dd>
+            <div className="panel-respuestas__encabezado">
+              <div>
+                <h2 id="resumen-operativo-titulo">Resumen operativo</h2>
               </div>
-              <div className="resumen-operativo__fila">
-                <dt>Casos cerrados</dt>
-                <dd>{casosCerrados}</dd>
+              <div className="panel-respuestas__periodos" role="group" aria-label="Período de distribución">
+                <button
+                  className={periodoRespuestas === 'semanal' ? 'panel-respuestas__periodo panel-respuestas__periodo--activo' : 'panel-respuestas__periodo'}
+                  type="button"
+                  aria-pressed={periodoRespuestas === 'semanal'}
+                  onClick={() => onCambiarPeriodoRespuestas('semanal')}
+                >
+                  Semanal
+                </button>
+                <button
+                  className={periodoRespuestas === 'mensual' ? 'panel-respuestas__periodo panel-respuestas__periodo--activo' : 'panel-respuestas__periodo'}
+                  type="button"
+                  aria-pressed={periodoRespuestas === 'mensual'}
+                  onClick={() => onCambiarPeriodoRespuestas('mensual')}
+                >
+                  Mensual
+                </button>
               </div>
-              <div className="resumen-operativo__fila">
-                <dt>Resueltos por bot</dt>
-                <dd>{resueltosPorBot}</dd>
-              </div>
-            </dl>
-
-            <div className="resumen-operativo__automatizacion">
-              <div className="resumen-operativo__barra-encabezado">
-                <span>Tasa de automatización</span>
-                <span className={`estado-automatizacion estado-automatizacion--${tasaAutomatizacion >= 60 ? 'optimo' : 'moderado'}`}>
-                  {estadoAutomatizacion}
-                </span>
-              </div>
-              <div
-                className="barra-progreso"
-                role="progressbar"
-                aria-label="Tasa de automatización del bot"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={tasaAutomatizacion}
-              >
-                <span
-                  className="barra-progreso__relleno"
-                  style={{ width: `${tasaAutomatizacion}%` }}
-                />
-              </div>
-              <span className="resumen-operativo__porcentaje">{tasaAutomatizacion}%</span>
             </div>
+
+            {distribucion?.total ? (
+              <div
+                key={`${periodoRespuestas}-${distribucion.total}-${distribucion.resueltasPorIA}-${distribucion.derivadasOperador}`}
+                className="panel-respuestas__contenido"
+              >
+                <div
+                  className="panel-respuestas__dona"
+                  role="img"
+                  aria-label={`${porcentajeIA}% resuelta por IA y ${porcentajeOperador}% derivada al operador`}
+                  style={{
+                    background: `conic-gradient(var(--color-success-text) 0 ${porcentajeIA}%, var(--color-secondary) ${porcentajeIA}% 100%)`,
+                  }}
+                >
+                  <div className="panel-respuestas__centro">
+                    <strong>{porcentajeIA}%</strong>
+                    <span>IA</span>
+                  </div>
+                </div>
+                <dl className="panel-respuestas__leyenda">
+                  <div>
+                    <dt><span className="panel-respuestas__punto panel-respuestas__punto--ia" />IA</dt>
+                    <dd>{porcentajeIA}%</dd>
+                    <small>{distribucion.resueltasPorIA} respuestas</small>
+                  </div>
+                  <div>
+                    <dt><span className="panel-respuestas__punto panel-respuestas__punto--operador" />Operador</dt>
+                    <dd>{porcentajeOperador}%</dd>
+                    <small>{distribucion.derivadasOperador} respuestas</small>
+                  </div>
+                </dl>
+              </div>
+            ) : (
+              <p className="panel-respuestas__vacio">Sin respuestas registradas en este período.</p>
+            )}
           </article>
         </section>
       )}

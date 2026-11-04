@@ -485,7 +485,9 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
   const [fallaActualizacion, setFallaActualizacion] = useState(false)
   const [actualizado, setActualizado] = useState<Date | null>(null)
   const [busqueda, setBusqueda] = useState('')
-  const [filtroPestana, setFiltroPestana] = useState<'todos' | 'derivados'>('todos')
+  const [filtroPestana, setFiltroPestana] = useState<'todos' | 'derivados' | 'sin-tomar'>(
+    bandejaInicial?.vista ?? 'todos',
+  )
   const [seleccionado, setSeleccionado] = useState<number | null>(bandejaInicial?.caseId ?? null)
   const [filtroCliente, setFiltroCliente] = useState<{ id: number; nombre: string | null } | null>(
     bandejaInicial?.customerId === undefined
@@ -522,7 +524,10 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
       const propio = new AbortController()
       controlador = propio
       const [lista, caso] = await Promise.allSettled([
-        listarBandeja({ limit: LIMITE_PAGINA, offset, customerId: filtroCliente?.id }, propio.signal),
+        listarBandeja(
+          { limit: LIMITE_PAGINA, offset, customerId: filtroCliente?.id, vista: filtroPestana },
+          propio.signal,
+        ),
         seleccionado === null ? Promise.resolve(null) : obtenerCasoBandeja(seleccionado, propio.signal),
       ])
       if (!activo || propio.signal.aborted) return
@@ -571,7 +576,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
       controlador?.abort()
       document.removeEventListener('visibilitychange', alCambiarVisibilidad)
     }
-  }, [offset, seleccionado, filtroCliente, reintento])
+  }, [offset, seleccionado, filtroCliente, filtroPestana, reintento])
 
   // Después de cada acción se consulta enseguida, sin esperar al sondeo.
   const refrescar = useCallback(() => setReintento((valor) => valor + 1), [])
@@ -608,7 +613,12 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
     ? [...casos].sort((a, b) => fechaDeActividad(b) - fechaDeActividad(a))
     : casos
   const casosFiltrados = casosOrdenados?.filter((caso) => {
-    const cumplePestana = filtroPestana === 'todos' || caso.handedOff === true
+    const cumplePestana =
+      filtroPestana === 'todos'
+        ? true
+        : filtroPestana === 'derivados'
+          ? caso.handedOff === true
+          : caso.handedOff === true && caso.assignee === null && caso.takenAt === null
     const cumpleBusqueda = consulta === '' || textoDelCaso(caso).includes(consulta)
     return cumplePestana && cumpleBusqueda
   }) ?? null
@@ -1031,7 +1041,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
               className="bandeja__pestana"
               role="tab"
               aria-selected={filtroPestana === 'todos'}
-              onClick={() => setFiltroPestana('todos')}
+              onClick={() => { setOffset(0); setFiltroPestana('todos') }}
             >
               Todos
             </button>
@@ -1040,9 +1050,18 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
               className="bandeja__pestana"
               role="tab"
               aria-selected={filtroPestana === 'derivados'}
-              onClick={() => setFiltroPestana('derivados')}
+              onClick={() => { setOffset(0); setFiltroPestana('derivados') }}
             >
               Derivados
+            </button>
+            <button
+              type="button"
+              className="bandeja__pestana"
+              role="tab"
+              aria-selected={filtroPestana === 'sin-tomar'}
+              onClick={() => { setOffset(0); setFiltroPestana('sin-tomar') }}
+            >
+              Sin tomar
             </button>
           </div>
         </header>

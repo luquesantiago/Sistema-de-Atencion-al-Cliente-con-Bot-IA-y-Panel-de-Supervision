@@ -495,7 +495,12 @@ El panel es una superficie **Operate**: el movimiento confirma estado, continuid
 | Diálogos | El velo aparece; el panel entra 8 px y escala 0,985 → 1 | 180 ms / 220 ms |
 | Avisos de éxito y riesgo | Aparecen desde −4 px con opacidad | 180 ms |
 | Hover y selección de filas | Transición de fondo y borde; la barra interior de selección crece | 160 ms / 240 ms |
-| Botones de la cartera | Transición de fondo, borde y color | 150 ms |
+| Navegación entre paneles | Salida 90 ms; cambio suave del contenido tras un mínimo delay; entrada global con opacidad, traslación horizontal 12 px y escala 0,995 → 1 | 90 ms + 280 ms, `cubic-bezier(0.16, 1, 0.3, 1)`; sin delay con movimiento reducido |
+| Modales y formularios | Velo con opacidad; panel sólido nace desde el centro con escala 0,92 → 1 | 180 ms / 240 ms, `cubic-bezier(0.16, 1, 0.3, 1)` |
+| Botones | Hover con elevación visible; `active` desplaza 1 px y reduce la escala a 0,94 | 160–180 ms |
+| Listados y tarjetas | Entrada escalonada de filas; tarjetas y estados ascienden 6 px | 220–260 ms |
+| KPI, dona y estados de carga | Entrada breve con opacidad y 2–6 px de traslación al actualizar | 180–260 ms |
+| Botones de toda la aplicación | Fondo, borde, color, elevación, foco y estado pulsado compartidos | 160–180 ms |
 
 - Todo el movimiento de entrada vive bajo `@media (prefers-reduced-motion: no-preference)`. Con `reduce`, el contenido aparece directamente en su estado final y las transiciones quedan instantáneas; nunca se oculta contenido por defecto.
 - El viaje del nombre usa `document.startViewTransition` solo en pantallas de `≥1024px` sin `reduce`; si el navegador no lo soporta, manda la animación CSS de la ficha. Al cerrar, el foco del teclado vuelve al botón de la fila de origen.

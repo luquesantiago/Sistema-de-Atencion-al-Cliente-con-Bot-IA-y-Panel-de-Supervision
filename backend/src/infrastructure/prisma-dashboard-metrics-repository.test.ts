@@ -13,6 +13,25 @@ function dataSourceWithCases(
 }
 
 describe('PrismaDashboardMetricsRepository', () => {
+  it('cuenta casos derivados abiertos sin responsable ni toma', async () => {
+    const findMany = vi.fn(async () => [
+      { id_caso: 12, fecha_apertura: new Date(), fecha_cierre: null, fecha_derivacion: new Date() },
+      { id_caso: 18, fecha_apertura: new Date(), fecha_cierre: null, fecha_derivacion: new Date() },
+    ])
+    const dataSource = dataSourceWithCases(findMany)
+
+    await expect(new PrismaDashboardMetricsRepository(dataSource).countUnattendedHandoffs()).resolves.toBe(2)
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        fecha_cierre: null,
+        fecha_derivacion: { not: null },
+        id_usuario_asignado: null,
+        fecha_toma: null,
+      },
+      select: { id_caso: true },
+    })
+  })
+
   it('suma prospectos y solicitudes de acción pendientes', async () => {
     const prospecto = vi.fn(async () => 2)
     const solicitudAccion = vi.fn(async () => 3)
@@ -140,6 +159,56 @@ describe('PrismaDashboardMetricsRepository', () => {
         hora: `${String(hour).padStart(2, '0')}hs`,
         cantidad: 0,
       })),
+    })
+  })
+
+  it('calcula la distribución semanal entre IA y operador', async () => {
+    const findMany = vi.fn(async () => [
+      { fecha_apertura: new Date('2026-11-02T08:00:00-03:00'), fecha_cierre: null, fecha_derivacion: null },
+      { fecha_apertura: new Date('2026-11-02T09:00:00-03:00'), fecha_cierre: null, fecha_derivacion: new Date('2026-11-02T09:01:00-03:00') },
+      { fecha_apertura: new Date('2026-11-01T09:00:00-03:00'), fecha_cierre: null, fecha_derivacion: null },
+    ])
+
+    const distribution = await new PrismaDashboardMetricsRepository(dataSourceWithCases(findMany))
+      .getResponseDistribution(new Date('2026-11-02T12:00:00-03:00'), 'semanal')
+
+    expect(distribution).toEqual({
+      resueltasPorIA: 2,
+      derivadasOperador: 1,
+      porcentajes: { IA: 67, operador: 33 },
+      total: 3,
+    })
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        fecha_apertura: {
+          gte: new Date('2026-10-27T00:00:00-03:00'),
+          lt: new Date('2026-11-03T00:00:00-03:00'),
+        },
+      },
+      select: { fecha_apertura: true, fecha_derivacion: true },
+    })
+  })
+
+  it('calcula ceros y el rango mensual cuando no hay casos', async () => {
+    const findMany = vi.fn(async () => [])
+
+    const distribution = await new PrismaDashboardMetricsRepository(dataSourceWithCases(findMany))
+      .getResponseDistribution(new Date('2026-11-02T12:00:00-03:00'), 'mensual')
+
+    expect(distribution).toEqual({
+      resueltasPorIA: 0,
+      derivadasOperador: 0,
+      porcentajes: { IA: 0, operador: 0 },
+      total: 0,
+    })
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        fecha_apertura: {
+          gte: new Date('2026-11-01T00:00:00-03:00'),
+          lt: new Date('2026-12-01T00:00:00-03:00'),
+        },
+      },
+      select: { fecha_apertura: true, fecha_derivacion: true },
     })
   })
 })

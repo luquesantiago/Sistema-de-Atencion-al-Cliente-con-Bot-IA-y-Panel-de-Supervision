@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useRef, useState, type ComponentType } from 'react'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
 import BandejaAtencion from './pages/BandejaAtencion'
@@ -7,7 +7,11 @@ import BaseClientes from './pages/BaseClientes'
 import Configuracion from './pages/Configuracion'
 import Login from './pages/Login'
 import { listarBandeja } from './api/bandeja'
-import { obtenerMetricasDashboard, type DashboardMetrics } from './api/dashboard'
+import {
+  obtenerMetricasDashboard,
+  type DashboardMetrics,
+  type DashboardResponsePeriod,
+} from './api/dashboard'
 import { EVENTO_SESION_VENCIDA } from './api/respuesta'
 import { cerrarSesion, obtenerSesion } from './api/sesion'
 import {
@@ -42,6 +46,7 @@ function moduloInicial(rol: RolUsuario): ModuloPanel {
 
 function App() {
   const [activo, setActivo] = useState<ModuloPanel>('dashboard')
+  const [navegacionCambiando, setNavegacionCambiando] = useState(false)
   const [bandejaInicial, setBandejaInicial] = useState<DestinoBandeja | undefined>(undefined)
   const [clientesInicial, setClientesInicial] = useState<DestinoClientes | undefined>(undefined)
   const [usuario, setUsuario] = useState<UsuarioPanel | null>(null)
@@ -49,9 +54,11 @@ function App() {
   const [cargandoMetricas, setCargandoMetricas] = useState(true)
   const [errorMetricas, setErrorMetricas] = useState<string | null>(null)
   const [casosPendientes, setCasosPendientes] = useState<number | null>(null)
+  const [periodoRespuestas, setPeriodoRespuestas] = useState<DashboardResponsePeriod>('semanal')
   // Al cargar, el panel pregunta al backend si ya hay una sesión abierta (cookie httpOnly).
   const [verificando, setVerificando] = useState(true)
   const [sesionVencida, setSesionVencida] = useState(false)
+  const temporizadorNavegacion = useRef<number | null>(null)
   const modulo = MODULOS.find((item) => item.id === activo) ?? MODULOS[0]
   const Pagina = activo === 'dashboard' ? undefined : PAGINAS[activo]
 
@@ -65,7 +72,7 @@ function App() {
       const actual = new AbortController()
       controlador = actual
       const [resultadoMetricas, resultadoBandeja] = await Promise.allSettled([
-        obtenerMetricasDashboard(actual.signal),
+        obtenerMetricasDashboard(periodoRespuestas, actual.signal),
         listarBandeja({ limit: 1, offset: 0 }, actual.signal),
       ])
       if (!vigente || actual.signal.aborted) return
@@ -96,15 +103,47 @@ function App() {
       if (temporizador !== undefined) clearTimeout(temporizador)
       controlador?.abort()
     }
-  }, [usuario])
+  }, [usuario, periodoRespuestas])
 
   // El destino de la bandeja o de la base de clientes viaja con la navegación
   // y se descarta al salir de ese módulo.
   function navegar(destino: ModuloPanel, opciones?: OpcionesNavegacion) {
-    setBandejaInicial(destino === 'bandeja' ? opciones?.bandeja : undefined)
-    setClientesInicial(destino === 'clientes' ? opciones?.clientes : undefined)
-    setActivo(destino)
+    if (destino === activo) {
+      setBandejaInicial(destino === 'bandeja' ? opciones?.bandeja : undefined)
+      setClientesInicial(destino === 'clientes' ? opciones?.clientes : undefined)
+      return
+    }
+
+    if (temporizadorNavegacion.current !== null) {
+      window.clearTimeout(temporizadorNavegacion.current)
+    }
+
+    const movimientoReducido = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (movimientoReducido) {
+      setBandejaInicial(destino === 'bandeja' ? opciones?.bandeja : undefined)
+      setClientesInicial(destino === 'clientes' ? opciones?.clientes : undefined)
+      setActivo(destino)
+      setNavegacionCambiando(false)
+      return
+    }
+
+    setNavegacionCambiando(true)
+    temporizadorNavegacion.current = window.setTimeout(() => {
+      setBandejaInicial(destino === 'bandeja' ? opciones?.bandeja : undefined)
+      setClientesInicial(destino === 'clientes' ? opciones?.clientes : undefined)
+      setActivo(destino)
+      setNavegacionCambiando(false)
+      temporizadorNavegacion.current = null
+    }, 90)
   }
+
+  useEffect(() => {
+    return () => {
+      if (temporizadorNavegacion.current !== null) {
+        window.clearTimeout(temporizadorNavegacion.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     let vigente = true
@@ -187,16 +226,15 @@ function App() {
         />
 
         <main
-          className={`panel__principal${activo === 'dashboard' ? ' panel__principal--dashboard' : ''}`}
+          className={`panel__principal${activo === 'dashboard' ? ' panel__principal--dashboard' : ''}${navegacionCambiando ? ' panel__principal--saliendo' : ''}`}
           id="contenido"
+          key={activo}
         >
-          {activo === 'dashboard' ? (
-            <div className="dashboard-manchas" aria-hidden="true">
-              <span className="dashboard-mancha dashboard-mancha--superior" />
-              <span className="dashboard-mancha dashboard-mancha--inferior" />
-              <span className="dashboard-mancha dashboard-mancha--centro" />
-            </div>
-          ) : null}
+          <div className="dashboard-manchas" aria-hidden="true">
+            <span className="dashboard-mancha dashboard-mancha--superior" />
+            <span className="dashboard-mancha dashboard-mancha--inferior" />
+            <span className="dashboard-mancha dashboard-mancha--centro" />
+          </div>
           {Pagina === undefined
             ? (
               <Dashboard
@@ -206,6 +244,8 @@ function App() {
                 metricas={metricas}
                 cargandoMetricas={cargandoMetricas}
                 errorMetricas={errorMetricas}
+                periodoRespuestas={periodoRespuestas}
+                onCambiarPeriodoRespuestas={setPeriodoRespuestas}
               />
             )
             : (

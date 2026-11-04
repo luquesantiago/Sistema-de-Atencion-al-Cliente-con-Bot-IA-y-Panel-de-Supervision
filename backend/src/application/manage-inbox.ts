@@ -18,6 +18,7 @@ import {
   type InboxLabel,
   type InboxLastMessage,
   type InboxRepository,
+  type InboxView,
 } from '../domain/inbox.js'
 import { RequestManagementError, type PageRequest } from '../domain/request-management.js'
 import type { RiskLevel } from '../domain/risk-level.js'
@@ -111,10 +112,10 @@ export class ManageInbox {
     private readonly clock: () => Date = () => new Date(),
   ) {}
 
-  public async listCases(page: PageRequest, actor: PanelActor, customerId?: number): Promise<InboxItemPage> {
+  public async listCases(page: PageRequest, actor: PanelActor, customerId?: number, view?: InboxView): Promise<InboxItemPage> {
     validatePage(page)
     if (customerId !== undefined) validateCustomerId(customerId)
-    const result = await this.repository.listPage(page, customerId)
+    const result = await this.repository.listPage(page, customerId, view)
     return { items: result.entries.map((entry) => toItem(entry, actor)), total: result.total }
   }
 

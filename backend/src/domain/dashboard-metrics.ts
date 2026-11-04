@@ -13,10 +13,24 @@ export interface DashboardOperationalSummary {
   volumenPorHora: DashboardHourlyVolume[]
 }
 
+export type DashboardResponsePeriod = 'semanal' | 'mensual'
+
+export interface DashboardResponseDistribution {
+  resueltasPorIA: number
+  derivadasOperador: number
+  porcentajes: {
+    IA: number
+    operador: number
+  }
+  total: number
+}
+
 export interface DashboardMetricsRepository {
+  countUnattendedHandoffs(): Promise<number>
   countPendingProcedures(): Promise<number>
   countOpenRiskAlerts(): Promise<number>
   getOperationalSummary(now: Date): Promise<DashboardOperationalSummary>
+  getResponseDistribution(now: Date, period: DashboardResponsePeriod): Promise<DashboardResponseDistribution>
 }
 
 // Argentina no aplica horario de verano: el día local empieza a las 00:00 -03:00.
