@@ -13,6 +13,25 @@ function dataSourceWithCases(
 }
 
 describe('PrismaDashboardMetricsRepository', () => {
+  it('cuenta casos derivados abiertos sin responsable ni toma', async () => {
+    const findMany = vi.fn(async () => [
+      { id_caso: 12, fecha_apertura: new Date(), fecha_cierre: null, fecha_derivacion: new Date() },
+      { id_caso: 18, fecha_apertura: new Date(), fecha_cierre: null, fecha_derivacion: new Date() },
+    ])
+    const dataSource = dataSourceWithCases(findMany)
+
+    await expect(new PrismaDashboardMetricsRepository(dataSource).countUnattendedHandoffs()).resolves.toBe(2)
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        fecha_cierre: null,
+        fecha_derivacion: { not: null },
+        id_usuario_asignado: null,
+        fecha_toma: null,
+      },
+      select: { id_caso: true },
+    })
+  })
+
   it('suma prospectos y solicitudes de acción pendientes', async () => {
     const prospecto = vi.fn(async () => 2)
     const solicitudAccion = vi.fn(async () => 3)

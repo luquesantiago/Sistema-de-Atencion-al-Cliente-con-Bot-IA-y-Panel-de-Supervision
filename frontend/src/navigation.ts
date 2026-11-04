@@ -10,6 +10,7 @@ export type DestinoBandeja = {
   caseId?: number
   customerId?: number
   clienteNombre?: string
+  vista?: 'todos' | 'derivados' | 'sin-tomar'
 }
 
 /** Lo que se abre al llegar a Base de Clientes: la ficha de un cliente. */

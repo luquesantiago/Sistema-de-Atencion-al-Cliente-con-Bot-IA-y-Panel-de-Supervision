@@ -83,11 +83,12 @@ export type ResultadoRespuesta =
 /** Una página de la bandeja, ya ordenada por el backend. `limit` va de 1 a 100.
  * `customerId` limita la bandeja a los casos del cliente identificado. */
 export async function listarBandeja(
-  pagina: { limit: number; offset: number; customerId?: number },
+  pagina: { limit: number; offset: number; customerId?: number; vista?: 'todos' | 'derivados' | 'sin-tomar' },
   signal?: AbortSignal,
 ): Promise<PaginaBandeja> {
   const parametros = new URLSearchParams({ limit: String(pagina.limit), offset: String(pagina.offset) })
   if (pagina.customerId !== undefined) parametros.set('customerId', String(pagina.customerId))
+  if (pagina.vista !== undefined) parametros.set('vista', pagina.vista)
   const respuesta = await fetch(`/api/bandeja?${parametros.toString()}`, { signal })
   return leer<PaginaBandeja>(respuesta)
 }

@@ -41,17 +41,22 @@ type CaseRow = {
   fecha_apertura: Date
   fecha_cierre: Date | null
   fecha_derivacion: Date | null
+  id_caso?: number
 }
 
 type CaseModel = {
   findMany(args: {
     where: {
-      OR: [
+      fecha_cierre?: null
+      fecha_derivacion?: { not: null }
+      id_usuario_asignado?: null
+      fecha_toma?: null
+      OR?: [
         { fecha_apertura: { gte: Date; lt: Date } },
         { fecha_cierre: { gte: Date; lt: Date } },
       ]
     }
-    select: { fecha_apertura: true; fecha_cierre: true; fecha_derivacion: true }
+    select: { fecha_apertura?: true; fecha_cierre?: true; fecha_derivacion?: true; id_caso?: true }
   }): Promise<CaseRow[]>
 }
 
@@ -85,6 +90,19 @@ function hourlyVolume(dates: Date[]): DashboardHourlyVolume[] {
 
 export class PrismaDashboardMetricsRepository implements DashboardMetricsRepository {
   public constructor(private readonly dataSource: DashboardMetricsDataSource) {}
+
+  public async countUnattendedHandoffs(): Promise<number> {
+    const cases = await this.dataSource.caso.findMany({
+      where: {
+        fecha_cierre: null,
+        fecha_derivacion: { not: null },
+        id_usuario_asignado: null,
+        fecha_toma: null,
+      },
+      select: { id_caso: true },
+    })
+    return cases.length
+  }
 
   public async countPendingProcedures(): Promise<number> {
     const [pendingProspects, pendingActionRequests] = await Promise.all([

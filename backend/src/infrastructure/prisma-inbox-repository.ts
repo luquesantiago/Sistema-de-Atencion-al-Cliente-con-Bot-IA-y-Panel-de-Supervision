@@ -13,6 +13,7 @@ import {
   type InboxMessage,
   type InboxPage,
   type InboxRepository,
+  type InboxView,
 } from '../domain/inbox.js'
 import { isIntent } from '../domain/intent.js'
 import type { PageRequest } from '../domain/request-management.js'
@@ -93,10 +94,10 @@ export type InboxOrderRow = { caseId: unknown; threatOrder: unknown; severityOrd
 export class PrismaInboxRepository implements InboxRepository {
   public constructor(private readonly prisma: PrismaClient) {}
 
-  public async listPage(page: PageRequest, customerId?: number): Promise<InboxPage> {
+  public async listPage(page: PageRequest, customerId?: number, view?: InboxView): Promise<InboxPage> {
     const [rows, countRows] = await Promise.all([
-      this.prisma.$queryRaw<InboxOrderRow[]>(inboxOrderQuery(page, undefined, customerId)),
-      this.prisma.$queryRaw<Array<{ total: unknown }>>(inboxCountQuery(customerId)),
+      this.prisma.$queryRaw<InboxOrderRow[]>(inboxOrderQuery(page, undefined, customerId, view)),
+      this.prisma.$queryRaw<Array<{ total: unknown }>>(inboxCountQuery(customerId, view)),
     ])
     const ordered = rows.map(toOrderedCase)
     const entries = await this.entriesFor(ordered)
@@ -331,10 +332,15 @@ const representativeCase = Prisma.sql`
 // Los casos sin cerrar. El listado deja un caso por conversación; caseId restringe a un caso,
 // para el detalle, que puede pedir cualquier caso abierto. customerId restringe a los casos
 // de la conversación identificada con ese cliente.
-function inboxWhere(caseId?: number, customerId?: number): Prisma.Sql {
+function inboxWhere(caseId?: number, customerId?: number, view?: InboxView): Prisma.Sql {
   const onlyCase = caseId === undefined ? representativeCase : Prisma.sql`AND c.id_caso = ${caseId}`
   const onlyCustomer = customerId === undefined ? Prisma.empty : Prisma.sql`AND conv.id_cliente = ${customerId}`
-  return Prisma.sql`WHERE c.fecha_cierre IS NULL ${onlyCase} ${onlyCustomer}`
+  const onlyView = view === 'sin-tomar'
+    ? Prisma.sql`AND c.fecha_derivacion IS NOT NULL AND c.id_usuario_asignado IS NULL AND c.fecha_toma IS NULL`
+    : view === 'derivados'
+      ? Prisma.sql`AND c.fecha_derivacion IS NOT NULL`
+      : Prisma.empty
+  return Prisma.sql`WHERE c.fecha_cierre IS NULL ${onlyCase} ${onlyCustomer} ${onlyView}`
 }
 
 // Cada caso pertenece a una conversación; el filtro por cliente la necesita.
@@ -344,7 +350,7 @@ const conversationJoin = Prisma.sql`
 // Orden de la bandeja: amenaza detectada antes que cualquier gravedad; después gravedad (la
 // más grave entre el nivel del caso, alertas sin atender y el nivel de su tipo), sin tomar,
 // mayor espera e id.
-export function inboxOrderQuery(page: PageRequest, caseId?: number, customerId?: number): Prisma.Sql {
+export function inboxOrderQuery(page: PageRequest, caseId?: number, customerId?: number, view?: InboxView): Prisma.Sql {
   return Prisma.sql`
     SELECT c.id_caso AS caseId,
       CASE
@@ -369,14 +375,14 @@ export function inboxOrderQuery(page: PageRequest, caseId?: number, customerId?:
       WHERE a.fecha_atencion IS NULL
       GROUP BY a.id_caso
     ) al ON al.id_caso = c.id_caso
-    ${inboxWhere(caseId, customerId)}
+    ${inboxWhere(caseId, customerId, view)}
     ORDER BY threatOrder, severityOrder IS NULL, severityOrder, c.fecha_toma IS NULL DESC,
       COALESCE(c.fecha_derivacion, sol.fecha_solicitud), c.id_caso
     LIMIT ${page.limit} OFFSET ${page.offset}`
 }
 
-export function inboxCountQuery(customerId?: number): Prisma.Sql {
-  return Prisma.sql`SELECT COUNT(*) AS total FROM caso c ${conversationJoin} ${pendingRequestJoin} ${inboxWhere(undefined, customerId)}`
+export function inboxCountQuery(customerId?: number, view?: InboxView): Prisma.Sql {
+  return Prisma.sql`SELECT COUNT(*) AS total FROM caso c ${conversationJoin} ${pendingRequestJoin} ${inboxWhere(undefined, customerId, view)}`
 }
 
 // MySQL devuelve los enteros calculados (COUNT, LEAST) como BigInt o texto según el tipo.

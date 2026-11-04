@@ -58,6 +58,7 @@ export type InboxAlert = { type: string; level: RiskLevel }
 export type InboxConversation = { entry: InboxEntry; messages: InboxMessage[]; alerts: InboxAlert[] }
 
 export type InboxPage = { entries: InboxEntry[]; total: number }
+export type InboxView = 'todos' | 'derivados' | 'sin-tomar'
 
 // El estado que necesitan las reglas de tomar, contestar y cerrar, más lo que piden las
 // escrituras (change bandeja-atender-casos, decisión 3).
@@ -76,7 +77,7 @@ export type InboxImageRef = { ref: string; phone: string }
 export interface InboxRepository {
   // La página ya ordenada: gravedad (sin nivel al final), sin tomar primero, mayor espera e id.
   // customerId limita la bandeja a los casos de la conversación identificada con ese cliente.
-  listPage(page: PageRequest, customerId?: number): Promise<InboxPage>
+  listPage(page: PageRequest, customerId?: number, view?: InboxView): Promise<InboxPage>
   // null si el caso no existe o no está en la bandeja.
   findConversation(caseId: number): Promise<InboxConversation | null>
   // null si el caso no existe.

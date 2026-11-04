@@ -331,9 +331,10 @@ export function createApp(
       }
       const tramitesPorAprobar = await dashboardMetricsRepository.countPendingProcedures()
       const alertasRiesgoAbiertas = await dashboardMetricsRepository.countOpenRiskAlerts()
+      const casosDerivadosSinTomar = await dashboardMetricsRepository.countUnattendedHandoffs()
       const resumenOperativo = await dashboardMetricsRepository.getOperationalSummary(new Date())
       response.status(200).json({
-        casosDerivadosSinTomar: 0,
+        casosDerivadosSinTomar,
         respuestasRetenidas: 0,
         tramitesPorAprobar,
         alertasRiesgoAbiertas,
@@ -349,7 +350,9 @@ export function createApp(
     try {
       const page = parsePage(request.query.limit, request.query.offset)
       const customerId = parseCustomerId(request.query.customerId)
-      const result = await manageInbox.listCases(page, currentPanelUser(response), customerId)
+      const view = request.query.vista
+      const inboxView = view === 'sin-tomar' || view === 'derivados' || view === 'todos' ? view : undefined
+      const result = await manageInbox.listCases(page, currentPanelUser(response), customerId, inboxView)
       response.status(200).json({ items: result.items, total: result.total, ...page })
     } catch (error) {
       handleRequestError(error, response, next)

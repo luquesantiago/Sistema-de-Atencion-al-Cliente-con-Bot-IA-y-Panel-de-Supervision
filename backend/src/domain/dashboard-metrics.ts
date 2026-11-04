@@ -14,6 +14,7 @@ export interface DashboardOperationalSummary {
 }
 
 export interface DashboardMetricsRepository {
+  countUnattendedHandoffs(): Promise<number>
   countPendingProcedures(): Promise<number>
   countOpenRiskAlerts(): Promise<number>
   getOperationalSummary(now: Date): Promise<DashboardOperationalSummary>

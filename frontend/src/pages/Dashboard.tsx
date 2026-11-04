@@ -1,4 +1,4 @@
-import type { Modulo, ModuloPanel } from '../navigation'
+import type { Modulo, Navegar } from '../navigation'
 import type { RolUsuario } from '../usuario'
 import PageHeader from '../components/PageHeader'
 import EstadoPanel from '../components/EstadoPanel'
@@ -6,6 +6,7 @@ import {
   IconoAlerta,
   IconoArchivoCheck,
   IconoCampana,
+  IconoIrBandeja,
   IconoPausa,
 } from '../components/iconos'
 import type { DashboardHourlyVolume, DashboardMetrics } from '../api/dashboard'
@@ -68,7 +69,7 @@ function pasoEtiquetas(cantidad: number): number {
 interface DashboardProps {
   modulo: Modulo
   rol: RolUsuario
-  onNavegar: (modulo: ModuloPanel) => void
+  onNavegar: Navegar
   metricas: DashboardMetrics | null
   cargandoMetricas: boolean
   errorMetricas: string | null
@@ -135,9 +136,20 @@ export default function Dashboard({
             <span className="tarjeta__icono tarjeta__icono--rose" aria-hidden="true">
               <IconoCampana />
             </span>
+            <button
+              className="tarjeta__accion-kpi"
+              type="button"
+              aria-label="Ir a casos derivados sin tomar en Bandeja de Atención"
+              title="Ir a Sin tomar"
+              onClick={() => onNavegar('bandeja', { bandeja: { vista: 'sin-tomar' } })}
+            >
+              <IconoIrBandeja />
+            </button>
             <span className="tarjeta__etiqueta">Casos derivados sin tomar</span>
-            <span className="tarjeta__valor tarjeta__valor--kpi">—</span>
-            <span className="tarjeta__nota">60 minutos para alertar, valor provisional.</span>
+            <span className="tarjeta__valor tarjeta__valor--kpi">
+              {cargandoMetricas ? '…' : (metricas?.casosDerivadosSinTomar ?? '—')}
+            </span>
+            <span className="tarjeta__nota">Casos derivados abiertos sin responsable.</span>
           </article>
 
           <article className="tarjeta tarjeta--kpi">
