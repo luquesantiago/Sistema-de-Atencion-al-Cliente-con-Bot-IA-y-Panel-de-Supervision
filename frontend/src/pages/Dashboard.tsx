@@ -132,7 +132,6 @@ export default function Dashboard({
   const casosCerrados = metricas?.casosCerrados ?? '—'
   const resueltosPorBot = metricas?.resueltosPorBot ?? '—'
   const tasaAutomatizacion = Math.round(metricas?.tasaAutomatizacion ?? 0)
-  const estadoAutomatizacion = tasaAutomatizacion >= 60 ? 'Óptimo' : 'Moderado'
   const distribucion = metricas?.distribucionRespuestas
   const porcentajeIA = distribucion?.porcentajes.IA ?? 0
   const porcentajeOperador = distribucion?.porcentajes.operador ?? 0
@@ -167,55 +166,33 @@ export default function Dashboard({
             <span className="tarjeta__icono tarjeta__icono--pink" aria-hidden="true">
               <IconoPausa />
             </span>
-            <span className="tarjeta__etiqueta">Distribución de respuestas</span>
-            <div className="kpi-respuestas__periodos" role="group" aria-label="Período de distribución">
-              <button
-                className={periodoRespuestas === 'semanal' ? 'kpi-respuestas__periodo kpi-respuestas__periodo--activo' : 'kpi-respuestas__periodo'}
-                type="button"
-                aria-pressed={periodoRespuestas === 'semanal'}
-                onClick={() => onCambiarPeriodoRespuestas('semanal')}
-              >
-                Semanal
-              </button>
-              <button
-                className={periodoRespuestas === 'mensual' ? 'kpi-respuestas__periodo kpi-respuestas__periodo--activo' : 'kpi-respuestas__periodo'}
-                type="button"
-                aria-pressed={periodoRespuestas === 'mensual'}
-                onClick={() => onCambiarPeriodoRespuestas('mensual')}
-              >
-                Mensual
-              </button>
-            </div>
+            <span className="tarjeta__etiqueta">Resumen operativo</span>
             {cargandoMetricas ? (
-              <span className="tarjeta__nota tarjeta__nota--pie">Cargando distribución…</span>
-            ) : distribucion?.total ? (
-              <div className="kpi-respuestas__contenido">
-                <div
-                  className="kpi-respuestas__dona"
-                  role="img"
-                  aria-label={`${porcentajeIA}% resuelta por IA y ${porcentajeOperador}% derivada al operador`}
-                  style={{
-                    background: `conic-gradient(var(--color-success-text) 0 ${porcentajeIA}%, var(--color-secondary) ${porcentajeIA}% 100%)`,
-                  }}
-                >
-                  <div className="kpi-respuestas__centro">
-                    <strong>{porcentajeIA}%</strong>
-                    <span>IA</span>
-                  </div>
-                </div>
-                <dl className="kpi-respuestas__leyenda">
+              <span className="tarjeta__nota tarjeta__nota--pie">Cargando resumen diario…</span>
+            ) : (
+              <>
+                <dl className="kpi-resumen">
                   <div>
-                    <dt><span className="kpi-respuestas__punto kpi-respuestas__punto--ia" />IA</dt>
-                    <dd>{porcentajeIA}% · {distribucion.resueltasPorIA}</dd>
+                    <dt>Consultas</dt>
+                    <dd>{consultasHoy}</dd>
                   </div>
                   <div>
-                    <dt><span className="kpi-respuestas__punto kpi-respuestas__punto--operador" />Operador</dt>
-                    <dd>{porcentajeOperador}% · {distribucion.derivadasOperador}</dd>
+                    <dt>Cerrados</dt>
+                    <dd>{casosCerrados}</dd>
+                  </div>
+                  <div>
+                    <dt>Resueltos por IA</dt>
+                    <dd>{resueltosPorBot}</dd>
+                  </div>
+                  <div>
+                    <dt>Automatización</dt>
+                    <dd>{tasaAutomatizacion}%</dd>
                   </div>
                 </dl>
-              </div>
-            ) : (
-              <span className="tarjeta__nota tarjeta__nota--pie">Sin respuestas registradas en este período.</span>
+                <div className="kpi-resumen__barra" aria-label={`Automatización ${tasaAutomatizacion}%`}>
+                  <span style={{ width: `${tasaAutomatizacion}%` }} />
+                </div>
+              </>
             )}
           </article>
 
@@ -318,44 +295,62 @@ export default function Dashboard({
             className="panel-dashboard panel-dashboard--resumen"
             aria-labelledby="resumen-operativo-titulo"
           >
-            <h2 id="resumen-operativo-titulo">Resumen operativo</h2>
-            <dl className="resumen-operativo">
-              <div className="resumen-operativo__fila">
-                <dt>Consultas de hoy</dt>
-                <dd>{consultasHoy}</dd>
+            <div className="panel-respuestas__encabezado">
+              <div>
+                <h2 id="resumen-operativo-titulo">Resumen operativo</h2>
+                <p className="panel-dashboard__nota">Distribución de respuestas atendidas.</p>
               </div>
-              <div className="resumen-operativo__fila">
-                <dt>Casos cerrados</dt>
-                <dd>{casosCerrados}</dd>
+              <div className="panel-respuestas__periodos" role="group" aria-label="Período de distribución">
+                <button
+                  className={periodoRespuestas === 'semanal' ? 'panel-respuestas__periodo panel-respuestas__periodo--activo' : 'panel-respuestas__periodo'}
+                  type="button"
+                  aria-pressed={periodoRespuestas === 'semanal'}
+                  onClick={() => onCambiarPeriodoRespuestas('semanal')}
+                >
+                  Semanal
+                </button>
+                <button
+                  className={periodoRespuestas === 'mensual' ? 'panel-respuestas__periodo panel-respuestas__periodo--activo' : 'panel-respuestas__periodo'}
+                  type="button"
+                  aria-pressed={periodoRespuestas === 'mensual'}
+                  onClick={() => onCambiarPeriodoRespuestas('mensual')}
+                >
+                  Mensual
+                </button>
               </div>
-              <div className="resumen-operativo__fila">
-                <dt>Resueltos por bot</dt>
-                <dd>{resueltosPorBot}</dd>
-              </div>
-            </dl>
-
-            <div className="resumen-operativo__automatizacion">
-              <div className="resumen-operativo__barra-encabezado">
-                <span>Tasa de automatización</span>
-                <span className={`estado-automatizacion estado-automatizacion--${tasaAutomatizacion >= 60 ? 'optimo' : 'moderado'}`}>
-                  {estadoAutomatizacion}
-                </span>
-              </div>
-              <div
-                className="barra-progreso"
-                role="progressbar"
-                aria-label="Tasa de automatización del bot"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={tasaAutomatizacion}
-              >
-                <span
-                  className="barra-progreso__relleno"
-                  style={{ width: `${tasaAutomatizacion}%` }}
-                />
-              </div>
-              <span className="resumen-operativo__porcentaje">{tasaAutomatizacion}%</span>
             </div>
+
+            {distribucion?.total ? (
+              <div className="panel-respuestas__contenido">
+                <div
+                  className="panel-respuestas__dona"
+                  role="img"
+                  aria-label={`${porcentajeIA}% resuelta por IA y ${porcentajeOperador}% derivada al operador`}
+                  style={{
+                    background: `conic-gradient(var(--color-success-text) 0 ${porcentajeIA}%, var(--color-secondary) ${porcentajeIA}% 100%)`,
+                  }}
+                >
+                  <div className="panel-respuestas__centro">
+                    <strong>{porcentajeIA}%</strong>
+                    <span>IA</span>
+                  </div>
+                </div>
+                <dl className="panel-respuestas__leyenda">
+                  <div>
+                    <dt><span className="panel-respuestas__punto panel-respuestas__punto--ia" />IA</dt>
+                    <dd>{porcentajeIA}%</dd>
+                    <small>{distribucion.resueltasPorIA} respuestas</small>
+                  </div>
+                  <div>
+                    <dt><span className="panel-respuestas__punto panel-respuestas__punto--operador" />Operador</dt>
+                    <dd>{porcentajeOperador}%</dd>
+                    <small>{distribucion.derivadasOperador} respuestas</small>
+                  </div>
+                </dl>
+              </div>
+            ) : (
+              <p className="panel-respuestas__vacio">Sin respuestas registradas en este período.</p>
+            )}
           </article>
         </section>
       )}
