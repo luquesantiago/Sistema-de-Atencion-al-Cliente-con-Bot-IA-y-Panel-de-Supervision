@@ -66,3 +66,7 @@ Los IDs llevan el prefijo del módulo. Citarlos en commits y pull requests.
 ### Aclaración de implementación asociada a RF-SUP-02
 
 La acción «Bloquear número» de la Bandeja aplica un bloqueo interno al registro `telefono`: los mensajes que WAHA entregue se descartan antes de guardarse o procesarse, y no se permiten respuestas manuales desde la Bandeja. No bloquea el contacto en WhatsApp ni impide que la persona escriba o que WAHA reciba el evento. El desbloqueo restaura el comportamiento interno habitual. Esta aclaración documenta la implementación del panel y no modifica ni agrega requisitos funcionales oficiales.
+
+### Aclaración de implementación asociada a RF-VER-01
+
+Cuando el detector clasifica positivamente un mensaje como posible intento de manipulación o exfiltración, el sistema guarda y deriva ese mensaje sin responder y activa automáticamente el bloqueo interno del número. Los mensajes posteriores se descartan antes de guardarse o procesarse hasta que un operador lo desbloquee desde la Bandeja; una falla del proveedor al clasificar no activa el bloqueo. En la Bandeja, «Posible amenaza» reemplaza cualquier otra etiqueta de prioridad del caso y se ordena antes que las demás prioridades, aunque el nivel de riesgo de catálogo del caso se conserve. Esto no bloquea al contacto en WhatsApp ni impide que WAHA reciba sus mensajes y no modifica ni agrega requisitos funcionales oficiales.

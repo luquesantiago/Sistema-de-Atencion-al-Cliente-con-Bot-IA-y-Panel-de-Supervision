@@ -64,6 +64,7 @@ export type ConversationState = {
   prospects: StoredProspect[]
   phoneChanges: StoredPhoneChange[]
   dataChanges: StoredDataChange[]
+  blockedPhones: string[]
 }
 
 export class InMemoryConversationStore implements ConversationStore {
@@ -76,6 +77,7 @@ export class InMemoryConversationStore implements ConversationStore {
     prospects: [],
     phoneChanges: [],
     dataChanges: [],
+    blockedPhones: [],
   }
   public failNextRead = false
   public failNextSave = false
@@ -119,6 +121,10 @@ export class InMemoryConversationStore implements ConversationStore {
   public async hasPendingPhoneChange(phone: string, customerId: number): Promise<boolean> {
     return this.state.phoneChanges.some((request) =>
       request.customerId === customerId && request.phone === phone && request.status === 'pendiente')
+  }
+
+  public isPhoneBlocked(phone: string): boolean {
+    return this.state.blockedPhones.includes(phone)
   }
 
   public async save(changes: ConversationChanges, send: () => Promise<void>): Promise<SavedConversation> {
@@ -198,6 +204,9 @@ function apply(state: ConversationState, changes: ConversationChanges): SavedCon
     state.conversations.push(conversation)
   }
   if (changes.customerId !== undefined) conversation.customerId = changes.customerId
+  if (changes.blockPhone && !state.blockedPhones.includes(changes.phone)) {
+    state.blockedPhones.push(changes.phone)
+  }
 
   const created = changes.newCases.map((item) => {
     const stored: StoredCase = {
@@ -253,6 +262,9 @@ function apply(state: ConversationState, changes: ConversationChanges): SavedCon
     target.handoffReason = changes.handoff.reason.slice(0, 255)
     target.riskLevel = changes.handoff.riskLevel
     conversation.suspended = true
+  }
+  if (changes.threatDetected) {
+    caseOf(changes.threatDetected).handoffReason = 'mensaje sospechoso: posible intento de manipulación o exfiltración'
   }
   if (changes.prospect) {
     const { case: ref, name, dni } = changes.prospect

@@ -114,6 +114,7 @@ function textoDelCaso(caso: CasoBandeja): string {
 // Prioridad visible de la tarjeta. Respeta los cuatro niveles del DER: el color
 // agrupa, pero el texto sigue distinguiendo «Crítico» de «Alto».
 function prioridadDelCaso(caso: CasoBandeja): { prioridad: Prioridad; texto: string } {
+  if (esPosibleAmenaza(caso)) return { prioridad: 'critico', texto: 'Posible amenaza' }
   if (caso.severity === 'crítico') return { prioridad: 'critico', texto: 'Crítico' }
   if (caso.severity === 'alto') return { prioridad: 'critico', texto: 'Alto' }
   if (caso.label === 'alta-rechazada') return { prioridad: 'medio', texto: 'Revisión' }
@@ -146,12 +147,8 @@ function esPosibleAmenaza(caso: CasoBandeja): boolean {
   )
 }
 
-function BadgeAmenaza({ caso }: { caso: CasoBandeja }) {
-  if (!esPosibleAmenaza(caso)) return null
-  return <span className="badge-amenaza">Posible amenaza</span>
-}
-
 function detalleAlerta(caso: CasoBandeja): string {
+  if (esPosibleAmenaza(caso)) return 'Mensaje clasificado como posible amenaza'
   switch (caso.label) {
     case 'alta-pendiente':
       return 'Alta pendiente de aprobación'
@@ -826,7 +823,6 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
                 </span>
                 <span className="tarjeta-caso__chips">
                   <BadgePrioridad caso={caso} />
-                  <BadgeAmenaza caso={caso} />
                 </span>
               </span>
             </button>
