@@ -78,8 +78,8 @@
 .topbar__boton {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   flex: none;
   padding: 0;
   background: var(--nav-overlay);
@@ -4095,6 +4095,7 @@ textarea:not([disabled]) {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    min-height: 44px;
     margin: 12px 12px 0;
     padding: 6px 12px;
     border: 1px solid var(--color-secondary);
