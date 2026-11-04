@@ -208,6 +208,9 @@ function DetalleProspecto({
   const [nombre, setNombre] = useState(nombreDividido.nombre)
   const [apellido, setApellido] = useState(nombreDividido.apellido)
   const [fundamento, setFundamento] = useState('')
+  const [nombreTocado, setNombreTocado] = useState(false)
+  const [apellidoTocado, setApellidoTocado] = useState(false)
+  const [fundamentoTocado, setFundamentoTocado] = useState(false)
 
   const tieneDni = (prospecto.dni ?? '').trim() !== ''
   const nombreValido = nombre.trim().length > 0 && nombre.trim().length <= LARGO_MAXIMO_NOMBRE
@@ -286,7 +289,8 @@ function DetalleProspecto({
                 value={nombre}
                 maxLength={LARGO_MAXIMO_NOMBRE}
                 disabled={ocupado}
-                aria-invalid={!nombreValido}
+                aria-invalid={nombreTocado && !nombreValido}
+                onBlur={() => setNombreTocado(true)}
                 onChange={(evento) => setNombre(evento.target.value)}
               />
             </label>
@@ -296,7 +300,8 @@ function DetalleProspecto({
                 value={apellido}
                 maxLength={LARGO_MAXIMO_NOMBRE}
                 disabled={ocupado}
-                aria-invalid={!apellidoValido}
+                aria-invalid={apellidoTocado && !apellidoValido}
+                onBlur={() => setApellidoTocado(true)}
                 onChange={(evento) => setApellido(evento.target.value)}
               />
             </label>
@@ -308,8 +313,9 @@ function DetalleProspecto({
               value={fundamento}
               maxLength={LARGO_MAXIMO_FUNDAMENTO}
               disabled={ocupado}
-              aria-invalid={!fundamentoValido}
+              aria-invalid={fundamentoTocado && !fundamentoValido}
               aria-describedby={`${id}-fundamento-ayuda`}
+              onBlur={() => setFundamentoTocado(true)}
               onChange={(evento) => setFundamento(evento.target.value)}
             />
           </label>
@@ -357,6 +363,7 @@ function DetalleCambioTelefono({
   const id = useId()
   const [fundamento, setFundamento] = useState('')
   const [seleccionados, setSeleccionados] = useState<number[]>([])
+  const [fundamentoTocado, setFundamentoTocado] = useState(false)
   const fundamentoValido =
     fundamento.trim().length >= LARGO_MINIMO_FUNDAMENTO && fundamento.trim().length <= LARGO_MAXIMO_FUNDAMENTO
   const puedeAprobar = fundamentoValido && !ocupado
@@ -449,8 +456,9 @@ function DetalleCambioTelefono({
             value={fundamento}
             maxLength={LARGO_MAXIMO_FUNDAMENTO}
             disabled={ocupado}
-            aria-invalid={!fundamentoValido}
+            aria-invalid={fundamentoTocado && !fundamentoValido}
             aria-describedby={`${id}-fundamento-ayuda`}
+            onBlur={() => setFundamentoTocado(true)}
             onChange={(evento) => setFundamento(evento.target.value)}
           />
         </label>
@@ -494,6 +502,7 @@ function DetalleCambioDatos({
 }) {
   const id = useId()
   const [fundamento, setFundamento] = useState('')
+  const [fundamentoTocado, setFundamentoTocado] = useState(false)
   const fundamentoValido =
     fundamento.trim().length >= LARGO_MINIMO_FUNDAMENTO && fundamento.trim().length <= LARGO_MAXIMO_FUNDAMENTO
   const puedeAprobar = fundamentoValido && !ocupado
@@ -560,8 +569,9 @@ function DetalleCambioDatos({
             value={fundamento}
             maxLength={LARGO_MAXIMO_FUNDAMENTO}
             disabled={ocupado}
-            aria-invalid={!fundamentoValido}
+            aria-invalid={fundamentoTocado && !fundamentoValido}
             aria-describedby={`${id}-fundamento-ayuda`}
+            onBlur={() => setFundamentoTocado(true)}
             onChange={(evento) => setFundamento(evento.target.value)}
           />
         </label>

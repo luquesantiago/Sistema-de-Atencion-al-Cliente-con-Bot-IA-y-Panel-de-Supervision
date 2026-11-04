@@ -78,8 +78,8 @@
 .topbar__boton {
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
+  width: 44px;
+  height: 44px;
   flex: none;
   padding: 0;
   background: var(--nav-overlay);
@@ -1943,7 +1943,7 @@ textarea:not([disabled]) {
 
 .busqueda__campo {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--color-secondary);
   border-radius: var(--radius-md);
@@ -2110,6 +2110,7 @@ textarea:not([disabled]) {
 
 /* «Ir al chat»: acción secundaria, al lado de «Ver detalle». */
 .tabla__chat {
+  min-height: 44px;
   padding: 4px 10px;
   border: 1px solid var(--color-secondary);
   border-radius: var(--radius-md);
@@ -2135,6 +2136,7 @@ textarea:not([disabled]) {
 }
 
 .tabla__ver {
+  min-height: 44px;
   padding: 4px 10px;
   border: 1px solid var(--color-secondary);
   border-radius: var(--radius-md);
@@ -2197,6 +2199,7 @@ textarea:not([disabled]) {
 
 .detalle-panel__cerrar {
   flex: none;
+  min-height: 44px;
   padding: 3px 9px;
   border: 1px solid var(--color-secondary);
   border-radius: var(--radius-md);
@@ -2372,6 +2375,7 @@ textarea:not([disabled]) {
 .bandeja-container {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   min-height: 0;
   overflow: hidden;
   background: #f8f7f5;
@@ -2893,7 +2897,7 @@ textarea:not([disabled]) {
 
 .conversacion__accion {
   display: inline-flex;
-  min-height: 38px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   gap: 7px;
@@ -3136,11 +3140,58 @@ textarea:not([disabled]) {
 }
 
 @media (max-width: 900px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    overflow-x: hidden;
+  }
+
   /* Una columna por vez: la lista o la conversación elegida */
+  .panel {
+    width: 100%;
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  .topbar {
+    flex: 0 0 auto;
+  }
+
+  .panel__principal {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 100vw;
+    height: auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  .panel__principal--bandeja {
+    overflow: hidden;
+  }
+
   .bandeja-container {
     flex-direction: column;
-    height: 100vh;
+    width: 100%;
+    max-width: 100vw;
+    height: 100%;
     min-height: 0;
+    overflow: hidden;
   }
 
   .bandeja-container--con-caso .bandeja-lista-panel,
@@ -3151,19 +3202,112 @@ textarea:not([disabled]) {
   .bandeja-lista-panel {
     flex: 1 1 auto;
     width: 100%;
+    max-width: 100vw;
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     border-right: 0;
+  }
+
+  .bandeja__lista-encabezado {
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
+  }
+
+  .bandeja__busqueda,
+  .bandeja__pestanas {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .bandeja__pestana {
+    min-width: 0;
+    padding-inline: 8px;
   }
 
   .bandeja-detalle-panel {
     flex: 1;
+    width: 100%;
+    max-width: 100vw;
+    height: 100%;
   }
 
   .bandeja-detalle-panel .conversacion {
+    height: 100%;
     min-height: 0;
   }
 
   .conversacion__volver {
     display: inline-flex;
+    min-height: 44px;
+  }
+
+  .conversacion {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    width: 100%;
+    max-width: 100vw;
+    overflow: hidden;
+  }
+
+  .chat-header {
+    position: relative;
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
+    z-index: 20;
+  }
+
+  .chat-body {
+    width: 100%;
+    max-width: 100vw;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  .chat-header__principal {
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
+    background: var(--color-bg);
+    align-items: flex-start;
+    padding-inline: 12px;
+  }
+
+  .conversacion__datos {
+    flex: 1 1 120px;
+  }
+
+  .conversacion__acciones {
+    flex-basis: 100%;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .conversacion__accion {
+    flex: 1 1 140px;
+    min-height: 44px;
+  }
+
+  .alerta-banner,
+  .chat__bloqueo {
+    padding-inline: 12px;
+  }
+
+  .respuesta {
+    width: auto;
+    max-width: calc(100vw - 24px);
+    min-width: 0;
+    margin: 8px 12px max(8px, env(safe-area-inset-bottom));
+  }
+
+  .respuesta__texto {
+    min-width: 0;
   }
 
   .mensaje-bubble {
@@ -3184,6 +3328,7 @@ textarea:not([disabled]) {
 }
 
 .detalle-panel__telefono-quitar {
+  min-height: 44px;
   padding: 1px 7px;
   border: 1px solid var(--color-danger-border);
   border-radius: var(--radius-md);
@@ -3597,7 +3742,126 @@ textarea:not([disabled]) {
   }
 
   .tabla {
-    min-width: 640px;
+    min-width: 0;
+    border-spacing: 0 12px;
+  }
+
+  .busqueda__campo,
+  .detalle-panel__telefono-fila input {
+    min-height: 44px;
+  }
+
+  .tabla thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .tabla tbody {
+    display: block;
+  }
+
+  .tabla__fila {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 12px;
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid var(--color-accent-light);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+
+  .tabla tbody td,
+  .tabla tbody td:first-child,
+  .tabla tbody td:last-child {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .tabla tbody tr:hover td {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .tabla tbody tr[aria-current] {
+    border-color: var(--color-secondary);
+    box-shadow: inset 3px 0 0 var(--color-primary);
+  }
+
+  .tabla tbody tr[aria-current] td {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .tabla__fila td::before {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--color-text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    content: attr(data-label);
+  }
+
+  .tabla__nombre {
+    grid-column: 1 / -1;
+    font-size: 1rem;
+  }
+
+  .tabla__identificacion,
+  .tabla__telefonos,
+  .tabla__fila td:nth-child(4) {
+    min-width: 0;
+  }
+
+  .tabla__accion {
+    grid-column: 1 / -1;
+  }
+
+  .tabla__acciones {
+    justify-content: stretch;
+  }
+
+  .tabla__chat,
+  .tabla__ver,
+  .detalle-panel__cerrar,
+  .detalle-panel__telefono-quitar,
+  .detalle-panel__polizas-encabezado .boton {
+    min-height: 44px;
+  }
+
+  .tabla__chat,
+  .tabla__ver {
+    flex: 1;
+  }
+
+  .cartera__lista {
+    overflow-x: visible;
+  }
+
+  .cartera--con-detalle .cartera__lista {
+    display: none;
+  }
+
+  .detalle-panel {
+    position: static;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .detalle-panel__cerrar {
+    padding-inline: 12px;
   }
 }
 
@@ -4068,6 +4332,7 @@ textarea:not([disabled]) {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    min-height: 44px;
     margin: 12px 12px 0;
     padding: 6px 12px;
     border: 1px solid var(--color-secondary);

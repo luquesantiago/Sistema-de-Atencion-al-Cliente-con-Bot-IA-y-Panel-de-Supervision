@@ -45,7 +45,7 @@ export const MODULOS: readonly Modulo[] = [
     id: 'tramites',
     nombre: 'Trámites por Aprobar',
     descripcion:
-      'Cambios de teléfono, bajas, modificaciones de póliza y altas de conductor pendientes de aprobación.',
+      'Altas, cambios de teléfono y cambios de datos pendientes de revisión y decisión.',
   },
   {
     id: 'clientes',
