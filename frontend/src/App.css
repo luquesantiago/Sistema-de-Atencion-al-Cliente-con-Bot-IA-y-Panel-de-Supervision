@@ -3852,6 +3852,189 @@
   }
 }
 
+/* Badges de navegación: no alteran las dimensiones ni el estilo de los ítems. */
+
+.nav__badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  margin-left: auto;
+  padding: 0 7px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(194, 68, 104, 0.62);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+/* Tratamiento visual acotado al Dashboard; el resto del panel conserva su fondo. */
+
+.panel__principal--dashboard {
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  background: #fdf9fa;
+}
+
+.dashboard-manchas {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.dashboard-mancha {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+}
+
+.dashboard-mancha--superior {
+  top: -120px;
+  right: -40px;
+  width: 600px;
+  height: 600px;
+  background: rgba(194, 68, 104, 0.34);
+  filter: blur(90px);
+}
+
+.dashboard-mancha--inferior {
+  bottom: -180px;
+  left: -100px;
+  width: 620px;
+  height: 620px;
+  background: rgba(122, 31, 53, 0.26);
+  filter: blur(100px);
+}
+
+.dashboard-mancha--centro {
+  top: 42%;
+  left: 52%;
+  width: 420px;
+  height: 420px;
+  background: rgba(255, 150, 175, 0.38);
+  filter: blur(90px);
+  transform: translate(-50%, -50%);
+}
+
+.panel__principal--dashboard > .pagina {
+  position: relative;
+  z-index: 1;
+}
+
+.panel__principal--dashboard .pagina__encabezado h1,
+.panel__principal--dashboard .panel-dashboard h2,
+.panel__principal--dashboard .tarjeta__valor--kpi,
+.panel__principal--dashboard .resumen-operativo__fila dd {
+  color: #3a0d1a;
+}
+
+.panel__principal--dashboard .pagina__descripcion,
+.panel__principal--dashboard .tarjeta__nota,
+.panel__principal--dashboard .panel-dashboard__nota,
+.panel__principal--dashboard .resumen-operativo__barra-encabezado {
+  color: #6b3a48;
+}
+
+.panel__principal--dashboard .grafico-chats__eje text {
+  fill: #6b3a48;
+}
+
+.panel__principal--dashboard .tarjeta__etiqueta,
+.panel__principal--dashboard .resumen-operativo__fila dt {
+  color: #4a1626;
+}
+
+.panel__principal--dashboard .tarjeta--kpi,
+.panel__principal--dashboard .panel-dashboard {
+  position: relative;
+  z-index: 1;
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 26px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 10px 30px rgba(122, 31, 53, 0.16),
+    inset 0 1px 0 #ffffff,
+    inset 0 -1px 0 rgba(122, 31, 53, 0.06);
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .panel__principal--dashboard .tarjeta--kpi,
+  .panel__principal--dashboard .panel-dashboard {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.38) 100%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+  }
+}
+
+.panel__principal--dashboard .tarjeta__icono {
+  width: 50px;
+  height: 50px;
+  flex: none;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 #ffffff;
+}
+
+.panel__principal--dashboard .tarjeta__icono--rose,
+.panel__principal--dashboard .tarjeta__icono--red {
+  background: linear-gradient(135deg, rgba(194, 68, 104, 0.28), rgba(194, 68, 104, 0.08));
+  color: #8a1f3d;
+}
+
+.panel__principal--dashboard .tarjeta__icono--pink {
+  background: linear-gradient(135deg, rgba(122, 31, 53, 0.22), rgba(122, 31, 53, 0.06));
+  color: #7a1f35;
+}
+
+.panel__principal--dashboard .tarjeta__icono--amber {
+  background: linear-gradient(135deg, rgba(240, 170, 40, 0.38), rgba(240, 170, 40, 0.12));
+  color: #8a5200;
+}
+
+.panel__principal--dashboard .grafico-chats__guias line {
+  stroke: rgba(122, 31, 53, 0.16);
+  stroke-dasharray: 3 5;
+  stroke-width: 1;
+}
+
+.panel__principal--dashboard .grafico-chats__base {
+  stroke: rgba(122, 31, 53, 0.32);
+  stroke-width: 1;
+}
+
+.panel__principal--dashboard .resumen-operativo__fila {
+  border-bottom-color: rgba(122, 31, 53, 0.14);
+}
+
+.panel__principal--dashboard .estado-automatizacion--moderado {
+  background: linear-gradient(135deg, #ffe7a8, #ffcf6b);
+  color: #5a3300;
+}
+
+.panel__principal--dashboard .barra-progreso {
+  height: 10px;
+  background: rgba(122, 31, 53, 0.14);
+  box-shadow: inset 0 1px 3px rgba(122, 31, 53, 0.12);
+}
+
+.panel__principal--dashboard .barra-progreso__relleno {
+  background: linear-gradient(90deg, #7a1f35, #c24468);
+}
+
+.panel__principal--dashboard .resumen-operativo__porcentaje {
+  color: #4a1626;
+}
+
 .badge-amenaza {
   display: inline-flex;
   align-items: center;
