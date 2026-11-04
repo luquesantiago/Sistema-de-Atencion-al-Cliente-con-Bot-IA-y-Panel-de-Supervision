@@ -37,6 +37,11 @@ describe('actionForIntent', () => {
     expect(isIntent('mis pólizas')).toBe(true)
   })
 
+  it('la grúa da el teléfono y deriva; los medios de pago se contestan', () => {
+    expect(actionForIntent('asistencia mecánica')).toEqual({ kind: 'assistance' })
+    expect(actionForIntent('medios de pago')).toEqual({ kind: 'payment-methods' })
+  })
+
   it('repregunta lo que no se entiende', () => {
     expect(actionForIntent('no se entiende')).toEqual({ kind: 'clarify' })
   })

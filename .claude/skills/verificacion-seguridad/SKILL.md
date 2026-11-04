@@ -36,7 +36,14 @@ Mantener alertas diferenciables para datos falsos o no verificables, exposición
 - Roles: Administrador (Roberto) ve métricas y configura el horario de atención; Operador (Graciela y Diego) atiende y hace el ABM de clientes, pólizas y siniestros.
 - Pueden aprobar trámites críticos Roberto, Graciela y Diego. Graciela puede aprobar casos que ella misma atendió.
 - La UI debe reflejar permisos, pero nunca ser la única barrera.
-- En el Parcial 1 no hay login: el backend atribuye las acciones del panel al usuario de prueba `operador`, nunca al usuario que mande el navegador. En el Parcial 2 lo reemplaza el login.
+- Sesión del panel (change `acceso-por-rol`):
+  - Login contra la tabla `usuario` con bcrypt. Un usuario que no existe, una clave incorrecta y un usuario dado de baja dan el mismo error; el usuario inexistente se compara igual contra un hash fijo, así el tiempo no revela si existe.
+  - Cookie firmada con HMAC-SHA256 (`PANEL_SESSION_SECRET`), `httpOnly`, `SameSite=Strict`, 8 horas, `Secure` en producción.
+  - `requireSession` cubre todo `/api` salvo las rutas de sesión, y lee el usuario, su rol y si está activo de la base en cada pedido: una baja corta el acceso en el pedido siguiente.
+  - `requireRole('administrador')` protege configuración y métricas.
+  - 5 fallos seguidos bloquean a ese usuario 15 minutos, con un contador en memoria que un reinicio borra.
+  - El actor de cada acción sale de la sesión, nunca del cuerpo del pedido.
+- Limitación aceptada: cerrar sesión borra la cookie de ese navegador, pero un token copiado vale hasta que vence. No hay registro de accesos hasta la auditoría del MVP 2.
 - La aprobación debe verificar que el trámite sigue pendiente y registrar actor, fecha, motivo, estado anterior y resultado.
 
 ## Auditoría y privacidad

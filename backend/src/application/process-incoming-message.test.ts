@@ -6,6 +6,8 @@ import type { Intent } from '../domain/intent.js'
 import type { Urgency } from '../domain/risk-level.js'
 import {
   approvalNotice,
+  anotherQueryQuestion,
+  assistanceMessage,
   clarificationRequestFor,
   clarificationRequests,
   customerStatusQuestion,
@@ -19,6 +21,7 @@ import {
   newCustomerPhotoRetryRequest,
   newCustomerQueryOffer,
   notInsuranceMessage,
+  paymentMethodsMessage,
   phoneChangePendingMessage,
   prospectHandoffMessage,
   repeatedDniRequest,
@@ -60,6 +63,10 @@ const agencyInfo: AgencyInfo = {
   plans: ['terceros', 'todo riesgo', 'terceros incompletos', 'riesgos incompletos'],
   address: 'Ficticia 123',
   phone: '11 7816-8015',
+  assistancePhone: null,
+  email: null,
+  web: null,
+  paymentMethods: null,
   hours: [1, 2, 3, 4, 5].map((day) => ({ day, opens: '09:00', closes: '18:00' })),
 }
 
@@ -97,8 +104,14 @@ class FakeAi implements AiClient {
     return { intent, urgency: this.urgencies.get(text) ?? null }
   }
 
-  public async extractDataChange(_text: string, _context: readonly ContextMessage[]): Promise<DataChangeExtraction> {
-    return { field: null, value: null }
+  public async extractDataChange(
+    text: string,
+    _context: readonly ContextMessage[],
+    pendingField: DataChangeField | null = null,
+  ): Promise<DataChangeExtraction> {
+    this.dataChangeCalls.push({ text, pendingField })
+    if (this.dataChangeError) throw this.dataChangeError
+    return this.dataChangeResults.get(text) ?? { field: null, value: null }
   }
 
   public async isThreat(text: string): Promise<boolean> {
@@ -784,7 +797,6 @@ describe('casos por intención', () => {
     ai.classifyError = new Error('HTTP 429')
     await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla del proveedor al decidir' })
     expect(lastText()).toBe(handoffMessage)
-    expect(whatsapp.textsTo(phone).filter((text) => clarificationRequests.includes(text))).toEqual([])
     expect((await openConversation()).cases.find((item) => item.handedOff)?.type).toBeNull()
   })
 })
@@ -798,9 +810,10 @@ describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
     await send('¿cuándo vence?')
     ai.rewritten.length = 0
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
-    expect(clarificationRequests).toContain(lastText())
+    expect(lastText()).toBe(clarificationRequestFor(1))
     await expect(send('lo otro')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
-    expect(clarificationRequests).toContain(lastText())
+    expect(lastText()).toBe(clarificationRequestFor(2))
+    expect(clarificationRequestFor(1)).not.toBe(clarificationRequestFor(2))
     expect(ai.rewritten).toEqual([])
 
     const conversation = await openConversation()
@@ -849,12 +862,12 @@ describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
     ai.intents.set('eso que te dije', 'no se entiende')
     await send('eso que te dije')
     await expect(send(ana.dni)).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
-    expect(clarificationRequests).toContain(lastText())
+    expect(lastText()).toBe(clarificationRequestFor(1))
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'CLARIFICATION_REQUESTED' })
     await expect(send('eso que te dije')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'no se entendió la consulta' })
   })
 
-  it('con la solicitud de cambio de teléfono pendiente, ni los mensajes ni la derivación van al caso de la solicitud', async () => {
+  it('con la solicitud de cambio de teléfono pendiente, no repregunta ni deriva, y los mensajes no van al caso de la solicitud', async () => {
     ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
     ai.intents.set('eso', 'no se entiende')
     await send('123')
@@ -862,14 +875,14 @@ describe('repregunta cuando no se entiende (RF-ATE-01)', () => {
     await expect(send(ana.dni)).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING' })
     await send('eso')
     await send('eso')
-    await expect(send('eso')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'no se entendió la consulta' })
+    await expect(send('eso')).resolves.toMatchObject({ status: 'PHONE_CHANGE_STILL_PENDING' })
 
     const conversation = await openConversation()
     const requestCase = conversation.cases.find((item) => item.type === 'cambio de teléfono')
     expect(requestCase).toMatchObject({ handedOff: false, hasPending: true })
     expect(conversation.messages.filter((message) => message.caseId === requestCase?.id).map((message) => message.text))
       .not.toContain('eso')
-    expect(conversation.cases.find((item) => item.handedOff)?.type).toBeNull()
+    expect(conversation.cases.some((item) => item.handedOff)).toBe(false)
   })
 
   it.each(['¿cómo pago?', 'necesito una grúa'])('«%s», con «otra consulta», deriva', async (text) => {
@@ -929,6 +942,31 @@ describe('respuestas (RF-ATE-02, RF-ATE-04)', () => {
     ai.intents.set('¿cuándo vence?', 'vencimiento')
     ai.rewriteResult = new Error('timeout')
     await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla de la redacción' })
+  })
+
+  it('la primera redacción rechazada se reintenta con el motivo del control y la segunda se envía', async () => {
+    await identifyShared()
+    ai.intents.set('¿cuándo vence?', 'vencimiento')
+    ai.rewriteResult = (input) =>
+      input.rejection
+        ? 'Ana, le cuento: su póliza POL-90001 de auto vence el 15/03/2027 y la POL-90002 de hogar venció el 01/09/2026.'
+        : input.template.replace('15/03/2027', '15/03/2028')
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'ANSWER_SENT' })
+    expect(ai.rewritten).toHaveLength(2)
+    expect(ai.rewritten[1]?.rejection).toBe('datos distintos de la plantilla')
+    expect(lastText()).toContain('le cuento')
+    expect(whatsapp.textsTo(phone).some((text) => text.includes('2028'))).toBe(false)
+  })
+
+  it('si el reintento de la redacción falla, se deriva como falla y el borrador rechazado queda guardado', async () => {
+    await identifyShared()
+    ai.intents.set('¿cuándo vence?', 'vencimiento')
+    ai.rewriteResult = (input) => {
+      if (input.rejection) throw new Error('timeout')
+      return input.template.replace('15/03/2027', '15/03/2028')
+    }
+    await expect(send('¿cuándo vence?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'falla de la redacción' })
+    expect(store.snapshot().replies.find((reply) => reply.sentMessageId === null)?.text).toContain('15/03/2028')
   })
 
   it('el saludo se responde con cortesía redactada, sin derivar', async () => {
@@ -1485,5 +1523,146 @@ describe('nivel de riesgo al derivar (RF-DER-01)', () => {
     const requestCase = store.snapshot().cases.find((item) => item.type === 'cambio de teléfono')
     expect(requestCase).toMatchObject({ riskLevel: 'bajo', handedOffAt: null })
     expect((await openConversation()).suspended).toBe(false)
+  })
+})
+
+describe('grúa y medios de pago (RF-ATE-01, RF-ATE-02, RF-DER-01)', () => {
+  // Datos ficticios: el administrador todavía no cargó los reales.
+  const towPhone = '0800 555 0000'
+  const payments = 'Transferencia bancaria. Alias: EJEMPLO.ALIAS'
+
+  function withData(data: { assistancePhone?: string; paymentMethods?: string }) {
+    agency.info = { ...agencyInfo, assistancePhone: data.assistancePhone ?? null, paymentMethods: data.paymentMethods ?? null }
+  }
+
+  function derivedCase() {
+    return store.snapshot().cases.find((item) => item.handedOffAt !== null)
+  }
+
+  it('cliente identificado pide una grúa con el número cargado: un solo mensaje con el teléfono y queda derivado con nivel medio', async () => {
+    withData({ assistancePhone: towPhone })
+    link(phone, ana)
+    ai.intents.set('necesito una grúa', 'asistencia mecánica')
+    await expect(send('necesito una grúa')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'intención: asistencia mecánica' })
+    expect(whatsapp.textsTo(phone)).toEqual([assistanceMessage(towPhone)])
+    expect(ai.rewritten).toEqual([])
+    expect(derivedCase()).toMatchObject({ type: 'asistencia mecánica', riskLevel: 'medio' })
+    expect((await openConversation()).suspended).toBe(true)
+  })
+
+  it('sin número cargado: mensaje de derivación habitual, sin teléfono, y nivel medio', async () => {
+    link(phone, ana)
+    ai.intents.set('necesito una grúa', 'asistencia mecánica')
+    await expect(send('necesito una grúa')).resolves.toMatchObject({
+      status: 'HANDOFF_SENT',
+      reason: 'sin teléfono de grúa o asistencia cargado',
+    })
+    expect(whatsapp.textsTo(phone)).toEqual([handoffMessage])
+    expect(derivedCase()).toMatchObject({ type: 'asistencia mecánica', riskLevel: 'medio' })
+  })
+
+  it('antes de identificarse: recibe el teléfono y la conversación queda derivada sin cliente', async () => {
+    withData({ assistancePhone: towPhone })
+    ai.intents.set('necesito una grúa', 'asistencia mecánica')
+    await expect(send('necesito una grúa')).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
+    expect(whatsapp.textsTo(phone)).toEqual([assistanceMessage(towPhone)])
+    const conversation = await openConversation()
+    expect(conversation.suspended).toBe(true)
+    expect(conversation.customerId).toBeNull()
+    expect(derivedCase()?.riskLevel).toBe('medio')
+  })
+
+  it('el cliente nuevo en la oferta también recibe el teléfono y se deriva', async () => {
+    withData({ assistancePhone: towPhone })
+    ai.customerStatuses.set('soy nuevo', 'NEW_CUSTOMER')
+    ai.intents.set('se me quedó el auto', 'asistencia mecánica')
+    await send('hola')
+    await send('soy nuevo')
+    await expect(send('se me quedó el auto')).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
+    expect(lastText()).toBe(assistanceMessage(towPhone))
+  })
+
+  it('con el cambio de teléfono pendiente, la grúa no espera: recibe el teléfono y se deriva', async () => {
+    withData({ assistancePhone: towPhone })
+    ai.customerStatuses.set('ya soy cliente', 'EXISTING_CUSTOMER')
+    await send('hola')
+    await send('ya soy cliente')
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'PHONE_CHANGE_PENDING' })
+    ai.intents.set('necesito una grúa', 'asistencia mecánica')
+    await expect(send('necesito una grúa')).resolves.toMatchObject({ status: 'HANDOFF_SENT' })
+    expect(lastText()).toBe(assistanceMessage(towPhone))
+  })
+
+  it('un choque con pedido de grúa sigue siendo siniestro: se deriva sin el mensaje de la grúa', async () => {
+    withData({ assistancePhone: towPhone })
+    link(phone, ana)
+    ai.intents.set('choqué y necesito una grúa', 'siniestro')
+    await expect(send('choqué y necesito una grúa')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'intención: siniestro' })
+    expect(lastText()).toBe(handoffMessage)
+    expect(derivedCase()?.riskLevel).toBe('alto')
+  })
+
+  it('medios de pago cargados: el texto tal cual, sin redacción ni derivación, en un caso de ese tipo', async () => {
+    withData({ paymentMethods: payments })
+    link(phone, ana)
+    ai.intents.set('¿cómo pago la cuota?', 'medios de pago')
+    await expect(send('¿cómo pago la cuota?')).resolves.toMatchObject({ status: 'ANSWER_SENT', intent: 'medios de pago' })
+    expect(whatsapp.textsTo(phone)).toEqual([paymentMethodsMessage(payments)])
+    expect(ai.rewritten).toEqual([])
+    const conversation = await openConversation()
+    expect(conversation.suspended).toBe(false)
+    expect(conversation.cases).toEqual([expect.objectContaining({ type: 'medios de pago', handedOff: false })])
+  })
+
+  it('medios de pago sin cargar: se deriva con el mensaje habitual y nivel bajo', async () => {
+    link(phone, ana)
+    ai.intents.set('¿cómo pago?', 'medios de pago')
+    await expect(send('¿cómo pago?')).resolves.toMatchObject({ status: 'HANDOFF_SENT', reason: 'sin medios de pago cargados' })
+    expect(lastText()).toBe(handoffMessage)
+    expect(derivedCase()).toMatchObject({ type: 'medios de pago', riskLevel: 'bajo' })
+  })
+
+  it('esperando el DNI: contesta los medios de pago y vuelve a pedir el DNI, sin contar un intento', async () => {
+    withData({ paymentMethods: payments })
+    link(phone, ana, bruno)
+    ai.intents.set('¿cómo pago?', 'medios de pago')
+    await expect(send('¿cómo pago?')).resolves.toMatchObject({ status: 'PAYMENT_METHODS_SENT' })
+    expect(whatsapp.textsTo(phone)).toEqual([paymentMethodsMessage(payments), repeatedDniRequest])
+    await expect(send('¿cómo pago?')).resolves.toMatchObject({ status: 'PAYMENT_METHODS_SENT' })
+    expect(lastText()).toBe(repeatedDniRequest)
+    await expect(send(ana.dni)).resolves.toMatchObject({ status: 'WELCOME_SENT' })
+  })
+
+  it('el cliente nuevo en la oferta recibe los medios de pago y la oferta otra vez', async () => {
+    withData({ paymentMethods: payments })
+    ai.customerStatuses.set('soy nuevo', 'NEW_CUSTOMER')
+    ai.intents.set('¿cómo se paga?', 'medios de pago')
+    await send('hola')
+    await send('soy nuevo')
+    await expect(send('¿cómo se paga?')).resolves.toMatchObject({ status: 'PAYMENT_METHODS_SENT' })
+    expect(whatsapp.textsTo(phone).slice(-2)).toEqual([paymentMethodsMessage(payments), newCustomerQueryOffer])
+  })
+
+  it('mientras toma los datos del alta no responde grúa ni medios de pago: sigue el alta', async () => {
+    withData({ assistancePhone: towPhone, paymentMethods: payments })
+    ai.customerStatuses.set('soy nuevo', 'NEW_CUSTOMER')
+    ai.intents.set('quiero contratar', 'contratar')
+    await send('hola')
+    await send('soy nuevo')
+    await send('quiero contratar')
+    ai.classified.length = 0
+    await expect(send('¿cómo pago?')).resolves.toMatchObject({ status: 'NEW_CUSTOMER_DNI_REQUESTED' })
+    expect(ai.classified).toEqual([])
+  })
+
+  it('en silencio no contesta grúa ni medios de pago', async () => {
+    withData({ assistancePhone: towPhone, paymentMethods: payments })
+    link(phone, ana)
+    ai.intents.set('me cobraron de más', 'reclamo')
+    await send('me cobraron de más')
+    const sentBefore = whatsapp.sent.length
+    await expect(send('necesito una grúa')).resolves.toMatchObject({ status: 'SILENCED' })
+    await expect(send('¿cómo pago?')).resolves.toMatchObject({ status: 'SILENCED' })
+    expect(whatsapp.sent.length).toBe(sentBefore)
   })
 })

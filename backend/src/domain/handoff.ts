@@ -1,6 +1,6 @@
 import type { Intent } from './intent.js'
 
-export type MissingData = 'policies' | 'installments' | 'agency-info'
+export type MissingData = 'policies' | 'installments' | 'agency-info' | 'assistance-phone' | 'payment-methods'
 export type ProviderFailureStep = 'customer-status' | 'intent' | 'rewrite'
 
 // Motivo de una derivación del asistente (change bandeja-atencion-lectura, decisión 1). Es un
@@ -29,6 +29,8 @@ const missingDataText: Record<MissingData, string> = {
   policies: 'cliente sin pólizas',
   installments: 'póliza sin cuotas registradas',
   'agency-info': 'datos de la agencia incompletos',
+  'assistance-phone': 'sin teléfono de grúa o asistencia cargado',
+  'payment-methods': 'sin medios de pago cargados',
 }
 
 const providerFailureText: Record<ProviderFailureStep, string> = {

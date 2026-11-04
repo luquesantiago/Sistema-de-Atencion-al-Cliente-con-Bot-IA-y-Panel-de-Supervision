@@ -1,6 +1,6 @@
 // Intenciones que el modelo puede elegir: los valores del catálogo tipo_consulta
-// (migraciones 20260928140100, 20260929204929 y 20261007235643), más cuatro que no son
-// tipos de consulta.
+// (migraciones 20260928140100, 20260929204929, 20261007235643 y 20261103180000), más seis
+// que no son tipos de consulta.
 export const intents = [
   'saldo',
   'vencimiento',
@@ -18,6 +18,11 @@ export const intents = [
   // sigue siendo la opción de arriba.
   'cambio de datos',
   'información de la agencia',
+  // Pide una grúa o asistencia mecánica sin contar un siniestro: se le da el teléfono, si
+  // está cargado, y se deriva para el seguimiento (change configuracion-agencia).
+  'asistencia mecánica',
+  // Pregunta cómo pagar: no es el saldo, que dice cuánto debe.
+  'medios de pago',
   'no es de seguros',
   // Quiere ser cliente o contratar un seguro: arranca el alta, que antes empezaba sola.
   'contratar',
@@ -53,6 +58,10 @@ export type IntentAction =
   // Quiere cambiar un dato personal registrado: el código extrae el campo y el valor y
   // decide el destino (preguntar, teléfono o solicitud en Trámites).
   | { kind: 'data-change' }
+  // Pide una grúa: el teléfono de asistencia en un texto fijo, y se deriva.
+  | { kind: 'assistance' }
+  // Pregunta cómo pagar: los medios de pago en un texto fijo, sin derivar.
+  | { kind: 'payment-methods' }
 
 export function isIntent(value: unknown): value is Intent {
   return typeof value === 'string' && intents.some((intent) => intent === value)
@@ -80,6 +89,10 @@ export function actionForIntent(intent: Intent): IntentAction {
       return { kind: 'data-change' }
     case 'información de la agencia':
       return { kind: 'answer', template: 'agency' }
+    case 'asistencia mecánica':
+      return { kind: 'assistance' }
+    case 'medios de pago':
+      return { kind: 'payment-methods' }
     case 'baja':
     case 'modificación':
     case 'cambio de teléfono':

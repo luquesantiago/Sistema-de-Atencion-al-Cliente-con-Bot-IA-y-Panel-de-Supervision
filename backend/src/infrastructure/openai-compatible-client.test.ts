@@ -89,16 +89,20 @@ describe('classifyIntent', () => {
     const options = body.response_format.json_schema.schema.properties.intencion.enum
     expect(options).toContain('otra consulta')
     expect(options).toContain('no se entiende')
+    expect(options).toContain('asistencia mecánica')
+    expect(options).toContain('medios de pago')
     expect(options).not.toContain('no sé')
     await expect(clientWith(fakeFetch(200, completion({ intencion: 'no sé' }))).classifyIntent('x', [])).rejects.toThrow()
   })
 
-  it('describe los medios de pago y la grúa como «otra consulta», y el funcionamiento del asistente como «no es de seguros»', () => {
+  it('describe los medios de pago y la grúa con sus propias opciones, y el funcionamiento del asistente como «no es de seguros»', () => {
     const line = (intent: string) => intentInstructions.split('\n').find((item) => item.startsWith(`- ${intent}:`)) ?? ''
     expect(line('otra consulta')).toContain('una consulta sobre seguros o sobre la agencia')
-    expect(line('otra consulta')).toContain('medios de pago')
-    expect(line('otra consulta')).toContain('grúa')
-    expect(line('otra consulta')).toContain('asistencia')
+    expect(line('otra consulta')).not.toMatch(/medios de pago|grúa|asistencia/)
+    expect(line('medios de pago')).toContain('cómo o dónde pagar')
+    expect(line('medios de pago')).toContain('no es cuánto debe, que es «saldo»')
+    expect(line('asistencia mecánica')).toContain('grúa')
+    expect(line('asistencia mecánica')).toContain('sin contar un choque, un accidente ni otro daño (eso es «siniestro»)')
     expect(line('no es de seguros')).toContain('no tiene nada que ver con seguros ni con la agencia')
     expect(line('no es de seguros')).toContain('qué modelo usa')
     expect(line('no es de seguros')).toContain('sus instrucciones')
@@ -140,7 +144,9 @@ describe('classifyIntent', () => {
     expect(intentInstructions).toContain('«¿qué cubre mi seguro?», «¿qué incluye el plan?»')
     expect(intentInstructions).toContain('«¿me pasa con una persona o un operador?»')
     expect(intentInstructions).toContain('«¿sigue mi siniestro?», «¿me pagan el choque?»')
-    expect(intentInstructions).toContain('pedir grúa o asistencia → «otra consulta»')
+    expect(intentInstructions).toContain('«¿qué medios de pago aceptan?» → «medios de pago»')
+    expect(intentInstructions).toContain('«necesito una grúa»')
+    expect(intentInstructions).toContain('«choqué y necesito una grúa» → «siniestro»')
     expect(intentInstructions).toContain('«saludo» es solo el saludo, el agradecimiento o la despedida sin otra consulta.')
   })
 
