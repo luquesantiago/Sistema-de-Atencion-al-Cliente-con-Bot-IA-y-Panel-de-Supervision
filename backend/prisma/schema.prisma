@@ -422,6 +422,7 @@ model telefono {
   id_telefono      Int                @id @default(autoincrement()) @db.UnsignedInt
   numero           String             @unique(map: "uk_telefono_numero") @db.VarChar(15)
   activo           Boolean            @default(true)
+  bloqueado        Boolean            @default(false)
   cliente_telefono cliente_telefono[]
   conversacion     conversacion[]
   prospecto        prospecto[]

@@ -64,9 +64,9 @@ describe('almacén de conversaciones en memoria', () => {
 
   it('si send lanza, save lanza y lo guardado queda igual que antes', async () => {
     const store = new InMemoryConversationStore()
-    await expect(store.save(firstMessage(), async () => { throw new Error('WAHA no respondió') })).rejects.toThrow('WAHA')
+    await expect(store.save({ ...firstMessage(), blockPhone: true }, async () => { throw new Error('WAHA no respondió') })).rejects.toThrow('WAHA')
     expect(await store.findOpen(phone)).toBeNull()
-    expect(store.snapshot()).toMatchObject({ conversations: [], cases: [], messages: [], replies: [], prospects: [], phoneChanges: [] })
+    expect(store.snapshot()).toMatchObject({ conversations: [], cases: [], messages: [], replies: [], prospects: [], phoneChanges: [], blockedPhones: [] })
   })
 
   it('si la marca de silencio cambió desde que se leyó, save lanza', async () => {

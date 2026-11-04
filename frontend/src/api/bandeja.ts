@@ -30,6 +30,8 @@ export type CasoBandeja = {
   /** Nombre (o razón social) y DNI (o CUIT); los datos que faltan llegan null. */
   customer: { id: number; name: string | null; document: string | null } | null
   phone: string
+  /** true si el número está bloqueado: el asistente ignora sus mensajes. */
+  phoneBlocked: boolean
   queryType: string | null
   handoffReason: string | null
   /** Derivado: el asistente está en silencio y el caso se contesta y se cierra desde acá. */
@@ -113,6 +115,17 @@ export async function tomarCaso(idCaso: number): Promise<CasoBandeja> {
 }
 
 export type ResultadoLiberacion = { caseId: number; releasedAt: string }
+
+/**
+ * Bloquea o desbloquea el número de WhatsApp del caso: mientras esté bloqueado, el
+ * asistente ignora los mensajes de ese número. Devuelve el número y el estado nuevo.
+ */
+export async function definirBloqueoNumero(
+  idCaso: number,
+  bloqueado: boolean,
+): Promise<{ caseId: number; phone: string; phoneBlocked: boolean }> {
+  return leer(await fetch(`${rutaCaso(idCaso)}/bloqueo`, enviarJson({ bloqueado })))
+}
 
 /**
  * Deja el caso sin responsable. Un caso derivado sigue derivado: el asistente no

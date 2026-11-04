@@ -24,6 +24,7 @@ function entry(overrides: Partial<InboxEntry> = {}): InboxEntry {
     severity: 'medio',
     customer: null,
     phone: '5491100000001',
+    phoneBlocked: false,
     queryType: null,
     handoffReason: 'cliente nuevo',
     handedOffAt: new Date('2026-10-15T13:00:00.000Z'),
@@ -47,6 +48,7 @@ function actionState(overrides: Partial<InboxActionState> = {}): InboxActionStat
     unattendedAlerts: 0,
     hasCustomerMessage: true,
     phone: '5491100000001',
+    phoneBlocked: false,
     takenAt: null,
     ...overrides,
   }
@@ -61,6 +63,8 @@ class InMemoryInbox implements InboxRepository {
   public readonly closed: Array<{ caseId: number; input: CloseInput }> = []
   public readonly takes: Array<{ caseId: number; expected: number | null }> = []
   public readonly releases: Array<{ caseId: number; expected: number }> = []
+  public readonly blocked: Array<{ caseId: number; blocked: boolean }> = []
+  public phoneBlockResult: { phone: string } | null = { phone: '5491100000001' }
   public failReplySave = false
   public takeConflict = false
   public releaseConflict = false
@@ -121,6 +125,11 @@ class InMemoryInbox implements InboxRepository {
   public async findImage(caseId: number, messageId: number): Promise<InboxImageRef | null> {
     this.lookups.push(caseId, messageId)
     return this.image
+  }
+
+  public async setPhoneBlocked(caseId: number, blocked: boolean): Promise<{ phone: string } | null> {
+    this.blocked.push({ caseId, blocked })
+    return this.phoneBlockResult
   }
 }
 
@@ -317,6 +326,15 @@ describe('ManageInbox.reply (RF-DER-02)', () => {
     expect(whatsapp.sent).toEqual([])
   })
 
+  it('un número bloqueado no permite responder desde la bandeja', async () => {
+    const repository = new InMemoryInbox([], null, actionState({ phoneBlocked: true }))
+    const whatsapp = new FakeWhatsApp()
+    await expect(inbox(repository, whatsapp).reply('12', me, 'Hola'))
+      .rejects.toMatchObject({ statusCode: 409, code: 'CONFLICT', message: 'El número está bloqueado en el panel. Desbloquealo para poder responder desde la Bandeja.' })
+    expect(whatsapp.sent).toEqual([])
+    expect(repository.replies).toEqual([])
+  })
+
   it.each(['', '   ', 42])('el texto %o es un error de validación', async (text) => {
     const whatsapp = new FakeWhatsApp()
     await expect(inbox(new InMemoryInbox([], null, actionState()), whatsapp).reply('12', me, text))
@@ -346,6 +364,42 @@ describe('ManageInbox.close (RF-DER-02, RF-DER-03, RF-SUP-04)', () => {
   it('un caso sin tomar pide tomarlo primero', async () => {
     const repository = new InMemoryInbox([], null, actionState())
     await expect(inbox(repository).close('12', me, {})).rejects.toMatchObject({ statusCode: 409, message: 'Solo el responsable puede cerrar el caso: si no tiene responsable, tomalo antes.' })
+  })
+})
+
+describe('ManageInbox.setPhoneBlocked', () => {
+  it('bloquea el número del caso y devuelve el teléfono y el estado nuevo', async () => {
+    const repository = new InMemoryInbox([], null, actionState())
+    await expect(inbox(repository).setPhoneBlocked('12', true)).resolves.toEqual({
+      caseId: 12,
+      phone: '5491100000001',
+      phoneBlocked: true,
+    })
+    expect(repository.blocked).toEqual([{ caseId: 12, blocked: true }])
+  })
+
+  it('desbloquea el número con bloqueado en false', async () => {
+    const repository = new InMemoryInbox([], null, actionState())
+    await expect(inbox(repository).setPhoneBlocked('12', false)).resolves.toMatchObject({ phoneBlocked: false })
+    expect(repository.blocked).toEqual([{ caseId: 12, blocked: false }])
+  })
+
+  it('un caso que no está en la bandeja da NOT_FOUND sin escribir', async () => {
+    const repository = new InMemoryInbox([], null, actionState({ inInbox: false }))
+    await expect(inbox(repository).setPhoneBlocked('12', true)).rejects.toMatchObject({ statusCode: 404, code: 'NOT_FOUND' })
+    expect(repository.blocked).toEqual([])
+  })
+
+  it('si el caso desapareció entre la lectura y la escritura, NOT_FOUND', async () => {
+    const repository = new InMemoryInbox([], null, actionState())
+    repository.phoneBlockResult = null
+    await expect(inbox(repository).setPhoneBlocked('12', true)).rejects.toMatchObject({ statusCode: 404, code: 'NOT_FOUND' })
+  })
+
+  it.each(['abc', '0', '-3', '1.5'])('rechaza el id %s sin consultar el repositorio', async (id) => {
+    const repository = new InMemoryInbox([], null, actionState())
+    await expect(inbox(repository).setPhoneBlocked(id, true)).rejects.toMatchObject({ statusCode: 400, code: 'VALIDATION_ERROR' })
+    expect(repository.blocked).toEqual([])
   })
 })
 

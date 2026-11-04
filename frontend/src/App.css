@@ -2205,6 +2205,18 @@
   color: var(--color-success-text);
 }
 
+/* Número bloqueado: aviso entre el chat y la barra para escribir */
+
+.chat__bloqueo {
+  margin: 0;
+  padding: 9px 20px;
+  border-top: 1px solid rgba(43, 18, 24, 0.08);
+  background: rgba(185, 28, 28, 0.12);
+  color: var(--color-danger-text);
+  font-size: 0.83rem;
+  font-weight: 650;
+}
+
 .conversacion__datos {
   flex: 1;
   min-width: 0;
@@ -2404,6 +2416,21 @@
 .conversacion__accion--cerrar:hover {
   border-color: var(--color-danger-text);
   background: var(--color-danger-bg);
+}
+
+.conversacion__accion--bloquear,
+.conversacion__accion--desbloquear {
+  border-color: var(--color-danger-text);
+  background: var(--color-danger-text);
+  color: #ffffff;
+  font-weight: 650;
+}
+
+.conversacion__accion--bloquear:hover,
+.conversacion__accion--desbloquear:hover {
+  border-color: var(--color-danger-hover);
+  background: var(--color-danger-hover);
+  color: #ffffff;
 }
 
 .conversacion__accion:focus-visible {
@@ -2741,6 +2768,19 @@
 
 .boton--peligro-claro:hover {
   background: var(--color-danger-bg);
+}
+
+/* «Ver chat» en la ficha del trámite: fondo transparente y letra bordó,
+   al lado del badge de estado. */
+
+.boton--bordo {
+  background: transparent;
+  color: var(--color-primary);
+}
+
+.boton--bordo:hover {
+  background: var(--color-accent-light);
+  color: var(--color-primary);
 }
 
 /* Modales: fondo velado y panel sólido centrado (design.md §2 «Dónde NO»).
@@ -3277,6 +3317,15 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+/* Estado del trámite a la derecha de la ficha: el badge y el «Ver chat» juntos */
+
+.tramite-detalle__estado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 .tramite-detalle__identidad {

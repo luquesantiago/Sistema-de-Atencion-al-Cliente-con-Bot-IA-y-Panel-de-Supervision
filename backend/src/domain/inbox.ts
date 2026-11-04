@@ -24,6 +24,8 @@ export type InboxEntry = {
   severity: RiskLevel | null
   customer: InboxCustomer | null
   phone: string
+  // Bloqueo interno de la aplicación: se descartan mensajes entrantes y se impiden respuestas desde la bandeja.
+  phoneBlocked: boolean
   queryType: QueryType | null
   handoffReason: string | null
   handedOffAt: Date | null
@@ -59,7 +61,11 @@ export type InboxPage = { entries: InboxEntry[]; total: number }
 
 // El estado que necesitan las reglas de tomar, contestar y cerrar, más lo que piden las
 // escrituras (change bandeja-atender-casos, decisión 3).
-export type InboxActionState = CaseActionState & { phone: string; takenAt: Date | null }
+export type InboxActionState = CaseActionState & {
+  phone: string
+  phoneBlocked: boolean
+  takenAt: Date | null
+}
 
 // changed: otro pedido cerró o reasignó el caso mientras tanto.
 export type CloseOutcome = { ok: true; closedAt: Date } | { ok: false; error: CloseError | 'changed' }
@@ -85,6 +91,8 @@ export interface InboxRepository {
   recordOperatorReply(caseId: number, actor: PanelActor, text: string, sentAt: Date, takeIfUnassigned: boolean): Promise<{ messageId: number }>
   // null si el caso no está en la bandeja o el mensaje no es una imagen de su conversación.
   findImage(caseId: number, messageId: number): Promise<InboxImageRef | null>
+  // Bloquea o desbloquea el número de la conversación del caso; null si el caso no existe.
+  setPhoneBlocked(caseId: number, blocked: boolean): Promise<{ phone: string } | null>
 }
 
 export type InboxLabel = 'alta-pendiente' | 'alta-rechazada' | 'pedido-pendiente' | 'cambio-telefono-pendiente' | 'cambio-datos-pendiente'

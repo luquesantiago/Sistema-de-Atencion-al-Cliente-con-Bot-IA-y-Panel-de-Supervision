@@ -81,6 +81,10 @@ export type AssistantMessage = {
 export type ConversationChanges = {
   phone: string
   at: Date
+  // Bloqueo interno activado por una detección positiva de amenaza, guardado con el caso.
+  blockPhone?: boolean
+  // Marca la amenaza como motivo principal, incluso si el caso ya estaba derivado.
+  threatDetected?: CaseRef
   // La conversación abierta que termina antes de este mensaje (decisión 6).
   closePrevious?: { conversationId: number; endedAt: Date; caseIds: number[] }
   // La conversación del mensaje. Para una existente, la marca de silencio que se leyó:

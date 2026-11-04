@@ -45,7 +45,7 @@ const entrySelect = {
   },
   conversacion: {
     select: {
-      telefono: { select: { numero: true } },
+      telefono: { select: { numero: true, bloqueado: true } },
       cliente: { select: { id_cliente: true, dni: true, cuit: true, razon_social: true, nombre: true, apellido: true } },
     },
   },
@@ -79,13 +79,13 @@ const actionStateSelect = {
   prospecto: { select: { id_prospecto: true, observaciones: true, estado_prospecto: { select: { nombre: true } } } },
   alerta: { where: { fecha_atencion: null }, select: { id_alerta: true } },
   mensaje: { where: { origen_mensaje: { is: { nombre: 'cliente' } } }, take: 1, select: { id_mensaje: true } },
-  conversacion: { select: { telefono: { select: { numero: true } } } },
+  conversacion: { select: { telefono: { select: { numero: true, bloqueado: true } } } },
 } satisfies Prisma.casoSelect
 
 export type InboxActionRecord = Prisma.casoGetPayload<{ select: typeof actionStateSelect }>
 
-// Fila de la consulta de orden: el caso y el `orden` de su gravedad (null si no tiene).
-export type InboxOrderRow = { caseId: unknown; severityOrder: unknown }
+// Fila de la consulta de orden: el caso, su prioridad de amenaza y la gravedad (null si no tiene).
+export type InboxOrderRow = { caseId: unknown; threatOrder: unknown; severityOrder: unknown }
 
 // Bandeja de Atención (change bandeja-atencion-lectura, decisión 4). La base filtra, ordena y
 // pagina con SQL escrito a mano, porque Prisma no ordena por una expresión calculada; los
@@ -266,6 +266,20 @@ export class PrismaInboxRepository implements InboxRepository {
     return { ref: message.id_imagen_whatsapp, phone: caseRow.conversacion.telefono.numero }
   }
 
+  // El bloqueo es del número, no del caso: se escribe sobre telefono de la conversación.
+  public async setPhoneBlocked(caseId: number, blocked: boolean): Promise<{ phone: string } | null> {
+    const caseRow = await this.prisma.caso.findUnique({
+      where: { id_caso: caseId },
+      select: { conversacion: { select: { id_telefono: true, telefono: { select: { numero: true } } } } },
+    })
+    if (!caseRow) return null
+    await this.prisma.telefono.update({
+      where: { id_telefono: caseRow.conversacion.id_telefono },
+      data: { bloqueado: blocked },
+    })
+    return { phone: caseRow.conversacion.telefono.numero }
+  }
+
   private async entriesFor(ordered: Array<{ caseId: number; severityOrder: number | null }>): Promise<InboxEntry[]> {
     if (ordered.length === 0) return []
     const [records, levels] = await Promise.all([
@@ -327,11 +341,16 @@ function inboxWhere(caseId?: number, customerId?: number): Prisma.Sql {
 const conversationJoin = Prisma.sql`
     JOIN conversacion conv ON conv.id_conversacion = c.id_conversacion`
 
-// Orden de la bandeja: gravedad (la más grave entre el nivel del caso, sus alertas sin
-// atender y el nivel de su tipo; sin nivel al final), sin tomar primero, mayor espera e id.
+// Orden de la bandeja: amenaza detectada antes que cualquier gravedad; después gravedad (la
+// más grave entre el nivel del caso, alertas sin atender y el nivel de su tipo), sin tomar,
+// mayor espera e id.
 export function inboxOrderQuery(page: PageRequest, caseId?: number, customerId?: number): Prisma.Sql {
   return Prisma.sql`
     SELECT c.id_caso AS caseId,
+      CASE
+        WHEN c.motivo_derivacion LIKE ${'mensaje sospechoso: posible intento de manipulación o exfiltración%'} THEN 0
+        ELSE 1
+      END AS threatOrder,
       NULLIF(LEAST(
         COALESCE(nc.orden, ${noSeverity}),
         COALESCE(al.orden, ${noSeverity}),
@@ -351,7 +370,7 @@ export function inboxOrderQuery(page: PageRequest, caseId?: number, customerId?:
       GROUP BY a.id_caso
     ) al ON al.id_caso = c.id_caso
     ${inboxWhere(caseId, customerId)}
-    ORDER BY severityOrder IS NULL, severityOrder, c.fecha_toma IS NULL DESC,
+    ORDER BY threatOrder, severityOrder IS NULL, severityOrder, c.fecha_toma IS NULL DESC,
       COALESCE(c.fecha_derivacion, sol.fecha_solicitud), c.id_caso
     LIMIT ${page.limit} OFFSET ${page.offset}`
 }
@@ -403,6 +422,7 @@ export function toInboxEntry(record: InboxCaseRecord, severity: RiskLevel | null
     severity,
     customer: toCustomer(record.conversacion.cliente),
     phone: record.conversacion.telefono.numero,
+    phoneBlocked: record.conversacion.telefono.bloqueado,
     queryType: toQueryType(record.tipo_consulta?.nombre ?? null),
     handoffReason: record.motivo_derivacion,
     handedOffAt: record.fecha_derivacion,
@@ -483,6 +503,7 @@ export function toActionState(record: InboxActionRecord, inInbox: boolean): Inbo
     unattendedAlerts: record.alerta.length,
     hasCustomerMessage: record.mensaje.length > 0,
     phone: record.conversacion.telefono.numero,
+    phoneBlocked: record.conversacion.telefono.bloqueado,
     takenAt: record.fecha_toma,
   }
 }

@@ -201,6 +201,10 @@ La Bandeja de Atención usa un badge de prioridad ajustado al texto en cada tarj
 
 El color agrupa la prioridad para lectura rápida, pero el texto conserva los cuatro niveles del DER: «Crítico» y «Alto» comparten rojo y se distinguen por la etiqueta. El banner muestra solo el mensaje de alerta, sin metadatos adicionales.
 
+### Bloqueo interno de un número
+
+La Bandeja puede bloquear un número manualmente o reflejar el bloqueo automático aplicado cuando el detector clasifica positivamente un posible intento de manipulación o exfiltración (RF-VER-01). «Posible amenaza» reemplaza cualquier otra etiqueta de prioridad del caso y se ordena antes que las demás prioridades, aunque se conserva el nivel de riesgo del catálogo. En la conversación de un número bloqueado, la Bandeja oculta el compositor de respuesta y muestra un aviso explícito de que el bloqueo solo aplica dentro del sistema: WAHA todavía puede recibir mensajes y el contacto no queda bloqueado en WhatsApp. El estado se comunica con texto además del color; el operador puede desbloquearlo desde el botón si fue una detección errónea, y entonces vuelve a habilitarse la respuesta manual.
+
 ## 4. Tipografía — inspirada en la web de Starbucks
 
 Starbucks utiliza las familias corporativas SoDo Sans, Lander y Pike. SoDo Sans es una tipografía propietaria y no debe suponerse disponible en el proyecto. Utilizarla únicamente si los archivos y la licencia necesarios están disponibles. No descargar ni copiar archivos de fuentes propietarias sin autorización.

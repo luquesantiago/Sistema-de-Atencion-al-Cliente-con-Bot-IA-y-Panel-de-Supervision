@@ -29,7 +29,7 @@ function record(overrides: Partial<InboxCaseRecord> = {}): InboxCaseRecord {
     prospecto: null,
     solicitud_accion: [],
     conversacion: {
-      telefono: { numero: '5491100000001' },
+      telefono: { numero: '5491100000001', bloqueado: false },
       cliente: { id_cliente: 7, dni: '99000001', cuit: null, razon_social: null, nombre: 'Ana', apellido: 'Prueba' },
     },
     mensaje: [{ contenido: 'me cobraron de más', fecha_hora: new Date('2026-10-15T13:00:00.000Z'), origen_mensaje: { nombre: 'cliente' } }],
@@ -55,7 +55,9 @@ describe('consultas de la bandeja', () => {
 
   it('la consulta de orden pagina en la base, con el límite y el desplazamiento como parámetros', () => {
     const query = inboxOrderQuery({ limit: 25, offset: 50 })
-    expect(query.sql).toContain('ORDER BY severityOrder IS NULL, severityOrder, c.fecha_toma IS NULL DESC')
+    expect(query.sql).toContain('ORDER BY threatOrder, severityOrder IS NULL, severityOrder, c.fecha_toma IS NULL DESC')
+    expect(query.sql).toMatch(/CASE\s+WHEN c\.motivo_derivacion LIKE \? THEN 0\s+ELSE 1\s+END AS threatOrder/)
+    expect(query.values).toContain('mensaje sospechoso: posible intento de manipulación o exfiltración%')
     expect(query.sql).toMatch(/LIMIT \? OFFSET \?\s*$/)
     expect(query.values.slice(-2)).toEqual([25, 50])
   })
@@ -104,8 +106,8 @@ describe('consultas de la bandeja', () => {
   })
 
   it('lee los números que MySQL devuelve como BigInt o texto', () => {
-    expect(toOrderedCase({ caseId: 12n, severityOrder: '2' })).toEqual({ caseId: 12, severityOrder: 2 })
-    expect(toOrderedCase({ caseId: 12, severityOrder: null })).toEqual({ caseId: 12, severityOrder: null })
+    expect(toOrderedCase({ caseId: 12n, threatOrder: 0, severityOrder: '2' })).toEqual({ caseId: 12, severityOrder: 2 })
+    expect(toOrderedCase({ caseId: 12, threatOrder: 1, severityOrder: null })).toEqual({ caseId: 12, severityOrder: null })
   })
 })
 
@@ -121,6 +123,7 @@ describe('toInboxEntry', () => {
       severity: 'alto',
       customer: { id: 7, name: 'Ana Prueba', document: '99000001' },
       phone: '5491100000001',
+      phoneBlocked: false,
       queryType: 'reclamo',
       handoffReason: 'intención: reclamo',
       handedOffAt: new Date('2026-10-15T13:00:00.000Z'),
@@ -136,7 +139,7 @@ describe('toInboxEntry', () => {
   it('una empresa muestra la razón social y el CUIT', () => {
     const entry = toInboxEntry(record({
       conversacion: {
-        telefono: { numero: '5491100000002' },
+        telefono: { numero: '5491100000002', bloqueado: false },
         cliente: { id_cliente: 8, dni: null, cuit: '30999000001', razon_social: 'Empresa Inventada SA', nombre: null, apellido: null },
       },
     }), 'alto')
@@ -144,9 +147,15 @@ describe('toInboxEntry', () => {
   })
 
   it('una conversación sin cliente da customer null, aunque el teléfono esté vinculado', () => {
-    const entry = toInboxEntry(record({ conversacion: { telefono: { numero: '5491100000001' }, cliente: null } }), 'bajo')
+    const entry = toInboxEntry(record({ conversacion: { telefono: { numero: '5491100000001', bloqueado: false }, cliente: null } }), 'bajo')
     expect(entry.customer).toBeNull()
     expect(entry.phone).toBe('5491100000001')
+    expect(entry.phoneBlocked).toBe(false)
+  })
+
+  it('un número bloqueado se mapea en la entrada', () => {
+    const entry = toInboxEntry(record({ conversacion: { telefono: { numero: '5491100000001', bloqueado: true }, cliente: null } }), null)
+    expect(entry.phoneBlocked).toBe(true)
   })
 
   it('el prospecto pendiente, la solicitud pendiente y el último mensaje recortado', () => {
@@ -230,7 +239,7 @@ describe('acciones', () => {
       prospecto: null,
       alerta: [],
       mensaje: [{ id_mensaje: 3 }],
-      conversacion: { telefono: { numero: '5491100000001' } },
+      conversacion: { telefono: { numero: '5491100000001', bloqueado: false } },
       ...overrides,
     }
   }
@@ -250,6 +259,7 @@ describe('acciones', () => {
       unattendedAlerts: 2,
       hasCustomerMessage: true,
       phone: '5491100000001',
+      phoneBlocked: false,
     })
   })
 
@@ -259,6 +269,12 @@ describe('acciones', () => {
       handedOff: false,
       hasCustomerMessage: false,
     })
+  })
+
+  it('incluye el estado de bloqueo del teléfono en el estado para responder', () => {
+    expect(toActionState(actionRecord({
+      conversacion: { telefono: { numero: '5491100000001', bloqueado: true } },
+    }), true).phoneBlocked).toBe(true)
   })
 
   it('la nota del cierre tiene quién, cuándo y el motivo', () => {

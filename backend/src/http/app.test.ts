@@ -58,6 +58,9 @@ class FakeAi implements AiClient {
   public async extractDataChange(_text: string): Promise<DataChangeExtraction> {
     return { field: null, value: null }
   }
+  public async isThreat(_text: string): Promise<boolean> {
+    return false
+  }
   public async rewrite(_input: RewriteInput): Promise<string> {
     return ''
   }
@@ -108,6 +111,13 @@ class FakeInbox implements InboxRepository {
 
   public async findImage(): Promise<InboxImageRef | null> {
     return this.image
+  }
+
+  public readonly blocked: Array<{ caseId: number; blocked: boolean }> = []
+
+  public async setPhoneBlocked(caseId: number, blocked: boolean): Promise<{ phone: string } | null> {
+    this.blocked.push({ caseId, blocked })
+    return this.state?.caseId === caseId ? { phone: this.state.phone } : null
   }
 }
 
@@ -1137,6 +1147,7 @@ describe('Bandeja de Atención', () => {
     severity: 'alto',
     customer: { id: 7, name: 'Ana Prueba', document: '99000001' },
     phone: '5491100000001',
+    phoneBlocked: false,
     queryType: 'reclamo',
     handoffReason: 'intención: reclamo',
     handedOffAt: new Date('2026-10-15T13:00:00.000Z'),
@@ -1177,6 +1188,7 @@ describe('Bandeja de Atención', () => {
       unattendedAlerts: 0,
       hasCustomerMessage: true,
       phone: '5491100000001',
+      phoneBlocked: false,
       takenAt: null,
     }
     const app = createApp(
@@ -1209,6 +1221,7 @@ describe('Bandeja de Atención', () => {
         label: null,
         customer: { id: 7, name: 'Ana Prueba', document: '99000001' },
         phone: '5491100000001',
+        phoneBlocked: false,
         queryType: 'reclamo',
         handoffReason: 'intención: reclamo',
         handedOff: true,
@@ -1289,6 +1302,15 @@ describe('Bandeja de Atención', () => {
     expect(whatsapp.sent).toEqual([{ to: '5491100000001', text: 'Hola, le escribo por su reclamo.' }])
   })
 
+  it('no permite enviar una respuesta desde la Bandeja a un número bloqueado', async () => {
+    if (!inbox.state) throw new Error('La prueba requiere el estado del caso')
+    inbox.state.phoneBlocked = true
+    const response = await post('/api/bandeja/12/respuestas', { texto: 'Hola' })
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'CONFLICT' } })
+    expect(whatsapp.sent).toEqual([])
+  })
+
   it('si WhatsApp falla al contestar, 502', async () => {
     whatsapp.fail = true
     const response = await post('/api/bandeja/12/respuestas', { texto: 'Hola' })
@@ -1317,6 +1339,35 @@ describe('Bandeja de Atención', () => {
   it('cerrar con alertasRevisadas que no es booleano da 400', async () => {
     const response = await post('/api/bandeja/12/cierre', { alertasRevisadas: 'sí' })
     expect(response.status).toBe(400)
+  })
+
+  it('bloquea y desbloquea el número del caso', async () => {
+    const bloqueado = await post('/api/bandeja/12/bloqueo', { bloqueado: true })
+    expect(bloqueado.status).toBe(200)
+    await expect(bloqueado.json()).resolves.toEqual({ caseId: 12, phone: '5491100000001', phoneBlocked: true })
+    const liberado = await post('/api/bandeja/12/bloqueo', { bloqueado: false })
+    expect(liberado.status).toBe(200)
+    await expect(liberado.json()).resolves.toEqual({ caseId: 12, phone: '5491100000001', phoneBlocked: false })
+    expect(inbox.blocked).toEqual([
+      { caseId: 12, blocked: true },
+      { caseId: 12, blocked: false },
+    ])
+  })
+
+  it.each([
+    ['sin cuerpo', undefined],
+    ['bloqueado que no es booleano', { bloqueado: 'sí' }],
+    ['campo desconocido', { bloqueado: true, usuario: 'admin' }],
+  ])('bloquear con %s da 400', async (_name, body) => {
+    const response = await post('/api/bandeja/12/bloqueo', body)
+    expect(response.status).toBe(400)
+    expect(inbox.blocked).toEqual([])
+  })
+
+  it('bloquear un caso fuera de la bandeja da 404 sin escribir', async () => {
+    const response = await post('/api/bandeja/99/bloqueo', { bloqueado: true })
+    expect(response.status).toBe(404)
+    expect(inbox.blocked).toEqual([])
   })
 
   it('las acciones con un id inválido dan 400 y con un caso fuera de la bandeja, 404', async () => {
