@@ -551,7 +551,7 @@
   align-items: flex-start;
   gap: 0;
   position: relative;
-  min-height: 220px;
+  min-height: 190px;
 }
 
 .tarjeta--kpi .tarjeta__nota--pie {
@@ -903,31 +903,44 @@
   color: var(--color-text);
 }
 
+.tarjeta--kpi-resumen .tarjeta__icono {
+  padding: 0.5rem;
+}
+
+.tarjeta--kpi-resumen .tarjeta__icono svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.tarjeta--kpi-resumen .tarjeta__etiqueta {
+  margin-top: 0.5rem;
+}
+
 .kpi-resumen {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
-  gap: 0.625rem;
-  margin: 0.75rem 0 0;
+  gap: 0.375rem 0.625rem;
+  margin: 0.5rem 0 0;
 }
 
 .kpi-resumen div {
   min-width: 0;
-  padding-bottom: 0.625rem;
+  padding-bottom: 0.375rem;
   border-bottom: 1px solid var(--color-accent-light);
 }
 
 .kpi-resumen dt {
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .kpi-resumen dd {
   margin: 0.125rem 0 0;
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
@@ -935,7 +948,7 @@
 .kpi-resumen__barra {
   width: 100%;
   height: 6px;
-  margin-top: 0.75rem;
+  margin-top: 0.5rem;
   overflow: hidden;
   border-radius: 999px;
   background: var(--color-accent-light);

@@ -162,7 +162,7 @@ export default function Dashboard({
             <span className="tarjeta__nota tarjeta__nota--pie">Casos derivados abiertos sin responsable.</span>
           </article>
 
-          <article className="tarjeta tarjeta--kpi">
+          <article className="tarjeta tarjeta--kpi tarjeta--kpi-resumen">
             <span className="tarjeta__icono tarjeta__icono--pink" aria-hidden="true">
               <IconoPausa />
             </span>
