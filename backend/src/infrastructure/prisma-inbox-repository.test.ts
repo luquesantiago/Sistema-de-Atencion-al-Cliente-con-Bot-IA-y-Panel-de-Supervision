@@ -55,7 +55,9 @@ describe('consultas de la bandeja', () => {
 
   it('la consulta de orden pagina en la base, con el límite y el desplazamiento como parámetros', () => {
     const query = inboxOrderQuery({ limit: 25, offset: 50 })
-    expect(query.sql).toContain('ORDER BY severityOrder IS NULL, severityOrder, c.fecha_toma IS NULL DESC')
+    expect(query.sql).toContain('ORDER BY threatOrder, severityOrder IS NULL, severityOrder, c.fecha_toma IS NULL DESC')
+    expect(query.sql).toMatch(/CASE\s+WHEN c\.motivo_derivacion LIKE \? THEN 0\s+ELSE 1\s+END AS threatOrder/)
+    expect(query.values).toContain('mensaje sospechoso: posible intento de manipulación o exfiltración%')
     expect(query.sql).toMatch(/LIMIT \? OFFSET \?\s*$/)
     expect(query.values.slice(-2)).toEqual([25, 50])
   })
@@ -104,8 +106,8 @@ describe('consultas de la bandeja', () => {
   })
 
   it('lee los números que MySQL devuelve como BigInt o texto', () => {
-    expect(toOrderedCase({ caseId: 12n, severityOrder: '2' })).toEqual({ caseId: 12, severityOrder: 2 })
-    expect(toOrderedCase({ caseId: 12, severityOrder: null })).toEqual({ caseId: 12, severityOrder: null })
+    expect(toOrderedCase({ caseId: 12n, threatOrder: 0, severityOrder: '2' })).toEqual({ caseId: 12, severityOrder: 2 })
+    expect(toOrderedCase({ caseId: 12, threatOrder: 1, severityOrder: null })).toEqual({ caseId: 12, severityOrder: null })
   })
 })
 

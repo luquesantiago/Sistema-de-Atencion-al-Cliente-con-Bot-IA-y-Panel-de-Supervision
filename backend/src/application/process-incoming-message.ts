@@ -244,23 +244,27 @@ export class ProcessIncomingMessage {
     // reinicio, con la que terminó: la charla reciente no vuelve a saludar.
     const greetingFresh = freshGreeting(open, at)
 
+    const threatDetected = await this.checkThreat(message)
+    if (threatDetected) {
+      const turn = new Turn(open, message.phone, at, messageTextForCase(message), undefined, greetingFresh)
+      turn.keepImageRef(message)
+      const ref = turn.caseFor(open?.suspended ? { kind: 'suspended' } : { kind: 'identifying' })
+      turn.receiveIn(ref)
+      turn.changes.blockPhone = true
+      turn.changes.threatDetected = ref
+      if (!open?.cases.some((item) => item.handedOff && item.closedAt === null)) {
+        turn.changes.handoff = handoffOf(ref, { kind: 'threat-detected' })
+      }
+      await this.conversations.save(turn.changes, async () => {})
+      return { status: 'HANDOFF_SENT', reason: 'mensaje sospechoso: posible intento de manipulación o exfiltración', responseSent: false }
+    }
+
     if (open?.suspended) {
       const turn = new Turn(open, message.phone, at, messageTextForCase(message), undefined, greetingFresh)
       turn.keepImageRef(message)
       turn.receiveIn(turn.caseFor({ kind: 'suspended' }))
       await this.conversations.save(turn.changes, async () => {})
       return { status: 'SILENCED', responseSent: false }
-    }
-
-    const threatDetected = await this.checkThreat(message)
-    if (threatDetected) {
-      const turn = new Turn(open, message.phone, at, messageTextForCase(message), undefined, greetingFresh)
-      turn.keepImageRef(message)
-      const ref = turn.caseFor({ kind: 'identifying' })
-      turn.receiveIn(ref)
-      turn.changes.handoff = handoffOf(ref, { kind: 'threat-detected' })
-      await this.conversations.save(turn.changes, async () => {})
-      return { status: 'HANDOFF_SENT', reason: 'mensaje sospechoso: posible intento de manipulación o exfiltración', responseSent: false }
     }
 
     const settings = await this.conversations.settings()

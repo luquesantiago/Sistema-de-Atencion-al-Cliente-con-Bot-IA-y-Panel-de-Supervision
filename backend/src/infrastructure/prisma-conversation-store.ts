@@ -14,6 +14,7 @@ import {
   type Settings,
 } from '../domain/conversation.js'
 import { dataChangeDetalle } from '../domain/data-change.js'
+import { describeHandoffReason } from '../domain/handoff.js'
 import { isIntent } from '../domain/intent.js'
 import type { RiskLevel } from '../domain/risk-level.js'
 
@@ -211,6 +212,9 @@ async function write(tx: Prisma.TransactionClient, changes: ConversationChanges)
     })
     conversationId = created.id_conversacion
   }
+  if (changes.blockPhone) {
+    await tx.telefono.update({ where: { numero: phone }, data: { bloqueado: true } })
+  }
   if (changes.customerId !== undefined) {
     await tx.conversacion.update({ where: { id_conversacion: conversationId }, data: { id_cliente: changes.customerId } })
   }
@@ -286,6 +290,12 @@ async function write(tx: Prisma.TransactionClient, changes: ConversationChanges)
       },
     })
     await tx.conversacion.update({ where: { id_conversacion: conversationId }, data: { asistente_suspendido: true } })
+  }
+  if (changes.threatDetected) {
+    await tx.caso.update({
+      where: { id_caso: caseId(changes.threatDetected) },
+      data: { motivo_derivacion: describeHandoffReason({ kind: 'threat-detected' }) },
+    })
   }
 
   if (changes.prospect) {

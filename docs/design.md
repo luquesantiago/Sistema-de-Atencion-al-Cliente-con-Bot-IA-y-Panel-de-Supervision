@@ -203,7 +203,7 @@ El color agrupa la prioridad para lectura rápida, pero el texto conserva los cu
 
 ### Bloqueo interno de un número
 
-En la conversación de un número bloqueado, la Bandeja oculta el compositor de respuesta y muestra un aviso explícito de que el bloqueo solo aplica dentro del sistema: WAHA todavía puede recibir mensajes y el contacto no queda bloqueado en WhatsApp. El estado se comunica con texto además del color; al desbloquear, vuelve a habilitarse la respuesta manual.
+La Bandeja puede bloquear un número manualmente o reflejar el bloqueo automático aplicado cuando el detector clasifica positivamente un posible intento de manipulación o exfiltración (RF-VER-01). «Posible amenaza» reemplaza cualquier otra etiqueta de prioridad del caso y se ordena antes que las demás prioridades, aunque se conserva el nivel de riesgo del catálogo. En la conversación de un número bloqueado, la Bandeja oculta el compositor de respuesta y muestra un aviso explícito de que el bloqueo solo aplica dentro del sistema: WAHA todavía puede recibir mensajes y el contacto no queda bloqueado en WhatsApp. El estado se comunica con texto además del color; el operador puede desbloquearlo desde el botón si fue una detección errónea, y entonces vuelve a habilitarse la respuesta manual.
 
 ## 4. Tipografía — inspirada en la web de Starbucks
 
