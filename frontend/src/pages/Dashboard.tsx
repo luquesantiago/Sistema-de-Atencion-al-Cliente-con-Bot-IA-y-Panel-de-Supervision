@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import type { Modulo, ModuloPanel } from '../navigation'
 import type { RolUsuario } from '../usuario'
 import PageHeader from '../components/PageHeader'
@@ -9,11 +8,7 @@ import {
   IconoCampana,
   IconoPausa,
 } from '../components/iconos'
-import {
-  obtenerMetricasDashboard,
-  type DashboardHourlyVolume,
-  type DashboardMetrics,
-} from '../api/dashboard'
+import type { DashboardHourlyVolume, DashboardMetrics } from '../api/dashboard'
 
 const GRAFICO_ANCHO = 500
 const GRAFICO_ALTO = 150
@@ -53,9 +48,14 @@ function curvaSuavizada(puntos: PuntoGrafico[]): string {
     const siguiente = puntos[i + 1]
     const posterior = puntos[i + 2] ?? siguiente
     const cp1x = redondear(actual.x + (siguiente.x - anterior.x) / 6)
-    const cp1y = redondear(actual.y + (siguiente.y - anterior.y) / 6)
+    const minimo = Math.min(actual.y, siguiente.y)
+    const maximo = Math.max(actual.y, siguiente.y)
+    const cp1y = Math.min(maximo, Math.max(minimo, redondear(actual.y + (siguiente.y - anterior.y) / 6)))
     const cp2x = redondear(siguiente.x - (posterior.x - actual.x) / 6)
-    const cp2y = redondear(siguiente.y - (posterior.y - actual.y) / 6)
+    const cp2ySinLimite = Math.min(maximo, Math.max(minimo, redondear(siguiente.y - (posterior.y - actual.y) / 6)))
+    const cp2y = actual.y <= siguiente.y
+      ? Math.max(cp1y, cp2ySinLimite)
+      : Math.min(cp1y, cp2ySinLimite)
     trazo += ` C ${cp1x} ${cp1y} ${cp2x} ${cp2y} ${siguiente.x} ${siguiente.y}`
   }
   return trazo
@@ -69,28 +69,19 @@ interface DashboardProps {
   modulo: Modulo
   rol: RolUsuario
   onNavegar: (modulo: ModuloPanel) => void
+  metricas: DashboardMetrics | null
+  cargandoMetricas: boolean
+  errorMetricas: string | null
 }
 
-export default function Dashboard({ modulo, rol, onNavegar }: DashboardProps) {
-  const [metricas, setMetricas] = useState<DashboardMetrics | null>(null)
-  const [cargandoMetricas, setCargandoMetricas] = useState(true)
-  const [errorMetricas, setErrorMetricas] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (rol === 'operador') return
-    const controller = new AbortController()
-    obtenerMetricasDashboard(controller.signal)
-      .then(setMetricas)
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === 'AbortError') return
-        setErrorMetricas(error instanceof Error ? error.message : 'No se pudieron cargar las métricas.')
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setCargandoMetricas(false)
-      })
-    return () => controller.abort()
-  }, [rol])
-
+export default function Dashboard({
+  modulo,
+  rol,
+  onNavegar,
+  metricas,
+  cargandoMetricas,
+  errorMetricas,
+}: DashboardProps) {
   if (rol === 'operador') {
     return (
       <div className="pagina">
@@ -209,17 +200,25 @@ export default function Dashboard({ modulo, rol, onNavegar }: DashboardProps) {
             >
               <defs>
                 <linearGradient id="degradado-volumen-chats" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.35" />
-                  <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0" />
+                  <stop offset="0%" stopColor="#7a1f35" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#7a1f35" stopOpacity="0.02" />
+                </linearGradient>
+                <linearGradient id="degradado-linea-chats" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#7a1f35" />
+                  <stop offset="100%" stopColor="#c24468" />
                 </linearGradient>
               </defs>
+              <g className="grafico-chats__guias" aria-hidden="true">
+                <line x1={0} y1={50} x2={GRAFICO_ANCHO} y2={50} />
+                <line x1={0} y1={88} x2={GRAFICO_ANCHO} y2={88} />
+              </g>
               {areaGrafico ? <path d={areaGrafico} fill="url(#degradado-volumen-chats)" /> : null}
               {trazoGrafico ? (
                 <path
                   d={trazoGrafico}
                   fill="none"
-                  stroke="var(--color-primary)"
-                  strokeWidth="2.5"
+                  stroke="url(#degradado-linea-chats)"
+                  strokeWidth="3.5"
                   strokeLinecap="round"
                 />
               ) : null}

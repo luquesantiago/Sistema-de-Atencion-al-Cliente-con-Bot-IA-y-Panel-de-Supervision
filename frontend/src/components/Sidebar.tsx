@@ -12,6 +12,8 @@ import { etiquetaRol, type UsuarioPanel } from '../usuario'
 interface SidebarProps {
   activo: ModuloPanel
   usuario: UsuarioPanel
+  casosPendientes: number | null
+  tramitesPendientes: number | null
   onNavegar: (modulo: ModuloPanel) => void
   onCerrarSesion: () => void
 }
@@ -81,6 +83,8 @@ function CajaUsuario({
 export default function Sidebar({
   activo,
   usuario,
+  casosPendientes,
+  tramitesPendientes,
   onNavegar,
   onCerrarSesion,
 }: SidebarProps) {
@@ -154,6 +158,14 @@ export default function Sidebar({
           <li className="nav__titulo">Módulos</li>
           {modulosVisibles.map((modulo) => {
             const seleccionado = modulo.id === activo
+            const pendientes = modulo.id === 'bandeja'
+              ? casosPendientes
+              : modulo.id === 'tramites'
+                ? tramitesPendientes
+                : null
+            const etiquetaPendientes = modulo.id === 'bandeja'
+              ? `${pendientes} ${pendientes === 1 ? 'caso pendiente por responder' : 'casos pendientes por responder'}`
+              : `${pendientes} ${pendientes === 1 ? 'trámite pendiente por aprobar' : 'trámites pendientes por aprobar'}`
             return (
               <li key={modulo.id}>
                 <button
@@ -164,6 +176,11 @@ export default function Sidebar({
                 >
                   <IconoModulo modulo={modulo.id} className="nav__icono" />
                   {modulo.nombre}
+                  {pendientes !== null && pendientes > 0 ? (
+                    <span className="nav__badge" aria-label={etiquetaPendientes}>
+                      {pendientes > 99 ? '99+' : pendientes}
+                    </span>
+                  ) : null}
                 </button>
               </li>
             )
