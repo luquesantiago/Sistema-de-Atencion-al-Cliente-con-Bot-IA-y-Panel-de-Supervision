@@ -2372,6 +2372,7 @@ textarea:not([disabled]) {
 .bandeja-container {
   display: flex;
   height: 100vh;
+  height: 100dvh;
   min-height: 0;
   overflow: hidden;
   background: #f8f7f5;
@@ -2893,7 +2894,7 @@ textarea:not([disabled]) {
 
 .conversacion__accion {
   display: inline-flex;
-  min-height: 38px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
   gap: 7px;
@@ -3140,6 +3141,7 @@ textarea:not([disabled]) {
   .bandeja-container {
     flex-direction: column;
     height: 100vh;
+    height: 100dvh;
     min-height: 0;
   }
 
@@ -3164,6 +3166,31 @@ textarea:not([disabled]) {
 
   .conversacion__volver {
     display: inline-flex;
+  }
+
+  .chat-header__principal {
+    align-items: flex-start;
+    padding-inline: 12px;
+  }
+
+  .conversacion__datos {
+    flex: 1 1 120px;
+  }
+
+  .conversacion__acciones {
+    flex-basis: 100%;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .conversacion__accion {
+    flex: 1 1 140px;
+    min-height: 44px;
+  }
+
+  .alerta-banner,
+  .chat__bloqueo {
+    padding-inline: 12px;
   }
 
   .mensaje-bubble {
