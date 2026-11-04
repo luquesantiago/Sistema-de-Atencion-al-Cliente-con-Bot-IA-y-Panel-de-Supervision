@@ -819,13 +819,13 @@ export default function BaseClientes({ modulo, onNavegar, clientesInicial }: Pro
                   style={{ animationDelay: `${Math.min(indice, 6) * 18}ms` }}
                   onClick={(evento) => abrirDetalleDesdeFila(cliente, evento.currentTarget)}
                 >
-                  <td className="tabla__identificacion">{identificacion(cliente)}</td>
-                  <td className="tabla__nombre">{nombreCompleto(cliente)}</td>
-                  <td className="tabla__telefonos">
+                  <td className="tabla__identificacion" data-label="Identificación">{identificacion(cliente)}</td>
+                  <td className="tabla__nombre" data-label="Cliente">{nombreCompleto(cliente)}</td>
+                  <td className="tabla__telefonos" data-label="Teléfonos">
                     {cliente.phones.length > 0 ? cliente.phones.join(' · ') : 'Sin teléfono vinculado'}
                   </td>
-                  <td>{resumenDePolizas(cliente.policies)}</td>
-                  <td className="tabla__accion">
+                  <td data-label="Pólizas">{resumenDePolizas(cliente.policies)}</td>
+                  <td className="tabla__accion" data-label="Acciones">
                     <div className="tabla__acciones">
                       <button
                         type="button"

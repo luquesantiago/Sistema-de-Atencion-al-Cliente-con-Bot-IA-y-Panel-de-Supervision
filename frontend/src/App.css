@@ -1943,7 +1943,7 @@ textarea:not([disabled]) {
 
 .busqueda__campo {
   width: 100%;
-  min-height: 42px;
+  min-height: 44px;
   padding: 0.625rem 0.75rem;
   border: 1px solid var(--color-secondary);
   border-radius: var(--radius-md);
@@ -2110,6 +2110,7 @@ textarea:not([disabled]) {
 
 /* «Ir al chat»: acción secundaria, al lado de «Ver detalle». */
 .tabla__chat {
+  min-height: 44px;
   padding: 4px 10px;
   border: 1px solid var(--color-secondary);
   border-radius: var(--radius-md);
@@ -2135,6 +2136,7 @@ textarea:not([disabled]) {
 }
 
 .tabla__ver {
+  min-height: 44px;
   padding: 4px 10px;
   border: 1px solid var(--color-secondary);
   border-radius: var(--radius-md);
@@ -2197,6 +2199,7 @@ textarea:not([disabled]) {
 
 .detalle-panel__cerrar {
   flex: none;
+  min-height: 44px;
   padding: 3px 9px;
   border: 1px solid var(--color-secondary);
   border-radius: var(--radius-md);
@@ -3211,6 +3214,7 @@ textarea:not([disabled]) {
 }
 
 .detalle-panel__telefono-quitar {
+  min-height: 44px;
   padding: 1px 7px;
   border: 1px solid var(--color-danger-border);
   border-radius: var(--radius-md);
@@ -3624,7 +3628,126 @@ textarea:not([disabled]) {
   }
 
   .tabla {
-    min-width: 640px;
+    min-width: 0;
+    border-spacing: 0 12px;
+  }
+
+  .busqueda__campo,
+  .detalle-panel__telefono-fila input {
+    min-height: 44px;
+  }
+
+  .tabla thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .tabla tbody {
+    display: block;
+  }
+
+  .tabla__fila {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px 12px;
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid var(--color-accent-light);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+
+  .tabla tbody td,
+  .tabla tbody td:first-child,
+  .tabla tbody td:last-child {
+    display: block;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .tabla tbody tr:hover td {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .tabla tbody tr[aria-current] {
+    border-color: var(--color-secondary);
+    box-shadow: inset 3px 0 0 var(--color-primary);
+  }
+
+  .tabla tbody tr[aria-current] td {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .tabla__fila td::before {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--color-text-muted);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    content: attr(data-label);
+  }
+
+  .tabla__nombre {
+    grid-column: 1 / -1;
+    font-size: 1rem;
+  }
+
+  .tabla__identificacion,
+  .tabla__telefonos,
+  .tabla__fila td:nth-child(4) {
+    min-width: 0;
+  }
+
+  .tabla__accion {
+    grid-column: 1 / -1;
+  }
+
+  .tabla__acciones {
+    justify-content: stretch;
+  }
+
+  .tabla__chat,
+  .tabla__ver,
+  .detalle-panel__cerrar,
+  .detalle-panel__telefono-quitar,
+  .detalle-panel__polizas-encabezado .boton {
+    min-height: 44px;
+  }
+
+  .tabla__chat,
+  .tabla__ver {
+    flex: 1;
+  }
+
+  .cartera__lista {
+    overflow-x: visible;
+  }
+
+  .cartera--con-detalle .cartera__lista {
+    display: none;
+  }
+
+  .detalle-panel {
+    position: static;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .detalle-panel__cerrar {
+    padding-inline: 12px;
   }
 }
 
