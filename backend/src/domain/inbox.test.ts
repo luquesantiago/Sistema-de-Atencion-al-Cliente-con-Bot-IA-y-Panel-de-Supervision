@@ -9,6 +9,7 @@ function entry(overrides: Partial<InboxEntry> = {}): InboxEntry {
     severity: 'alto',
     customer: { id: 7, name: 'Ana Prueba', document: '99000001' },
     phone: '5491100000001',
+    phoneBlocked: false,
     queryType: 'reclamo',
     handoffReason: 'intención: reclamo',
     handedOffAt: new Date('2026-10-15T13:00:00.000Z'),

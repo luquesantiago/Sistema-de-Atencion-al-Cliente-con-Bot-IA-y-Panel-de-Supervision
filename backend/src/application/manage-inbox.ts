@@ -34,6 +34,8 @@ export type InboxItem = {
   label: InboxLabel | null
   customer: InboxCustomer | null
   phone: string
+  // true si el número está bloqueado en la aplicación: se descartan mensajes y no se permiten respuestas.
+  phoneBlocked: boolean
   queryType: QueryType | null
   handoffReason: string | null
   handedOff: boolean
@@ -66,6 +68,8 @@ export type ReplyResult =
   | { sent: true; saved: false; warning: string }
 
 export type ReleaseResult = { caseId: number; releasedAt: Date }
+
+export type PhoneBlockResult = { caseId: number; phone: string; phoneBlocked: boolean }
 
 export type CloseRequest = { reason?: string | null; alertsReviewed?: boolean }
 
@@ -160,6 +164,9 @@ export class ManageInbox {
     if (typeof text !== 'string') throw replyErrors['invalid-text']()
     const state = await this.repository.findActionState(caseId)
     if (!state) throw notInInbox()
+    if (state.phoneBlocked) {
+      throw new RequestManagementError(409, 'CONFLICT', 'El número está bloqueado en el panel. Desbloquealo para poder responder desde la Bandeja.')
+    }
     const decision = decideReply(state, actor, text)
     if (!decision.ok) throw replyErrors[decision.error]()
 
@@ -184,6 +191,18 @@ export class ManageInbox {
     const outcome = await this.repository.close(caseId, actor, request, this.clock())
     if (!outcome.ok) throw closeErrors[outcome.error]()
     return { caseId, closedAt: outcome.closedAt }
+  }
+
+  // El bloqueo interno descarta mensajes entrantes y evita respuestas manuales desde la bandeja.
+  // Cualquier operador puede cambiarlo, sin tomar el caso.
+  public async setPhoneBlocked(id: string, blocked: boolean): Promise<PhoneBlockResult> {
+    const caseId = parseCaseId(id)
+    const state = await this.repository.findActionState(caseId)
+    if (!state || !state.inInbox) throw notInInbox()
+    const updated = await this.repository.setPhoneBlocked(caseId, blocked)
+    if (!updated) throw notInInbox()
+    console.log(`[bandeja] caso ${caseId}: número ${blocked ? 'bloqueado' : 'desbloqueado'}`)
+    return { caseId, phone: updated.phone, phoneBlocked: blocked }
   }
 
   // La imagen se pide a WhatsApp en el momento y no se guarda (decisión 7).
@@ -211,6 +230,7 @@ function toItem(entry: InboxEntry, actor: PanelActor): InboxItem {
     label: inboxLabel(entry),
     customer: entry.customer,
     phone: entry.phone,
+    phoneBlocked: entry.phoneBlocked,
     queryType: entry.queryType,
     handoffReason: entry.handoffReason,
     handedOff: entry.handedOffAt !== null,

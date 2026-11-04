@@ -1,7 +1,7 @@
 # DER — Caso 8: Sistema de Atención al Cliente con Bot IA y Panel de Supervisión
 
 Seguros Castaño — PPP 1, UNLa, Grupo 11. Entregable del Hito 0.
-Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 29/09/2026 (suma `caso.id_poliza`). El `.puml` suma `mensaje.id_imagen_whatsapp` el 15/10/2026; el `.png` y el `.svg` todavía no se regeneraron con ese cambio. Los cambios del 28/09/2026 y del 15/10/2026 están en las secciones del final.
+Diagrama: `caso8_der.puml` / `.png` / `.svg`. El modelo original se revisó el 29/09/2026 (suma `caso.id_poliza`); el `.puml` incorporó después `mensaje.id_imagen_whatsapp` (15/10/2026) y `telefono.bloqueado`. El `.png` y el `.svg` se regeneraron desde el `.puml` y reflejan esos cambios. Las decisiones del 28/09/2026, del 15/10/2026 y del bloqueo interno están en las secciones del final.
 
 ## Convenciones aplicadas
 
@@ -23,7 +23,7 @@ Diagrama: `caso8_der.puml` / `.png` / `.svg`, revisado el 29/09/2026 (suma `caso
 | Entidad | Para qué está |
 |---|---|
 | `cliente` | Registro único de cada cliente. Una persona se identifica por DNI (con apellido y nombre) y una empresa por CUIT (con razón social); la base exige uno de los dos grupos completo. DNI y CUIT son únicos: resuelven los duplicados de la planilla. |
-| `telefono` | Número normalizado, independiente del cliente. Incluye los números de WhatsApp que todavía no están vinculados a ningún cliente. |
+| `telefono` | Número normalizado, independiente del cliente. Incluye los números de WhatsApp que todavía no están vinculados a ningún cliente. `bloqueado` indica el bloqueo interno aplicado desde la Bandeja; no bloquea el contacto en WhatsApp. |
 | `cliente_telefono` | Relación N:M: un cliente puede tener varios teléfonos y un teléfono pertenecer a varios clientes. |
 | `compania_aseguradora` | Compañía de cada póliza. Por ahora el equipo asume que Seguros Castaño es la aseguradora de todas (supuesto a confirmar con la agencia); la tabla queda para registrar otras compañías si la agencia opera con ellas. |
 | `moneda` | Catálogo de monedas (código ISO 4217): peso argentino y dólar. **Una moneda por póliza.** |
@@ -161,6 +161,10 @@ Están en este documento, en el `.puml` y en la migración `20260929204929_caso_
 Está en este documento, en el `.puml` y en la migración `20261015185550_mensaje_id_imagen_whatsapp` de `backend/prisma/migrations` (change `bandeja-atender-casos`).
 
 1. **Imagen del cliente sin copia**: `mensaje.id_imagen_whatsapp`, opcional, guarda el id serializado del mensaje de WhatsApp en WAHA, solo en los mensajes de imagen (la foto del DNI del cliente nuevo y la imagen que llega a una conversación en silencio). El panel pide la imagen a WAHA en el momento de mostrarla y no la guarda (RF-ATE-05). Decisión de Santiago.
+
+## Bloqueo interno de teléfono
+
+El atributo `telefono.bloqueado` está representado en este documento, en el `.puml`, `.svg` y `.png`, y en la migración `20261103024105_bloqueo_numero`. Es booleano y su valor inicial es `false`. Cuando está activo, el backend descarta los mensajes entrantes recibidos por WAHA antes de guardarlos o procesarlos y la Bandeja no permite enviar respuestas manuales a ese número. El bloqueo es interno: no evita que WhatsApp/WAHA reciba los mensajes ni bloquea al contacto en WhatsApp.
 
 ## Decisiones del equipo que conviene confirmar
 

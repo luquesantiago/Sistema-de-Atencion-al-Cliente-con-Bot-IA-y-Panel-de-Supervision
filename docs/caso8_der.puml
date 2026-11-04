@@ -45,6 +45,7 @@ package "Cartera" #F7FAFD {
     --
     * numero : VARCHAR <<UK>>
     * activo : BOOLEAN
+    * bloqueado : BOOLEAN
   }
 
   entity "cliente_telefono" as cliente_telefono {

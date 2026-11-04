@@ -431,6 +431,17 @@ export function createApp(
       handleRequestError(error, response, next)
     }
   })
+  app.post('/api/bandeja/:idCaso/bloqueo', async (request, response, next) => {
+    try {
+      const body = parseBody(request.body, ['bloqueado'])
+      if (typeof body.bloqueado !== 'boolean') {
+        throw new RequestManagementError(400, 'VALIDATION_ERROR', 'bloqueado debe ser verdadero o falso.')
+      }
+      response.status(200).json(await manageInbox.setPhoneBlocked(request.params.idCaso, body.bloqueado))
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
   app.post('/api/clientes/:id/telefonos', async (request, response, next) => {
     try {
       const detail = await manageCustomerEdits.linkPhone(request.params.id, request.body)

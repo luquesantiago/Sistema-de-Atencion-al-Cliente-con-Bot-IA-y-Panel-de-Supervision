@@ -194,12 +194,14 @@ function DetalleProspecto({
   error,
   onAprobar,
   onRechazar,
+  onVerChat,
 }: {
   prospecto: ProspectoPendiente
   ocupado: boolean
   error: string | null
   onAprobar: (datos: { nombre: string; apellido: string; fundamento: string }) => void
   onRechazar: (fundamento: string) => void
+  onVerChat: () => void
 }) {
   const id = useId()
   const nombreDividido = dividirNombre(prospecto.name)
@@ -231,10 +233,15 @@ function DetalleProspecto({
             <p className="tramite-detalle__subtitulo">Caso {prospecto.caseId} · Solicitado el {fechaHora(prospecto.registeredAt)}</p>
           </div>
         </div>
-        <span className="badge badge--warning">
-          <IconoReloj className="badge__icono" />
-          Pendiente
-        </span>
+        <div className="tramite-detalle__estado">
+          <span className="badge badge--warning">
+            <IconoReloj className="badge__icono" />
+            Pendiente
+          </span>
+          <button type="button" className="boton boton--bordo" onClick={onVerChat}>
+            Ver chat
+          </button>
+        </div>
       </header>
 
       <dl className="tramite-detalle__datos">
@@ -338,12 +345,14 @@ function DetalleCambioTelefono({
   error,
   onAprobar,
   onRechazar,
+  onVerChat,
 }: {
   cambio: CambioTelefonoPendiente
   ocupado: boolean
   error: string | null
   onAprobar: (datos: { fundamento: string; telefonosADesvincular: number[] }) => void
   onRechazar: (fundamento: string) => void
+  onVerChat: () => void
 }) {
   const id = useId()
   const [fundamento, setFundamento] = useState('')
@@ -375,10 +384,15 @@ function DetalleCambioTelefono({
             <p className="tramite-detalle__subtitulo">Caso {cambio.caseId} · Solicitado el {fechaHora(cambio.requestedAt)}</p>
           </div>
         </div>
-        <span className="badge badge--warning">
-          <IconoReloj className="badge__icono" />
-          Pendiente
-        </span>
+        <div className="tramite-detalle__estado">
+          <span className="badge badge--warning">
+            <IconoReloj className="badge__icono" />
+            Pendiente
+          </span>
+          <button type="button" className="boton boton--bordo" onClick={onVerChat}>
+            Ver chat
+          </button>
+        </div>
       </header>
 
       <dl className="tramite-detalle__datos">
@@ -1105,6 +1119,7 @@ export default function TramitesAprobar({
       error={errorDecision}
       onAprobar={(datos) => pedirAprobarProspecto(prospectoSeleccionado, datos)}
       onRechazar={(fundamento) => pedirRechazarProspecto(prospectoSeleccionado, fundamento)}
+      onVerChat={() => onNavegar('bandeja', { bandeja: { caseId: prospectoSeleccionado.caseId } })}
     />
   ) : cambioSeleccionado !== null ? (
     <DetalleCambioTelefono
@@ -1114,6 +1129,7 @@ export default function TramitesAprobar({
       error={errorDecision}
       onAprobar={(datos) => pedirAprobarCambio(cambioSeleccionado, datos)}
       onRechazar={(fundamento) => pedirRechazarCambio(cambioSeleccionado, fundamento)}
+      onVerChat={() => onNavegar('bandeja', { bandeja: { caseId: cambioSeleccionado.caseId } })}
     />
   ) : datoSeleccionado !== null ? (
     <DetalleCambioDatos
