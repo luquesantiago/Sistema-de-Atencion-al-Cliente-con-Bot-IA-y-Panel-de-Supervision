@@ -79,7 +79,7 @@ const actionStateSelect = {
   prospecto: { select: { id_prospecto: true, observaciones: true, estado_prospecto: { select: { nombre: true } } } },
   alerta: { where: { fecha_atencion: null }, select: { id_alerta: true } },
   mensaje: { where: { origen_mensaje: { is: { nombre: 'cliente' } } }, take: 1, select: { id_mensaje: true } },
-  conversacion: { select: { telefono: { select: { numero: true } } } },
+  conversacion: { select: { telefono: { select: { numero: true, bloqueado: true } } } },
 } satisfies Prisma.casoSelect
 
 export type InboxActionRecord = Prisma.casoGetPayload<{ select: typeof actionStateSelect }>
@@ -498,6 +498,7 @@ export function toActionState(record: InboxActionRecord, inInbox: boolean): Inbo
     unattendedAlerts: record.alerta.length,
     hasCustomerMessage: record.mensaje.length > 0,
     phone: record.conversacion.telefono.numero,
+    phoneBlocked: record.conversacion.telefono.bloqueado,
     takenAt: record.fecha_toma,
   }
 }

@@ -34,7 +34,7 @@ export type InboxItem = {
   label: InboxLabel | null
   customer: InboxCustomer | null
   phone: string
-  // true si el número está bloqueado: el asistente ignora sus mensajes.
+  // true si el número está bloqueado en la aplicación: se descartan mensajes y no se permiten respuestas.
   phoneBlocked: boolean
   queryType: QueryType | null
   handoffReason: string | null
@@ -164,6 +164,9 @@ export class ManageInbox {
     if (typeof text !== 'string') throw replyErrors['invalid-text']()
     const state = await this.repository.findActionState(caseId)
     if (!state) throw notInInbox()
+    if (state.phoneBlocked) {
+      throw new RequestManagementError(409, 'CONFLICT', 'El número está bloqueado en el panel. Desbloquealo para poder responder desde la Bandeja.')
+    }
     const decision = decideReply(state, actor, text)
     if (!decision.ok) throw replyErrors[decision.error]()
 
@@ -190,8 +193,8 @@ export class ManageInbox {
     return { caseId, closedAt: outcome.closedAt }
   }
 
-  // Bloquear o desbloquear el número de WhatsApp del caso: mientras esté bloqueado, el
-  // asistente ignora sus mensajes. Cualquier operador puede cambiarlo, sin tomar el caso.
+  // El bloqueo interno descarta mensajes entrantes y evita respuestas manuales desde la bandeja.
+  // Cualquier operador puede cambiarlo, sin tomar el caso.
   public async setPhoneBlocked(id: string, blocked: boolean): Promise<PhoneBlockResult> {
     const caseId = parseCaseId(id)
     const state = await this.repository.findActionState(caseId)

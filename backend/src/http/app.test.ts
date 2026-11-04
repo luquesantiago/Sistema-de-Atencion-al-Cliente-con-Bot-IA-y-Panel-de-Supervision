@@ -58,6 +58,9 @@ class FakeAi implements AiClient {
   public async extractDataChange(_text: string): Promise<DataChangeExtraction> {
     return { field: null, value: null }
   }
+  public async isThreat(_text: string): Promise<boolean> {
+    return false
+  }
   public async rewrite(_input: RewriteInput): Promise<string> {
     return ''
   }
@@ -1185,6 +1188,7 @@ describe('Bandeja de Atención', () => {
       unattendedAlerts: 0,
       hasCustomerMessage: true,
       phone: '5491100000001',
+      phoneBlocked: false,
       takenAt: null,
     }
     const app = createApp(
@@ -1296,6 +1300,15 @@ describe('Bandeja de Atención', () => {
     expect(response.status).toBe(201)
     await expect(response.json()).resolves.toEqual({ sent: true, saved: true, messageId: 77 })
     expect(whatsapp.sent).toEqual([{ to: '5491100000001', text: 'Hola, le escribo por su reclamo.' }])
+  })
+
+  it('no permite enviar una respuesta desde la Bandeja a un número bloqueado', async () => {
+    if (!inbox.state) throw new Error('La prueba requiere el estado del caso')
+    inbox.state.phoneBlocked = true
+    const response = await post('/api/bandeja/12/respuestas', { texto: 'Hola' })
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'CONFLICT' } })
+    expect(whatsapp.sent).toEqual([])
   })
 
   it('si WhatsApp falla al contestar, 502', async () => {

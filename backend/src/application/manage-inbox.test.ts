@@ -48,6 +48,7 @@ function actionState(overrides: Partial<InboxActionState> = {}): InboxActionStat
     unattendedAlerts: 0,
     hasCustomerMessage: true,
     phone: '5491100000001',
+    phoneBlocked: false,
     takenAt: null,
     ...overrides,
   }
@@ -323,6 +324,15 @@ describe('ManageInbox.reply (RF-DER-02)', () => {
     await expect(inbox(new InMemoryInbox([], null, actionState({ assigneeId: 20 })), whatsapp).reply('12', me, 'Hola'))
       .rejects.toMatchObject({ statusCode: 409, code: 'CONFLICT' })
     expect(whatsapp.sent).toEqual([])
+  })
+
+  it('un número bloqueado no permite responder desde la bandeja', async () => {
+    const repository = new InMemoryInbox([], null, actionState({ phoneBlocked: true }))
+    const whatsapp = new FakeWhatsApp()
+    await expect(inbox(repository, whatsapp).reply('12', me, 'Hola'))
+      .rejects.toMatchObject({ statusCode: 409, code: 'CONFLICT', message: 'El número está bloqueado en el panel. Desbloquealo para poder responder desde la Bandeja.' })
+    expect(whatsapp.sent).toEqual([])
+    expect(repository.replies).toEqual([])
   })
 
   it.each(['', '   ', 42])('el texto %o es un error de validación', async (text) => {

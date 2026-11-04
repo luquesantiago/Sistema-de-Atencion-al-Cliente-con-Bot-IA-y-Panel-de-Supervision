@@ -679,11 +679,18 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
     setAvisoCaso(null)
     try {
       await definirBloqueoNumero(caso.caseId, bloqueado)
+      if (bloqueado) {
+        setBorradores((anteriores) => {
+          const siguientes = { ...anteriores }
+          delete siguientes[caso.caseId]
+          return siguientes
+        })
+      }
       setAvisoCaso({
         tono: bloqueado ? 'riesgo' : 'exito',
         texto: bloqueado
-          ? `Bloqueaste el número ${caso.phone}: el asistente deja de atenderlo hasta que lo desbloquees.`
-          : `Desbloqueaste el número ${caso.phone}: el asistente vuelve a atenderlo.`,
+          ? `Bloqueaste el número ${caso.phone} en el panel: se descartarán sus mensajes entrantes y no podrás responderle desde la Bandeja. WhatsApp puede seguir entregando mensajes al servidor.`
+          : `Desbloqueaste el número ${caso.phone}: el asistente volverá a procesar sus mensajes.`,
       })
     } catch (error) {
       setAvisoCaso({ tono: 'riesgo', texto: mensajeDeError(error, 'No se pudo cambiar el bloqueo del número.') })
@@ -876,7 +883,7 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
               ? 'Desbloqueando…'
               : 'Bloqueando…'
             : caso.phoneBlocked
-              ? 'Desbloquear usuario'
+              ? 'Desbloquear número'
               : 'Bloquear número'}
         </button>
         <button
@@ -975,11 +982,11 @@ export default function BandejaAtencion({ modulo, bandejaInicial }: PropsBandeja
 
         {caso?.phoneBlocked ? (
           <p className="chat__bloqueo" role="status">
-            Bloqueaste a este número: el asistente no le responderá.
+            Número bloqueado en el panel: los mensajes entrantes se descartan y no se permiten respuestas desde la Bandeja. 
           </p>
         ) : null}
 
-        {caso && caso.handedOff && !fueraDeBandeja ? (
+        {caso && caso.handedOff && !caso.phoneBlocked && !fueraDeBandeja ? (
           <CajaRespuesta
             caso={caso}
             borrador={borradores[caso.caseId] ?? ''}

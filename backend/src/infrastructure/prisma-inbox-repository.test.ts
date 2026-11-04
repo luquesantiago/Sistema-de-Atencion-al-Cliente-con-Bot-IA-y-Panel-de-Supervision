@@ -237,7 +237,7 @@ describe('acciones', () => {
       prospecto: null,
       alerta: [],
       mensaje: [{ id_mensaje: 3 }],
-      conversacion: { telefono: { numero: '5491100000001' } },
+      conversacion: { telefono: { numero: '5491100000001', bloqueado: false } },
       ...overrides,
     }
   }
@@ -257,6 +257,7 @@ describe('acciones', () => {
       unattendedAlerts: 2,
       hasCustomerMessage: true,
       phone: '5491100000001',
+      phoneBlocked: false,
     })
   })
 
@@ -266,6 +267,12 @@ describe('acciones', () => {
       handedOff: false,
       hasCustomerMessage: false,
     })
+  })
+
+  it('incluye el estado de bloqueo del teléfono en el estado para responder', () => {
+    expect(toActionState(actionRecord({
+      conversacion: { telefono: { numero: '5491100000001', bloqueado: true } },
+    }), true).phoneBlocked).toBe(true)
   })
 
   it('la nota del cierre tiene quién, cuándo y el motivo', () => {

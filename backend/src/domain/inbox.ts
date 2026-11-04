@@ -24,7 +24,7 @@ export type InboxEntry = {
   severity: RiskLevel | null
   customer: InboxCustomer | null
   phone: string
-  // El número está bloqueado desde la bandeja: el asistente ignora sus mensajes.
+  // Bloqueo interno de la aplicación: se descartan mensajes entrantes y se impiden respuestas desde la bandeja.
   phoneBlocked: boolean
   queryType: QueryType | null
   handoffReason: string | null
@@ -61,7 +61,11 @@ export type InboxPage = { entries: InboxEntry[]; total: number }
 
 // El estado que necesitan las reglas de tomar, contestar y cerrar, más lo que piden las
 // escrituras (change bandeja-atender-casos, decisión 3).
-export type InboxActionState = CaseActionState & { phone: string; takenAt: Date | null }
+export type InboxActionState = CaseActionState & {
+  phone: string
+  phoneBlocked: boolean
+  takenAt: Date | null
+}
 
 // changed: otro pedido cerró o reasignó el caso mientras tanto.
 export type CloseOutcome = { ok: true; closedAt: Date } | { ok: false; error: CloseError | 'changed' }
