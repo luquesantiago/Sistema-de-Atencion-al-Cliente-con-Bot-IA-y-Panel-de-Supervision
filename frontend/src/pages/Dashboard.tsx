@@ -135,6 +135,9 @@ export default function Dashboard({
   const distribucion = metricas?.distribucionRespuestas
   const porcentajeIA = distribucion?.porcentajes.IA ?? 0
   const porcentajeOperador = distribucion?.porcentajes.operador ?? 0
+  const descripcionGrafico = volumenPorHora.length > 0
+    ? volumenPorHora.map((item) => `${item.hora}: ${item.cantidad}`).join('; ')
+    : 'No hay consultas registradas hoy.'
 
   return (
     <div className="pagina">
@@ -169,7 +172,14 @@ export default function Dashboard({
                     <dd key={`automatizacion-${tasaAutomatizacion}`}>{tasaAutomatizacion}%</dd>
                   </div>
                 </dl>
-                <div className="kpi-resumen__barra" aria-label={`Automatización ${tasaAutomatizacion}%`}>
+                <div
+                  className="kpi-resumen__barra"
+                  role="progressbar"
+                  aria-label="Automatización"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={tasaAutomatizacion}
+                >
                   <span style={{ width: `${tasaAutomatizacion}%` }} />
                 </div>
               </>
@@ -244,15 +254,18 @@ export default function Dashboard({
               viewBox={`0 0 ${GRAFICO_ANCHO} ${GRAFICO_ALTO}`}
               role="img"
               aria-label="Volumen de chats de hoy por hora"
+              aria-describedby="volumen-chats-datos"
             >
+              <title>Volumen de chats de hoy por hora</title>
+              <desc>{descripcionGrafico}</desc>
               <defs>
                 <linearGradient id="degradado-volumen-chats" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#7a1f35" stopOpacity="0.3" />
-                  <stop offset="100%" stopColor="#7a1f35" stopOpacity="0.02" />
+                  <stop offset="0%" stopColor="var(--color-dashboard-chart-wine)" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="var(--color-dashboard-chart-wine)" stopOpacity="0.02" />
                 </linearGradient>
                 <linearGradient id="degradado-linea-chats" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#7a1f35" />
-                  <stop offset="100%" stopColor="#c24468" />
+                  <stop offset="0%" stopColor="var(--color-dashboard-chart-wine)" />
+                  <stop offset="100%" stopColor="var(--color-dashboard-chart-rose)" />
                 </linearGradient>
               </defs>
               <g className="grafico-chats__guias" aria-hidden="true">
@@ -289,6 +302,21 @@ export default function Dashboard({
                 ))}
               </g>
             </svg>
+            <ul
+              className="visually-hidden"
+              id="volumen-chats-datos"
+              aria-label="Datos por hora del volumen de chats"
+            >
+              {volumenPorHora.length > 0 ? (
+                volumenPorHora.map((item) => (
+                  <li key={item.hora}>
+                    {item.hora}: {item.cantidad} {item.cantidad === 1 ? 'consulta' : 'consultas'}
+                  </li>
+                ))
+              ) : (
+                <li>No hay consultas registradas hoy.</li>
+              )}
+            </ul>
           </article>
 
           <article
