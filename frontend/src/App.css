@@ -3174,6 +3174,14 @@ textarea:not([disabled]) {
     max-width: 100vw;
     height: auto;
     min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  .panel__principal--bandeja {
     overflow: hidden;
   }
 

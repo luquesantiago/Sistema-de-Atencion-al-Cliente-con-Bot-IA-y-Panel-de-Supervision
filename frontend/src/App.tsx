@@ -226,7 +226,7 @@ function App() {
         />
 
         <main
-          className={`panel__principal${activo === 'dashboard' ? ' panel__principal--dashboard' : ''}${navegacionCambiando ? ' panel__principal--saliendo' : ''}`}
+          className={`panel__principal panel__principal--${activo}${navegacionCambiando ? ' panel__principal--saliendo' : ''}`}
           id="contenido"
           key={activo}
         >
