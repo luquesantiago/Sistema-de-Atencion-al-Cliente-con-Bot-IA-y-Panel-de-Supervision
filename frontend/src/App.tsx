@@ -230,11 +230,6 @@ function App() {
           id="contenido"
           key={activo}
         >
-          <div className="dashboard-manchas" aria-hidden="true">
-            <span className="dashboard-mancha dashboard-mancha--superior" />
-            <span className="dashboard-mancha dashboard-mancha--inferior" />
-            <span className="dashboard-mancha dashboard-mancha--centro" />
-          </div>
           {Pagina === undefined
             ? (
               <Dashboard
