@@ -7,6 +7,7 @@ import type { PanelActor } from '../domain/case-actions.js'
 import type { ProcessIncomingMessage } from '../application/process-incoming-message.js'
 import {
   RequestManagementError,
+  type DataChangeDecisionInput,
   type PhoneChangeDecisionInput,
   type ProspectDecisionInput,
 } from '../domain/request-management.js'
@@ -103,6 +104,29 @@ export function createApp(
         decision: result.decision,
         casoId: result.casoId,
         ...(result.clienteId === undefined ? {} : { clienteId: result.clienteId }),
+        // Solo el alta aprobada se avisa al cliente (RF-ATE-05).
+        ...(result.notificationSent === undefined ? {} : { notificationSent: result.notificationSent }),
+        ...(result.notificationSent === false ? {
+          warning: 'El alta quedó registrada, pero no se pudo avisar al cliente por WhatsApp.',
+        } : {}),
+      })
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.post('/api/tramites/prospectos/:id/notificacion', async (request, response, next) => {
+    try {
+      if (request.body !== undefined && Object.keys(parseBody(request.body, [])).length > 0) {
+        throw new RequestManagementError(400, 'VALIDATION_ERROR', 'Este endpoint no acepta campos en el cuerpo.')
+      }
+      const result = await manageRequests.retryProspectNotification(parseId(request.params.id))
+      response.status(200).json({
+        id: result.id,
+        decision: result.decision,
+        notificationSent: result.notificationSent,
+        ...(result.notificationSent ? {} : {
+          warning: 'El alta está registrada, pero todavía no se pudo avisar al cliente por WhatsApp.',
+        }),
       })
     } catch (error) {
       handleRequestError(error, response, next)
@@ -130,6 +154,49 @@ export function createApp(
         throw new RequestManagementError(400, 'VALIDATION_ERROR', 'Este endpoint no acepta campos en el cuerpo.')
       }
       const result = await manageRequests.retryPhoneChangeNotification(parseId(request.params.id))
+      response.status(200).json({
+        id: result.id,
+        decision: result.decision,
+        notificationSent: result.notificationSent,
+        ...(result.notificationSent ? {} : {
+          warning: 'La decisión está registrada, pero todavía no se pudo avisar al cliente por WhatsApp.',
+        }),
+      })
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.get('/api/tramites/cambios-datos', async (request, response, next) => {
+    try {
+      const page = parsePage(request.query.limit, request.query.offset)
+      const items = await manageRequests.listPendingDataChanges(page)
+      response.status(200).json({ items, ...page })
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.post('/api/tramites/cambios-datos/:id/decision', async (request, response, next) => {
+    try {
+      const input = parseDataChangeDecision(request.params.id, request.body)
+      const result = await manageRequests.decideDataChange(input)
+      response.status(200).json({
+        id: result.id,
+        decision: result.decision,
+        notificationSent: result.notificationSent,
+        ...(result.notificationSent ? {} : {
+          warning: 'La decisión quedó registrada, pero no se pudo avisar al cliente por WhatsApp.',
+        }),
+      })
+    } catch (error) {
+      handleRequestError(error, response, next)
+    }
+  })
+  app.post('/api/tramites/cambios-datos/:id/notificacion', async (request, response, next) => {
+    try {
+      if (request.body !== undefined && Object.keys(parseBody(request.body, [])).length > 0) {
+        throw new RequestManagementError(400, 'VALIDATION_ERROR', 'Este endpoint no acepta campos en el cuerpo.')
+      }
+      const result = await manageRequests.retryDataChangeNotification(parseId(request.params.id))
       response.status(200).json({
         id: result.id,
         decision: result.decision,
@@ -442,6 +509,16 @@ function parsePhoneChangeDecision(idValue: unknown, value: unknown): PhoneChange
     decision: parseDecision(body.decision),
     fundamento: parseString(body.fundamento, 'fundamento'),
     telefonosADesvincular: ids,
+  }
+}
+
+// El dato y el valor no viajan en la petición: salen del detalle de la solicitud (regla 8).
+function parseDataChangeDecision(idValue: unknown, value: unknown): DataChangeDecisionInput {
+  const body = parseBody(value, ['decision', 'fundamento'])
+  return {
+    id: parseId(idValue),
+    decision: parseDecision(body.decision),
+    fundamento: parseString(body.fundamento, 'fundamento'),
   }
 }
 

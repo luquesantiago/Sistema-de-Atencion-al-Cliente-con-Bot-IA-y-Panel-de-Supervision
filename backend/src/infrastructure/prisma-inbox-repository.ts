@@ -37,11 +37,11 @@ const entrySelect = {
   solicitud_accion: {
     where: {
       estado_solicitud: { is: { nombre: 'pendiente' } },
-      tipo_accion: { is: { nombre: 'cambio de teléfono' } },
+      tipo_accion: { is: { nombre: { in: ['cambio de teléfono', 'cambio de datos'] } } },
     },
     orderBy: { fecha_solicitud: 'asc' },
-    take: 1,
-    select: { fecha_solicitud: true },
+    take: 2,
+    select: { fecha_solicitud: true, tipo_accion: { select: { nombre: true } } },
   },
   conversacion: {
     select: {
@@ -299,21 +299,40 @@ export function severityByQueryTypeSql(): Prisma.Sql {
   return Prisma.sql`CASE tc.nombre ${Prisma.join(whens, ' ')} END`
 }
 
-// Fecha de la solicitud de cambio de teléfono pendiente de cada caso.
-const pendingPhoneChangeJoin = Prisma.sql`
+// Fecha de la solicitud pendiente (cambio de teléfono o de datos) de cada caso, para que un
+// caso sin derivar también tenga desde cuándo espera.
+const pendingRequestJoin = Prisma.sql`
     LEFT JOIN (
       SELECT s.id_caso, MIN(s.fecha_solicitud) AS fecha_solicitud
       FROM solicitud_accion s
       JOIN estado_solicitud es ON es.id_estado_solicitud = s.id_estado_solicitud
       JOIN tipo_accion ta ON ta.id_tipo_accion = s.id_tipo_accion
-      WHERE es.nombre = 'pendiente' AND ta.nombre = 'cambio de teléfono'
+      WHERE es.nombre = 'pendiente' AND ta.nombre IN ('cambio de teléfono', 'cambio de datos')
       GROUP BY s.id_caso
     ) sol ON sol.id_caso = c.id_caso`
 
-// Todos los casos sin cerrar. caseId restringe a un caso, para el detalle. customerId
-// restringe a los casos de la conversación identificada con ese cliente.
+// Una fila por conversación (change bandeja-una-fila-por-conversacion): de los casos sin
+// cerrar de cada conversación queda el derivado; si no hay, el que tiene un cambio de
+// teléfono pendiente; si no, el más reciente, que tiene el último mensaje de la charla.
+const representativeCase = Prisma.sql`
+    AND c.id_caso = (
+      SELECT c2.id_caso FROM caso c2
+      WHERE c2.id_conversacion = c.id_conversacion AND c2.fecha_cierre IS NULL
+      ORDER BY c2.fecha_derivacion IS NULL,
+        NOT EXISTS (
+          SELECT 1 FROM solicitud_accion s2
+          JOIN estado_solicitud es2 ON es2.id_estado_solicitud = s2.id_estado_solicitud
+          JOIN tipo_accion ta2 ON ta2.id_tipo_accion = s2.id_tipo_accion
+          WHERE s2.id_caso = c2.id_caso AND es2.nombre = 'pendiente' AND ta2.nombre = 'cambio de teléfono'
+        ),
+        c2.id_caso DESC
+      LIMIT 1)`
+
+// Los casos sin cerrar. El listado deja un caso por conversación; caseId restringe a un caso,
+// para el detalle, que puede pedir cualquier caso abierto. customerId restringe a los casos
+// de la conversación identificada con ese cliente.
 function inboxWhere(caseId?: number, customerId?: number): Prisma.Sql {
-  const onlyCase = caseId === undefined ? Prisma.empty : Prisma.sql`AND c.id_caso = ${caseId}`
+  const onlyCase = caseId === undefined ? representativeCase : Prisma.sql`AND c.id_caso = ${caseId}`
   const onlyCustomer = customerId === undefined ? Prisma.empty : Prisma.sql`AND conv.id_cliente = ${customerId}`
   return Prisma.sql`WHERE c.fecha_cierre IS NULL ${onlyCase} ${onlyCustomer}`
 }
@@ -334,7 +353,7 @@ export function inboxOrderQuery(page: PageRequest, caseId?: number, customerId?:
       ), ${noSeverity}) AS severityOrder
     FROM caso c
     ${conversationJoin}
-    ${pendingPhoneChangeJoin}
+    ${pendingRequestJoin}
     LEFT JOIN tipo_consulta tc ON tc.id_tipo_consulta = c.id_tipo_consulta
     LEFT JOIN nivel_riesgo nc ON nc.id_nivel_riesgo = c.id_nivel_riesgo
     LEFT JOIN nivel_riesgo nt ON nt.nombre = ${severityByQueryTypeSql()}
@@ -352,7 +371,7 @@ export function inboxOrderQuery(page: PageRequest, caseId?: number, customerId?:
 }
 
 export function inboxCountQuery(customerId?: number): Prisma.Sql {
-  return Prisma.sql`SELECT COUNT(*) AS total FROM caso c ${conversationJoin} ${pendingPhoneChangeJoin} ${inboxWhere(undefined, customerId)}`
+  return Prisma.sql`SELECT COUNT(*) AS total FROM caso c ${conversationJoin} ${pendingRequestJoin} ${inboxWhere(undefined, customerId)}`
 }
 
 // MySQL devuelve los enteros calculados (COUNT, LEAST) como BigInt o texto según el tipo.
@@ -390,6 +409,8 @@ function severityName(order: number | null, levels: ReadonlyArray<{ nombre: stri
 
 export function toInboxEntry(record: InboxCaseRecord, severity: RiskLevel | null): InboxEntry {
   const [lastMessage] = record.mensaje
+  const pendingPhone = record.solicitud_accion.find((request) => request.tipo_accion.nombre === 'cambio de teléfono')
+  const pendingDataChange = record.solicitud_accion.find((request) => request.tipo_accion.nombre === 'cambio de datos')
   return {
     caseId: record.id_caso,
     conversationId: record.id_conversacion,
@@ -405,7 +426,8 @@ export function toInboxEntry(record: InboxCaseRecord, severity: RiskLevel | null
       ? { id: record.usuario.id_usuario, name: `${record.usuario.nombre} ${record.usuario.apellido}` }
       : null,
     prospectState: toProspectState(record.prospecto?.estado_prospecto.nombre ?? null),
-    pendingPhoneChangeAt: record.solicitud_accion[0]?.fecha_solicitud ?? null,
+    pendingPhoneChangeAt: pendingPhone?.fecha_solicitud ?? null,
+    pendingDataChangeAt: pendingDataChange?.fecha_solicitud ?? null,
     lastMessage: lastMessage
       ? { text: shorten(lastMessage.contenido), origin: toOrigin(lastMessage.origen_mensaje.nombre), at: lastMessage.fecha_hora }
       : null,

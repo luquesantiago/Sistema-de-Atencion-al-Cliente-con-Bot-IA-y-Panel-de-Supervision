@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { balanceTemplate, formatAmount, policyBalance } from './balance.js'
 import type { Customer, CustomerPolicy, Installment } from './customer.js'
+import { installmentPlan } from './installments.js'
 
 // 04/10/2026 a las 23:30 en Argentina: en UTC ya es el 05/10.
 const lateNight = new Date('2026-10-05T02:30:00Z')
@@ -14,7 +15,7 @@ function policy(number: string, installments: Installment[], overrides: Partial<
 }
 
 function customerWith(policies: CustomerPolicy[]): Customer {
-  return { id: 90099, dni: '99000099', firstName: 'Ana', lastName: 'Prueba', policies }
+  return { id: 90099, dni: '99000099', firstName: 'Ana', lastName: 'Prueba', policies, active: true }
 }
 
 describe('policyBalance', () => {
@@ -91,5 +92,24 @@ describe('balanceTemplate', () => {
   it('una póliza sin cuotas registradas hace derivar, aunque las otras tengan', () => {
     const customer = customerWith([policy('POL-90001', [installment(1, '2026-09-01', 1000)]), policy('POL-90002', [])])
     expect(balanceTemplate(customer, lateNight)).toBeNull()
+  })
+})
+
+// La póliza que se da de alta desde el panel trae su plan de cuotas (RF-CAR-02): el saldo se
+// responde sin derivar. La que no tiene cuotas sigue derivando por dato ausente (RF-ATE-02).
+describe('balanceTemplate con el plan de cuotas del alta', () => {
+  const now = new Date('2026-11-03T15:00:00Z')
+  const plan = installmentPlan({ startDate: '2026-08-03', endDate: '2027-08-03', premiumCents: 45_000_00 }, 1)
+
+  it('responde las vencidas sin pagar y las por vencer de la póliza nueva', () => {
+    const text = balanceTemplate(customerWith([policy('POL-00007', plan)]), now)
+    expect(text).toBe([
+      'Ana, este es el detalle de las cuotas sin pagar de sus pólizas:',
+      '- POL-00007 (auto): 2 cuotas vencidas sin pagar por $ 90.000,00 y 9 cuotas por vencer por $ 405.000,00.',
+    ].join('\n'))
+  })
+
+  it('si otra póliza del cliente no tiene cuotas, sigue derivando', () => {
+    expect(balanceTemplate(customerWith([policy('POL-00007', plan), policy('POL-00008', [])]), now)).toBeNull()
   })
 })

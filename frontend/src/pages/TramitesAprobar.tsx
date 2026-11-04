@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useState, type FormEvent } from 'react'
-import type { Modulo, Navegar } from '../navigation'
+import type { Modulo, ModuloPanel, OpcionesNavegacion } from '../navigation'
 import PageHeader from '../components/PageHeader'
 import EstadoPanel from '../components/EstadoPanel'
 import ConfirmarCambio, { type LineaConfirmacion } from '../components/ConfirmarCambio'
@@ -7,11 +7,16 @@ import { IconoAlerta, IconoReloj } from '../components/iconos'
 import { ErrorDeApi } from '../api/respuesta'
 import { obtenerCasoBandeja, obtenerImagenMensaje } from '../api/bandeja'
 import {
+  decidirCambioDatos,
   decidirCambioTelefono,
   decidirProspecto,
+  listarCambiosDatos,
   listarCambiosTelefono,
   listarProspectos,
+  reintentarAvisoAlta,
   reintentarNotificacion,
+  reintentarNotificacionCambioDatos,
+  type CambioDatosPendiente,
   type CambioTelefonoPendiente,
   type DecisionTramite,
   type ProspectoPendiente,
@@ -22,14 +27,18 @@ const LARGO_MINIMO_FUNDAMENTO = 3
 const LARGO_MAXIMO_FUNDAMENTO = 2000
 const LARGO_MAXIMO_NOMBRE = 100
 
-type Seccion = 'prospectos' | 'telefonos'
+type Seccion = 'prospectos' | 'telefonos' | 'datos'
 type TramitePendiente =
   | { tipo: 'prospecto'; fecha: string; prospecto: ProspectoPendiente }
   | { tipo: 'cambio'; fecha: string; cambio: CambioTelefonoPendiente }
+  | { tipo: 'dato'; fecha: string; cambio: CambioDatosPendiente }
+// notificacion: el aviso al cliente que quedó sin enviar y se puede reintentar; tipo dice a
+// qué endpoint va (cambio de teléfono o cambio de datos).
 type Aviso = {
   tono: 'exito' | 'alerta' | 'riesgo'
   texto: string
-  notificacionId?: number
+// El aviso por WhatsApp que falló y se puede reintentar: el del alta, el del cambio de teléfono o el de datos.
+  notificacion?: { tipo: 'prospecto' | 'telefono' | 'datos'; id: number }
   accion?: {
     etiqueta: string
     onClick: () => void
@@ -55,7 +64,15 @@ type ConfirmacionTelefono = {
   lineas: LineaConfirmacion[]
 }
 
-type Confirmacion = ConfirmacionProspecto | ConfirmacionTelefono
+type ConfirmacionDatos = {
+  tipo: 'dato'
+  decision: DecisionTramite
+  cambio: CambioDatosPendiente
+  fundamento: string
+  lineas: LineaConfirmacion[]
+}
+
+type Confirmacion = ConfirmacionProspecto | ConfirmacionTelefono | ConfirmacionDatos
 
 const formatoFecha = new Intl.DateTimeFormat('es-AR', {
   timeZone: 'America/Argentina/Buenos_Aires',
@@ -76,6 +93,11 @@ function mensajeDeError(error: unknown, textoPorDefecto: string): string {
 
 function nombreDeclarado(prospecto: ProspectoPendiente): string {
   return prospecto.name?.trim() || 'Sin nombre declarado'
+}
+
+/** Cómo se llama el dato en pantalla: «Nombre» o «Apellido». */
+function etiquetaDato(field: 'nombre' | 'apellido'): string {
+  return field === 'nombre' ? 'Nombre' : 'Apellido'
 }
 
 function inicial(nombre: string): string {
@@ -105,7 +127,7 @@ function AvisoPanel({
   return (
     <div className={`tramites-aviso tramites-aviso--${aviso.tono}`} role={aviso.tono === 'riesgo' ? 'alert' : 'status'}>
       <span>{aviso.texto}</span>
-      {aviso.notificacionId !== undefined ? (
+      {aviso.notificacion !== undefined ? (
         <button type="button" className="boton boton--chico" onClick={onReintentar} disabled={reintentando}>
           {reintentando ? 'Reintentando…' : 'Reintentar aviso'}
         </button>
@@ -457,12 +479,165 @@ function DetalleCambioTelefono({
   )
 }
 
+function DetalleCambioDatos({
+  cambio,
+  ocupado,
+  error,
+  onAprobar,
+  onRechazar,
+}: {
+  cambio: CambioDatosPendiente
+  ocupado: boolean
+  error: string | null
+  onAprobar: (datos: { fundamento: string }) => void
+  onRechazar: (fundamento: string) => void
+}) {
+  const id = useId()
+  const [fundamento, setFundamento] = useState('')
+  const fundamentoValido =
+    fundamento.trim().length >= LARGO_MINIMO_FUNDAMENTO && fundamento.trim().length <= LARGO_MAXIMO_FUNDAMENTO
+  const puedeAprobar = fundamentoValido && !ocupado
+
+  function alAprobar(evento: FormEvent) {
+    evento.preventDefault()
+    if (!puedeAprobar) return
+    onAprobar({ fundamento: fundamento.trim() })
+  }
+
+  return (
+    <article className="tramite-detalle">
+      <header className="tramite-detalle__cabecera">
+        <div className="tramite-detalle__identidad">
+          <span className="avatar avatar--grande" aria-hidden="true">{inicial(cambio.customerName)}</span>
+          <div>
+            <p className="tramite-detalle__tipo">Cambio de {etiquetaDato(cambio.field).toLowerCase()}</p>
+            <h2 className="tramite-detalle__titulo">{cambio.customerName}</h2>
+            <p className="tramite-detalle__subtitulo">Caso {cambio.caseId} · Solicitado el {fechaHora(cambio.requestedAt)}</p>
+          </div>
+        </div>
+        <span className="badge badge--warning">
+          <IconoReloj className="badge__icono" />
+          Pendiente
+        </span>
+      </header>
+
+      <dl className="tramite-detalle__datos">
+        <div>
+          <dt>DNI</dt>
+          <dd>{cambio.customerDni}</dd>
+        </div>
+        <div>
+          <dt>{etiquetaDato(cambio.field)} actual</dt>
+          <dd>{cambio.currentValue}</dd>
+        </div>
+        <div>
+          <dt>{etiquetaDato(cambio.field)} solicitado</dt>
+          <dd>{cambio.value}</dd>
+        </div>
+        <div>
+          <dt>Autoridad requerida</dt>
+          <dd>Administrador u operador habilitado</dd>
+        </div>
+        <div>
+          <dt>Estado actual</dt>
+          <dd>Dato sin modificar, esperando decisión</dd>
+        </div>
+      </dl>
+
+      <form className="tramite-detalle__formulario" onSubmit={alAprobar}>
+        <fieldset className="tramite-detalle__grupo">
+          <legend>Revisión del cambio</legend>
+          <p className="tramite-detalle__ayuda">
+            Al aprobar, el {etiquetaDato(cambio.field).toLowerCase()} de {cambio.customerName} pasa de «{cambio.currentValue}»
+            a «{cambio.value}». Al rechazar, el dato queda como está.
+          </p>
+        </fieldset>
+
+        <label className="formulario__campo">
+          Fundamento de la decisión (obligatorio)
+          <textarea
+            rows={3}
+            value={fundamento}
+            maxLength={LARGO_MAXIMO_FUNDAMENTO}
+            disabled={ocupado}
+            aria-invalid={!fundamentoValido}
+            aria-describedby={`${id}-fundamento-ayuda`}
+            onChange={(evento) => setFundamento(evento.target.value)}
+          />
+        </label>
+        <p className="tramite-detalle__ayuda" id={`${id}-fundamento-ayuda`}>
+          Al aprobar se actualiza la cartera y se avisa al cliente por WhatsApp. La decisión queda auditada con quién,
+          cuándo y con qué fundamento.
+        </p>
+
+        {error !== null ? <p className="tramites-aviso tramites-aviso--riesgo" role="alert">{error}</p> : null}
+
+        <div className="tramite-detalle__acciones">
+          <button
+            type="button"
+            className="boton boton--peligro-claro"
+            disabled={!fundamentoValido || ocupado}
+            onClick={() => onRechazar(fundamento.trim())}
+          >
+            Rechazar cambio
+          </button>
+          <button type="submit" className="boton boton--primario" disabled={!puedeAprobar}>
+            {ocupado ? 'Aplicando…' : 'Aprobar cambio'}
+          </button>
+        </div>
+      </form>
+    </article>
+  )
+}
+
+/** Qué dice el diálogo de confirmación de cada trámite, según el tipo y la decisión. */
+function textosConfirmacion(confirmacion: Confirmacion): { titulo: string; descripcion: string; etiqueta: string } {
+  if (confirmacion.tipo === 'prospecto') {
+    return confirmacion.decision === 'aprobar'
+      ? {
+          titulo: 'Aprobar el alta del cliente',
+          descripcion: 'Se crea el cliente con el DNI declarado y se vincula el teléfono de la conversación.',
+          etiqueta: 'Aprobar alta',
+        }
+      : {
+          titulo: 'Rechazar el alta del cliente',
+          descripcion: 'No se crea ningún cliente. El caso queda abierto en la Bandeja para explicarle el rechazo al cliente.',
+          etiqueta: 'Rechazar alta',
+        }
+  }
+  if (confirmacion.tipo === 'telefono') {
+    return confirmacion.decision === 'aprobar'
+      ? {
+          titulo: 'Aprobar el cambio de teléfono',
+          descripcion: 'El número nuevo queda vinculado al cliente. El aviso sale por WhatsApp y se guarda en el caso.',
+          etiqueta: 'Aprobar cambio',
+        }
+      : {
+          titulo: 'Rechazar el cambio de teléfono',
+          descripcion: 'No cambia ningún vínculo telefónico. El cliente recibe el aviso de rechazo por WhatsApp.',
+          etiqueta: 'Rechazar cambio',
+        }
+  }
+  const etiqueta = etiquetaDato(confirmacion.cambio.field).toLowerCase()
+  return confirmacion.decision === 'aprobar'
+    ? {
+        titulo: 'Aprobar el cambio de datos',
+        descripcion: `Se actualiza el ${etiqueta} del cliente en la cartera. El aviso sale por WhatsApp y se guarda en el caso.`,
+        etiqueta: 'Aprobar cambio',
+      }
+    : {
+        titulo: 'Rechazar el cambio de datos',
+        descripcion: `No cambia el ${etiqueta} del cliente. El cliente recibe el aviso de rechazo por WhatsApp.`,
+        etiqueta: 'Rechazar cambio',
+      }
+}
+
 export default function TramitesAprobar({
   modulo,
   onNavegar,
 }: {
   modulo: Modulo
-  onNavegar: Navegar
+  onNavegar: (destino: ModuloPanel, opciones?: OpcionesNavegacion) => void
 }) {
   const [prospectos, setProspectos] = useState<ProspectoPendiente[]>([])
   const [cargandoProspectos, setCargandoProspectos] = useState(true)
@@ -474,6 +649,11 @@ export default function TramitesAprobar({
   const [cargandoMasCambios, setCargandoMasCambios] = useState(false)
   const [hayMasCambios, setHayMasCambios] = useState(false)
   const [errorCambios, setErrorCambios] = useState<string | null>(null)
+  const [cambiosDatos, setCambiosDatos] = useState<CambioDatosPendiente[]>([])
+  const [cargandoCambiosDatos, setCargandoCambiosDatos] = useState(true)
+  const [cargandoMasCambiosDatos, setCargandoMasCambiosDatos] = useState(false)
+  const [hayMasCambiosDatos, setHayMasCambiosDatos] = useState(false)
+  const [errorCambiosDatos, setErrorCambiosDatos] = useState<string | null>(null)
   const [seleccion, setSeleccion] = useState<{ seccion: Seccion; id: number } | null>(null)
   const [confirmacion, setConfirmacion] = useState<Confirmacion | null>(null)
   const [guardando, setGuardando] = useState(false)
@@ -513,22 +693,41 @@ export default function TramitesAprobar({
     }
   }, [])
 
+  const cargarCambiosDatos = useCallback(async (desde = 0, sumar = false) => {
+    if (sumar) setCargandoMasCambiosDatos(true)
+    else setCargandoCambiosDatos(true)
+    setErrorCambiosDatos(null)
+    try {
+      const pagina = await listarCambiosDatos({ limit: LIMITE_PAGINA, offset: desde })
+      setCambiosDatos((previos) => (sumar ? [...previos, ...pagina.items] : pagina.items))
+      setHayMasCambiosDatos(pagina.items.length === LIMITE_PAGINA)
+    } catch (error) {
+      setErrorCambiosDatos(mensajeDeError(error, 'No se pudieron consultar los cambios de datos.'))
+    } finally {
+      if (sumar) setCargandoMasCambiosDatos(false)
+      else setCargandoCambiosDatos(false)
+    }
+  }, [])
+
   useEffect(() => {
     const temporizador = setTimeout(() => {
       void cargarProspectos()
       void cargarCambios()
+      void cargarCambiosDatos()
     }, 0)
     return () => clearTimeout(temporizador)
-  }, [cargarProspectos, cargarCambios])
+  }, [cargarProspectos, cargarCambios, cargarCambiosDatos])
 
   function recargar() {
     void cargarProspectos()
     void cargarCambios()
+    void cargarCambiosDatos()
   }
 
   function cargarMas() {
     if (hayMasProspectos) void cargarProspectos(prospectos.length, true)
     if (hayMasCambios) void cargarCambios(cambios.length, true)
+    if (hayMasCambiosDatos) void cargarCambiosDatos(cambiosDatos.length, true)
   }
 
   const tramites: TramitePendiente[] = [
@@ -542,16 +741,24 @@ export default function TramitesAprobar({
       fecha: cambio.requestedAt,
       cambio,
     })),
+    ...cambiosDatos.map((cambio): TramitePendiente => ({
+      tipo: 'dato',
+      fecha: cambio.requestedAt,
+      cambio,
+    })),
   ].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime())
 
-  const hayMasTramites = hayMasProspectos || hayMasCambios
-  const cargandoMasTramites = cargandoMasProspectos || cargandoMasCambios
-  const erroresTramites = [errorProspectos, errorCambios].filter((error): error is string => error !== null)
+  const hayMasTramites = hayMasProspectos || hayMasCambios || hayMasCambiosDatos
+  const cargandoMasTramites = cargandoMasProspectos || cargandoMasCambios || cargandoMasCambiosDatos
+  const erroresTramites = [errorProspectos, errorCambios, errorCambiosDatos]
+    .filter((error): error is string => error !== null)
 
   const prospectoSeleccionado =
     seleccion?.seccion === 'prospectos' ? prospectos.find((item) => item.id === seleccion.id) ?? null : null
   const cambioSeleccionado =
     seleccion?.seccion === 'telefonos' ? cambios.find((item) => item.id === seleccion.id) ?? null : null
+  const datoSeleccionado =
+    seleccion?.seccion === 'datos' ? cambiosDatos.find((item) => item.id === seleccion.id) ?? null : null
 
   function pedirAprobarProspecto(prospecto: ProspectoPendiente, datos: { nombre: string; apellido: string; fundamento: string }) {
     setErrorDecision(null)
@@ -565,6 +772,7 @@ export default function TramitesAprobar({
         { etiqueta: 'Nombre revisado', antes: nombreDeclarado(prospecto), despues: `${datos.nombre} ${datos.apellido}` },
         { etiqueta: 'DNI', antes: prospecto.dni ?? 'No informado', despues: prospecto.dni ?? 'No informado' },
         { etiqueta: 'Teléfono', antes: prospecto.phone, despues: 'Vinculado al cliente' },
+        { etiqueta: 'Aviso al cliente', antes: '—', despues: `WhatsApp a ${prospecto.phone}` },
         { etiqueta: 'Fundamento', antes: '—', despues: datos.fundamento },
       ],
     })
@@ -631,6 +839,46 @@ export default function TramitesAprobar({
     })
   }
 
+  function pedirAprobarDato(cambio: CambioDatosPendiente, datos: { fundamento: string }) {
+    setErrorDecision(null)
+    setConfirmacion({
+      tipo: 'dato',
+      decision: 'aprobar',
+      cambio,
+      ...datos,
+      lineas: [
+        {
+          etiqueta: etiquetaDato(cambio.field),
+          antes: cambio.currentValue,
+          despues: cambio.value,
+        },
+        { etiqueta: 'Cliente', antes: cambio.customerName, despues: cambio.customerName },
+        { etiqueta: 'Aviso al cliente', antes: '—', despues: `WhatsApp a ${cambio.phone}` },
+        { etiqueta: 'Fundamento', antes: '—', despues: datos.fundamento },
+      ],
+    })
+  }
+
+  function pedirRechazarDato(cambio: CambioDatosPendiente, fundamento: string) {
+    setErrorDecision(null)
+    setConfirmacion({
+      tipo: 'dato',
+      decision: 'rechazar',
+      cambio,
+      fundamento,
+      lineas: [
+        {
+          etiqueta: etiquetaDato(cambio.field),
+          antes: cambio.currentValue,
+          despues: `${cambio.currentValue} (sin cambios)`,
+        },
+        { etiqueta: 'Cliente', antes: cambio.customerName, despues: cambio.customerName },
+        { etiqueta: 'Aviso al cliente', antes: '—', despues: `WhatsApp a ${cambio.phone}` },
+        { etiqueta: 'Fundamento', antes: '—', despues: fundamento },
+      ],
+    })
+  }
+
   async function aplicarConfirmacion() {
     if (confirmacion === null) return
     setGuardando(true)
@@ -644,10 +892,23 @@ export default function TramitesAprobar({
             nombre: confirmacion.nombre,
             apellido: confirmacion.apellido,
           })
-          setAviso({
-            tono: 'exito',
-            texto: `Se aprobó el alta de ${confirmacion.nombre} ${confirmacion.apellido}. El cliente${resultado.clienteId ? ` #${resultado.clienteId}` : ''} quedó creado y el teléfono vinculado.`,
-          })
+          const clienteId = resultado.clienteId
+          // Desde la aprobación se va a la ficha del cliente nuevo para cargarle la póliza.
+          const accion = clienteId === undefined
+            ? undefined
+            : {
+                etiqueta: 'Ir a la ficha del cliente',
+                onClick: () => onNavegar('clientes', { clientes: { customerId: clienteId } }),
+              }
+          const creado = `Se aprobó el alta de ${confirmacion.nombre} ${confirmacion.apellido}. El cliente${clienteId ? ` #${clienteId}` : ''} quedó creado y el teléfono vinculado.`
+          setAviso(resultado.notificationSent === false
+            ? {
+                tono: 'alerta',
+                texto: `${creado} No se pudo avisar al cliente por WhatsApp.`,
+                notificacion: { tipo: 'prospecto', id: resultado.id },
+                accion,
+              }
+            : { tono: 'exito', texto: `${creado} El cliente recibió el aviso por WhatsApp.`, accion })
         } else {
           const resultado = await decidirProspecto(confirmacion.prospecto.id, {
             decision: 'rechazar',
@@ -661,7 +922,7 @@ export default function TramitesAprobar({
         }
         setSeleccion(null)
         void cargarProspectos()
-      } else {
+      } else if (confirmacion.tipo === 'telefono') {
         const resultado = await decidirCambioTelefono(confirmacion.cambio.id, {
           decision: confirmacion.decision,
           fundamento: confirmacion.fundamento,
@@ -676,11 +937,33 @@ export default function TramitesAprobar({
           setAviso({
             tono: 'alerta',
             texto: `La decisión quedó registrada, pero no se pudo avisar al cliente por WhatsApp.`,
-            notificacionId: resultado.id,
+            notificacion: { tipo: 'telefono', id: resultado.id },
           })
         }
         setSeleccion(null)
         void cargarCambios()
+      } else {
+        const resultado = await decidirCambioDatos(confirmacion.cambio.id, {
+          decision: confirmacion.decision,
+          fundamento: confirmacion.fundamento,
+        })
+        const detalle = `${etiquetaDato(confirmacion.cambio.field).toLowerCase()} de ${confirmacion.cambio.customerName}`
+        if (resultado.notificationSent) {
+          setAviso({
+            tono: 'exito',
+            texto: confirmacion.decision === 'aprobar'
+              ? `Se aprobó el cambio del ${detalle}: ahora es «${confirmacion.cambio.value}». El cliente recibió el aviso por WhatsApp.`
+              : `Se rechazó el cambio del ${detalle}. El cliente recibió el aviso por WhatsApp.`,
+          })
+        } else {
+          setAviso({
+            tono: 'alerta',
+            texto: 'La decisión quedó registrada, pero no se pudo avisar al cliente por WhatsApp.',
+            notificacion: { tipo: 'datos', id: resultado.id },
+          })
+        }
+        setSeleccion(null)
+        void cargarCambiosDatos()
       }
       setConfirmacion(null)
     } catch (error) {
@@ -692,24 +975,33 @@ export default function TramitesAprobar({
   }
 
   async function reintentarAviso() {
-    if (aviso?.notificacionId === undefined) return
+    const notificacion = aviso?.notificacion
+    if (notificacion === undefined) return
+// La acción del aviso (ir a la ficha del cliente) sigue disponible después del reintento.
+    const accion = aviso?.accion
     setReintentando(true)
     try {
-      const resultado = await reintentarNotificacion(aviso.notificacionId)
+      const resultado = notificacion.tipo === 'prospecto'
+        ? await reintentarAvisoAlta(notificacion.id)
+        : notificacion.tipo === 'datos'
+          ? await reintentarNotificacionCambioDatos(notificacion.id)
+          : await reintentarNotificacion(notificacion.id)
       if (resultado.notificationSent) {
-        setAviso({ tono: 'exito', texto: 'El aviso al cliente se envió por WhatsApp.' })
+        setAviso({ tono: 'exito', texto: 'El aviso al cliente se envió por WhatsApp.', accion })
       } else {
         setAviso({
           tono: 'riesgo',
           texto: 'Todavía no se pudo enviar el aviso al cliente por WhatsApp. La decisión sigue registrada.',
-          notificacionId: resultado.id,
+          notificacion,
+          accion,
         })
       }
     } catch (error) {
       setAviso({
         tono: 'riesgo',
         texto: mensajeDeError(error, 'No se pudo reintentar el aviso al cliente.'),
-        notificacionId: aviso.notificacionId,
+        notificacion,
+        accion,
       })
     } finally {
       setReintentando(false)
@@ -717,7 +1009,7 @@ export default function TramitesAprobar({
   }
 
   function listaTramites() {
-    if ((cargandoProspectos || cargandoCambios) && tramites.length === 0) {
+    if ((cargandoProspectos || cargandoCambios || cargandoCambiosDatos) && tramites.length === 0) {
       return <p className="tramites__estado" role="status">Cargando trámites pendientes…</p>
     }
     if (erroresTramites.length > 0 && tramites.length === 0) {
@@ -733,7 +1025,7 @@ export default function TramitesAprobar({
         <div className="tramites__vacio">
           <IconoReloj className="tramites__vacio-icono" />
           <p className="tramites__vacio-titulo">No hay trámites pendientes</p>
-          <p className="tramites__vacio-texto">Las altas y los cambios de teléfono aparecen acá para aprobar o rechazar.</p>
+          <p className="tramites__vacio-texto">Las altas, los cambios de teléfono y los cambios de datos aparecen acá para aprobar o rechazar.</p>
         </div>
       )
     }
@@ -746,45 +1038,74 @@ export default function TramitesAprobar({
           </div>
         ) : null}
         <ul className="tramites__lista">
-          {tramites.map((tramite) => tramite.tipo === 'prospecto' ? (
-            <li key={`prospecto-${tramite.prospecto.id}`}>
-              <button
-                type="button"
-                className="tramite-card"
-                aria-current={seleccion?.seccion === 'prospectos' && seleccion.id === tramite.prospecto.id ? 'true' : undefined}
-                onClick={() => setSeleccion({ seccion: 'prospectos', id: tramite.prospecto.id })}
-              >
-                <span className="avatar" aria-hidden="true">{inicial(nombreDeclarado(tramite.prospecto))}</span>
-                <span className="tramite-card__cuerpo">
-                  <span className="tramite-card__fila">
-                    <span className="tramite-card__titulo">{nombreDeclarado(tramite.prospecto)}</span>
-                    <span className="tramite-card__fecha">{fechaHora(tramite.prospecto.registeredAt)}</span>
+          {tramites.map((tramite) => {
+            if (tramite.tipo === 'prospecto') {
+              return (
+                <li key={`prospecto-${tramite.prospecto.id}`}>
+                  <button
+                    type="button"
+                    className="tramite-card"
+                    aria-current={seleccion?.seccion === 'prospectos' && seleccion.id === tramite.prospecto.id ? 'true' : undefined}
+                    onClick={() => setSeleccion({ seccion: 'prospectos', id: tramite.prospecto.id })}
+                  >
+                    <span className="avatar" aria-hidden="true">{inicial(nombreDeclarado(tramite.prospecto))}</span>
+                    <span className="tramite-card__cuerpo">
+                      <span className="tramite-card__fila">
+                        <span className="tramite-card__titulo">{nombreDeclarado(tramite.prospecto)}</span>
+                        <span className="tramite-card__fecha">{fechaHora(tramite.prospecto.registeredAt)}</span>
+                      </span>
+                      <span className="tramite-card__meta">DNI {tramite.prospecto.dni ?? 'sin informar'} · {tramite.prospecto.phone}</span>
+                      <span className="badge badge--warning">Alta pendiente</span>
+                    </span>
+                  </button>
+                </li>
+              )
+            }
+            if (tramite.tipo === 'cambio') {
+              return (
+                <li key={`cambio-${tramite.cambio.id}`}>
+                  <button
+                    type="button"
+                    className="tramite-card"
+                    aria-current={seleccion?.seccion === 'telefonos' && seleccion.id === tramite.cambio.id ? 'true' : undefined}
+                    onClick={() => setSeleccion({ seccion: 'telefonos', id: tramite.cambio.id })}
+                  >
+                    <span className="avatar" aria-hidden="true">{inicial(tramite.cambio.customerName)}</span>
+                    <span className="tramite-card__cuerpo">
+                      <span className="tramite-card__fila">
+                        <span className="tramite-card__titulo">{tramite.cambio.customerName}</span>
+                        <span className="tramite-card__fecha">{fechaHora(tramite.cambio.requestedAt)}</span>
+                      </span>
+                      <span className="tramite-card__meta">DNI {tramite.cambio.customerDni} · Nuevo: {tramite.cambio.requestedPhone}</span>
+                      <span className="badge badge--warning">Cambio de teléfono</span>
+                    </span>
+                  </button>
+                </li>
+              )
+            }
+            return (
+              <li key={`dato-${tramite.cambio.id}`}>
+                <button
+                  type="button"
+                  className="tramite-card"
+                  aria-current={seleccion?.seccion === 'datos' && seleccion.id === tramite.cambio.id ? 'true' : undefined}
+                  onClick={() => setSeleccion({ seccion: 'datos', id: tramite.cambio.id })}
+                >
+                  <span className="avatar" aria-hidden="true">{inicial(tramite.cambio.customerName)}</span>
+                  <span className="tramite-card__cuerpo">
+                    <span className="tramite-card__fila">
+                      <span className="tramite-card__titulo">{tramite.cambio.customerName}</span>
+                      <span className="tramite-card__fecha">{fechaHora(tramite.cambio.requestedAt)}</span>
+                    </span>
+                    <span className="tramite-card__meta">
+                      DNI {tramite.cambio.customerDni} · {etiquetaDato(tramite.cambio.field)}: {tramite.cambio.value}
+                    </span>
+                    <span className="badge badge--warning">Cambio de {etiquetaDato(tramite.cambio.field).toLowerCase()}</span>
                   </span>
-                  <span className="tramite-card__meta">DNI {tramite.prospecto.dni ?? 'sin informar'} · {tramite.prospecto.phone}</span>
-                  <span className="badge badge--warning">Alta pendiente</span>
-                </span>
-              </button>
-            </li>
-          ) : (
-            <li key={`cambio-${tramite.cambio.id}`}>
-              <button
-                type="button"
-                className="tramite-card"
-                aria-current={seleccion?.seccion === 'telefonos' && seleccion.id === tramite.cambio.id ? 'true' : undefined}
-                onClick={() => setSeleccion({ seccion: 'telefonos', id: tramite.cambio.id })}
-              >
-                <span className="avatar" aria-hidden="true">{inicial(tramite.cambio.customerName)}</span>
-                <span className="tramite-card__cuerpo">
-                  <span className="tramite-card__fila">
-                    <span className="tramite-card__titulo">{tramite.cambio.customerName}</span>
-                    <span className="tramite-card__fecha">{fechaHora(tramite.cambio.requestedAt)}</span>
-                  </span>
-                  <span className="tramite-card__meta">DNI {tramite.cambio.customerDni} · Nuevo: {tramite.cambio.requestedPhone}</span>
-                  <span className="badge badge--warning">Cambio de teléfono</span>
-                </span>
-              </button>
-            </li>
-          ))}
+                </button>
+              </li>
+            )
+          })}
         </ul>
       </>
     )
@@ -809,6 +1130,15 @@ export default function TramitesAprobar({
       onAprobar={(datos) => pedirAprobarCambio(cambioSeleccionado, datos)}
       onRechazar={(fundamento) => pedirRechazarCambio(cambioSeleccionado, fundamento)}
       onVerChat={() => onNavegar('bandeja', { bandeja: { caseId: cambioSeleccionado.caseId } })}
+    />
+  ) : datoSeleccionado !== null ? (
+    <DetalleCambioDatos
+      key={`dato-${datoSeleccionado.id}`}
+      cambio={datoSeleccionado}
+      ocupado={guardando}
+      error={errorDecision}
+      onAprobar={(datos) => pedirAprobarDato(datoSeleccionado, datos)}
+      onRechazar={(fundamento) => pedirRechazarDato(datoSeleccionado, fundamento)}
     />
   ) : seleccion !== null ? (
     <EstadoPanel
@@ -879,34 +1209,10 @@ export default function TramitesAprobar({
 
       {confirmacion !== null ? (
         <ConfirmarCambio
-          titulo={
-            confirmacion.tipo === 'prospecto'
-              ? confirmacion.decision === 'aprobar'
-                ? 'Aprobar el alta del cliente'
-                : 'Rechazar el alta del cliente'
-              : confirmacion.decision === 'aprobar'
-                ? 'Aprobar el cambio de teléfono'
-                : 'Rechazar el cambio de teléfono'
-          }
-          descripcion={
-            confirmacion.tipo === 'prospecto'
-              ? confirmacion.decision === 'aprobar'
-                ? 'Se crea el cliente con el DNI declarado y se vincula el teléfono de la conversación.'
-                : 'No se crea ningún cliente. El caso queda abierto en la Bandeja para explicarle el rechazo al cliente.'
-              : confirmacion.decision === 'aprobar'
-                ? 'El número nuevo queda vinculado al cliente. El aviso sale por WhatsApp y se guarda en el caso.'
-                : 'No cambia ningún vínculo telefónico. El cliente recibe el aviso de rechazo por WhatsApp.'
-          }
+          titulo={textosConfirmacion(confirmacion).titulo}
+          descripcion={textosConfirmacion(confirmacion).descripcion}
           lineas={confirmacion.lineas}
-          etiquetaConfirmar={
-            confirmacion.tipo === 'prospecto'
-              ? confirmacion.decision === 'aprobar'
-                ? 'Aprobar alta'
-                : 'Rechazar alta'
-              : confirmacion.decision === 'aprobar'
-                ? 'Aprobar cambio'
-                : 'Rechazar cambio'
-          }
+          etiquetaConfirmar={textosConfirmacion(confirmacion).etiqueta}
           peligro={confirmacion.decision === 'rechazar'}
           ocupado={guardando}
           error={errorDecision}

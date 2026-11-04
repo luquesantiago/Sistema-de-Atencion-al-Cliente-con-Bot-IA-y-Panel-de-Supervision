@@ -32,6 +32,7 @@ function entry(overrides: Partial<InboxEntry> = {}): InboxEntry {
     assignee: null,
     prospectState: 'pendiente',
     pendingPhoneChangeAt: null,
+    pendingDataChangeAt: null,
     lastMessage: null,
     ...overrides,
   }

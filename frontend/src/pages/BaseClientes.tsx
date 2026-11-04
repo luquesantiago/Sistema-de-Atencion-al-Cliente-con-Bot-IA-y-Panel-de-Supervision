@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { flushSync } from 'react-dom'
-import type { Modulo, ModuloPanel, OpcionesNavegacion } from '../navigation'
+import type { DestinoClientes, Modulo, ModuloPanel, OpcionesNavegacion } from '../navigation'
 import PageHeader from '../components/PageHeader'
 import EstadoPanel from '../components/EstadoPanel'
 import ConfirmarCambio, { type LineaConfirmacion } from '../components/ConfirmarCambio'
@@ -36,6 +36,7 @@ import {
 } from '../api/clientes'
 import { obtenerCatalogos, type Catalogos } from '../api/catalogos'
 import { listarBandeja } from '../api/bandeja'
+import { hoyEnArgentina, vencimientosMensuales } from '../cuotas'
 
 const LIMITE_PAGINA = 25
 const RETRASO_BUSQUEDA_MS = 300
@@ -64,19 +65,6 @@ function nombreCompleto(cliente: ClienteLista | ClienteDetalle): string {
 // Las fechas de la base son aaaa-mm-dd, sin hora: se muestran como dd/mm/aaaa.
 function fechaLegible(iso: string): string {
   return `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`
-}
-
-// Fecha de hoy en Argentina, aaaa-mm-dd: igual que el backend
-// (templates.ts, argentinaToday), aunque el navegador esté en otra zona.
-function hoyEnArgentina(): string {
-  const partes = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Argentina/Buenos_Aires',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(new Date())
-  const parte = (tipo: string) => partes.find((item) => item.type === tipo)?.value ?? ''
-  return `${parte('year')}-${parte('month')}-${parte('day')}`
 }
 
 // Misma regla que el asistente (domain/templates.ts): solo una póliza activa
@@ -208,18 +196,22 @@ function esPeligroso(confirmacion: ConfirmacionPendiente): boolean {
 type PropsBaseClientes = {
   modulo: Modulo
   onNavegar: (destino: ModuloPanel, opciones?: OpcionesNavegacion) => void
+  clientesInicial?: DestinoClientes
 }
 
-export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
+export default function BaseClientes({ modulo, onNavegar, clientesInicial }: PropsBaseClientes) {
   const [texto, setTexto] = useState('')
   const [items, setItems] = useState<ClienteLista[]>([])
   const [total, setTotal] = useState(0)
   const [cargando, setCargando] = useState(true)
   const [cargandoMas, setCargandoMas] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [seleccionado, setSeleccionado] = useState<string | null>(null)
+  // Al llegar desde otro módulo (por ejemplo, después de aprobar un alta en
+  // Trámites) la ficha pedida ya arranca abierta y cargando.
+  const [fichaInicial] = useState(() => (clientesInicial === undefined ? null : String(clientesInicial.customerId)))
+  const [seleccionado, setSeleccionado] = useState<string | null>(fichaInicial)
   const [detalle, setDetalle] = useState<ClienteDetalle | null>(null)
-  const [cargandoDetalle, setCargandoDetalle] = useState(false)
+  const [cargandoDetalle, setCargandoDetalle] = useState(fichaInicial !== null)
   const [errorDetalle, setErrorDetalle] = useState<string | null>(null)
   const numeroDeConsulta = useRef(0)
   const numeroDeFicha = useRef(0)
@@ -313,6 +305,24 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
       if (numero === numeroDeFicha.current) setCargandoDetalle(false)
     }
   }, [])
+
+  // Carga la ficha con la que arrancó la pantalla, igual que «Ver detalle».
+  useEffect(() => {
+    if (fichaInicial === null) return
+    const numero = ++numeroDeFicha.current
+    obtenerCliente(fichaInicial)
+      .then((ficha) => {
+        if (numero === numeroDeFicha.current) setDetalle(ficha)
+      })
+      .catch((errorDeFicha: unknown) => {
+        if (numero === numeroDeFicha.current) {
+          setErrorDetalle(mensajeDeError(errorDeFicha, 'No se pudo cargar la ficha del cliente.'))
+        }
+      })
+      .finally(() => {
+        if (numero === numeroDeFicha.current) setCargandoDetalle(false)
+      })
+  }, [fichaInicial])
 
   const cerrarDetalle = useCallback(() => {
     numeroDeFicha.current++
@@ -629,9 +639,21 @@ export default function BaseClientes({ modulo, onNavegar }: PropsBaseClientes) {
         despues: `${fechaLegible(entrada.startDate)} a ${fechaLegible(entrada.expirationDate)}`,
       },
     ]
-    const cuota = pesosDe(entrada.premiumCents ?? null, entrada.currency)
-    if (cuota !== null) {
-      lineas.push({ etiqueta: 'Cuota mensual', antes: '—', despues: cuota })
+    const cuota = pesosDe(entrada.premiumCents, entrada.currency) ?? '—'
+    lineas.push({ etiqueta: 'Cuota mensual', antes: '—', despues: cuota })
+    // El sistema registra una cuota por mes de la vigencia: el resumen dice
+    // cuántas, de cuánto, cuántas quedan pagas y entre qué fechas.
+    const vencimientos = vencimientosMensuales(entrada.startDate, entrada.expirationDate)
+    const primera = vencimientos[0]
+    const ultima = vencimientos[vencimientos.length - 1]
+    if (primera !== undefined && ultima !== undefined) {
+      const pagas = entrada.paidInstallments ?? 0
+      lineas.push({
+        etiqueta: 'Cuotas',
+        antes: '—',
+        despues: `${vencimientos.length} de ${cuota}, ${pagas === 1 ? '1 paga' : `${pagas} pagas`}; ` +
+          `la primera vence el ${fechaLegible(primera)} y la última el ${fechaLegible(ultima)}`,
+      })
     }
     if (entrada.insuredItem !== null && entrada.insuredItem !== undefined) {
       lineas.push({ etiqueta: 'Bien asegurado', antes: '—', despues: entrada.insuredItem.description })

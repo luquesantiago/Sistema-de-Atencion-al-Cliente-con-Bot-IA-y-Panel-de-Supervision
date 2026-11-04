@@ -17,6 +17,7 @@ function entry(overrides: Partial<InboxEntry> = {}): InboxEntry {
     assignee: null,
     prospectState: null,
     pendingPhoneChangeAt: null,
+    pendingDataChangeAt: null,
     lastMessage: null,
     ...overrides,
   }
@@ -47,6 +48,22 @@ describe('inboxLabel', () => {
     }))).toBe('cambio-telefono-pendiente')
   })
 
+  it('el cambio de datos pendiente, que no se deriva', () => {
+    expect(inboxLabel(entry({
+      queryType: 'cambio de datos',
+      handedOffAt: null,
+      pendingDataChangeAt: new Date('2026-11-02T12:00:00.000Z'),
+    }))).toBe('cambio-datos-pendiente')
+  })
+
+  it('un cambio de datos con la solicitud ya decidida no lleva la etiqueta', () => {
+    expect(inboxLabel(entry({
+      queryType: 'cambio de datos',
+      handedOffAt: null,
+      pendingDataChangeAt: null,
+    }))).toBeNull()
+  })
+
   it('una baja sin derivar no lleva la etiqueta de pedido', () => {
     expect(inboxLabel(entry({ queryType: 'baja', handedOffAt: null }))).toBeNull()
   })
@@ -65,12 +82,17 @@ describe('waitingSince', () => {
     const requestedAt = new Date('2026-10-15T12:00:00.000Z')
     expect(waitingSince(entry({ handedOffAt: null, pendingPhoneChangeAt: requestedAt }))).toEqual(requestedAt)
   })
+
+  it('un cambio de datos sin derivar cuenta desde la solicitud', () => {
+    const requestedAt = new Date('2026-11-02T12:00:00.000Z')
+    expect(waitingSince(entry({ handedOffAt: null, pendingDataChangeAt: requestedAt }))).toEqual(requestedAt)
+  })
 })
 
 describe('queryTypeRiskLevels', () => {
   it('da los tipos con nivel propio y ninguno más', () => {
     const levels = queryTypeRiskLevels()
-    expect(levels).toHaveLength(7)
+    expect(levels).toHaveLength(8)
     expect(levels).toEqual(expect.arrayContaining([
       { type: 'siniestro', level: 'alto' },
       { type: 'reclamo', level: 'alto' },
@@ -79,6 +101,7 @@ describe('queryTypeRiskLevels', () => {
       { type: 'baja', level: 'medio' },
       { type: 'modificación', level: 'medio' },
       { type: 'cambio de teléfono', level: 'bajo' },
+      { type: 'cambio de datos', level: 'bajo' },
     ]))
   })
 })

@@ -1,5 +1,6 @@
 import type { CustomerDetail, CustomerRepository } from '../domain/customer.js'
 import {
+  createPolicyInstallments,
   parseCreateCustomer,
   parseCreatePolicy,
   parseLinkPhone,
@@ -10,6 +11,7 @@ import {
   type CustomerEditRepository,
 } from '../domain/customer-edits.js'
 import { RequestManagementError } from '../domain/request-management.js'
+import { argentinaToday } from '../domain/templates.js'
 
 // Casos de uso de edición de cartera desde el panel (RF-CAR-01, RF-CAR-02,
 // RF-CAR-03): alta, edición y baja de clientes, vínculos de teléfono, y alta
@@ -22,6 +24,7 @@ export class ManageCustomerEdits {
   public constructor(
     private readonly edits: CustomerEditRepository,
     private readonly customers: CustomerRepository,
+    private readonly clock: () => Date = () => new Date(),
   ) {}
 
   public async createCustomer(body: unknown): Promise<CustomerDetail> {
@@ -60,7 +63,8 @@ export class ManageCustomerEdits {
   public async createPolicy(customerIdValue: string, body: unknown): Promise<CustomerDetail> {
     const customerId = parseId(customerIdValue, 'cliente')
     const input = parseCreatePolicy(customerId, body)
-    await this.edits.createPolicy(input)
+    const installments = createPolicyInstallments(input, argentinaToday(this.clock()))
+    await this.edits.createPolicy(input, installments)
     return this.detail(customerId)
   }
 

@@ -2715,7 +2715,6 @@
   border-radius: var(--radius-md);
   font-size: 0.87rem;
   font-weight: 600;
-  overflow-wrap: anywhere;
 }
 
 .cartera__aviso--info {
@@ -3709,4 +3708,20 @@
     animation-duration: 200ms;
     animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   }
+}
+
+.badge-amenaza {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  align-self: flex-start;
+  width: fit-content;
+  padding: 0.18rem 0.5rem;
+  border: 1px solid var(--color-danger-border);
+  border-radius: 999px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.3;
 }

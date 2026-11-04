@@ -76,6 +76,19 @@ describe('consultas de la bandeja', () => {
     expect(query.values).toContain(12)
   })
 
+  // Una fila por conversación: el listado y el total eligen un caso por charla (derivado,
+  // después cambio de teléfono pendiente, después el más reciente); el detalle no.
+  it('el listado y el total dejan un caso por conversación, y el detalle no', () => {
+    const representative = /AND c\.id_caso = \(\s*SELECT c2\.id_caso FROM caso c2/
+    const list = inboxOrderQuery({ limit: 25, offset: 0 })
+    expect(list.sql).toMatch(representative)
+    expect(list.sql).toMatch(/ORDER BY c2\.fecha_derivacion IS NULL,\s*NOT EXISTS/)
+    expect(list.sql).toMatch(/c2\.id_caso DESC\s*LIMIT 1\)/)
+    expect(inboxCountQuery().sql).toMatch(representative)
+    expect(inboxCountQuery(7).sql).toMatch(representative)
+    expect(inboxOrderQuery({ limit: 1, offset: 0 }, 12).sql).not.toMatch(representative)
+  })
+
   it('el filtro por cliente restringe el listado y el total a ese cliente', () => {
     const query = inboxOrderQuery({ limit: 25, offset: 0 }, undefined, 7)
     expect(query.sql).toContain('JOIN conversacion conv ON conv.id_conversacion = c.id_conversacion')
@@ -116,6 +129,7 @@ describe('toInboxEntry', () => {
       assignee: { id: 20, name: 'Graciela Castaño' },
       prospectState: null,
       pendingPhoneChangeAt: null,
+      pendingDataChangeAt: null,
       lastMessage: { text: 'me cobraron de más', origin: 'cliente', at: new Date('2026-10-15T13:00:00.000Z') },
     })
   })
@@ -146,14 +160,25 @@ describe('toInboxEntry', () => {
     const long = 'a'.repeat(200)
     const entry = toInboxEntry(record({
       prospecto: { estado_prospecto: { nombre: 'pendiente' } },
-      solicitud_accion: [{ fecha_solicitud: new Date('2026-10-15T12:00:00.000Z') }],
+      solicitud_accion: [{ fecha_solicitud: new Date('2026-10-15T12:00:00.000Z'), tipo_accion: { nombre: 'cambio de teléfono' } }],
       mensaje: [{ contenido: long, fecha_hora: new Date('2026-10-15T13:00:00.000Z'), origen_mensaje: { nombre: 'asistente' } }],
     }), null)
     expect(entry.prospectState).toBe('pendiente')
     expect(entry.pendingPhoneChangeAt).toEqual(new Date('2026-10-15T12:00:00.000Z'))
+    expect(entry.pendingDataChangeAt).toBeNull()
     expect(entry.lastMessage?.text).toHaveLength(160)
     expect(entry.lastMessage?.text.endsWith('…')).toBe(true)
     expect(entry.severity).toBeNull()
+  })
+
+  it('la solicitud de cambio de datos pendiente se levanta como tal', () => {
+    const entry = toInboxEntry(record({
+      fecha_derivacion: null,
+      solicitud_accion: [{ fecha_solicitud: new Date('2026-11-02T12:00:00.000Z'), tipo_accion: { nombre: 'cambio de datos' } }],
+    }), 'bajo')
+    expect(entry.pendingDataChangeAt).toEqual(new Date('2026-11-02T12:00:00.000Z'))
+    expect(entry.pendingPhoneChangeAt).toBeNull()
+    expect(entry.handedOffAt).toBeNull()
   })
 
   it('un tipo de consulta o un origen fuera de catálogo lanza', () => {

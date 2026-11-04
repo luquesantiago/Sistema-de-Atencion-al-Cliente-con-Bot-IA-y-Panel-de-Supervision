@@ -1,7 +1,7 @@
 import { once } from 'node:events'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AddressInfo } from 'node:net'
-import type { AiClient, CustomerStatus, RewriteInput } from '../domain/ai-client.js'
+import type { AiClient, CustomerStatus, DataChangeExtraction, RewriteInput } from '../domain/ai-client.js'
 import type { CustomerPolicy, CustomerRepository } from '../domain/customer.js'
 import type {
   Catalogs,
@@ -14,9 +14,13 @@ import type {
   UpdateCustomerInput,
   UpdatePolicyInput,
 } from '../domain/customer-edits.js'
+import type { PlannedInstallment } from '../domain/installments.js'
 import {
   RequestManagementError,
+  type DataChangeDecisionInput,
+  type DecisionNotification,
   type PageRequest,
+  type PendingDataChange,
   type PendingPhoneChange,
   type PendingProspect,
   type PhoneChangeDecisionInput,
@@ -50,6 +54,9 @@ class FakeAi implements AiClient {
   }
   public async classifyIntent(_text: string) {
     return { intent: 'otra consulta' as const, urgency: null }
+  }
+  public async extractDataChange(_text: string): Promise<DataChangeExtraction> {
+    return { field: null, value: null }
   }
   public async rewrite(_input: RewriteInput): Promise<string> {
     return ''
@@ -132,10 +139,13 @@ class FakeWhatsApp implements WhatsAppClient {
 class FakeRequestRepository implements RequestManagementRepository {
   public readonly prospectPage: PageRequest[] = []
   public readonly phonePage: PageRequest[] = []
+  public readonly dataChangePage: PageRequest[] = []
   public readonly prospectDecisions: ProspectDecisionInput[] = []
   public readonly phoneDecisions: PhoneChangeDecisionInput[] = []
+  public readonly dataChangeDecisions: DataChangeDecisionInput[] = []
   public prospects: PendingProspect[] = []
   public phoneChanges: PendingPhoneChange[] = []
+  public dataChanges: PendingDataChange[] = []
 
   public async listPendingProspects(page: PageRequest): Promise<PendingProspect[]> {
     this.prospectPage.push(page)
@@ -147,9 +157,35 @@ class FakeRequestRepository implements RequestManagementRepository {
     return this.phoneChanges
   }
 
+  public async listPendingDataChanges(page: PageRequest): Promise<PendingDataChange[]> {
+    this.dataChangePage.push(page)
+    return this.dataChanges
+  }
+
   public async decideProspect(input: ProspectDecisionInput) {
     this.prospectDecisions.push(input)
-    return { id: input.id, decision: input.decision, casoId: 31, ...(input.decision === 'aprobar' ? { clienteId: 44 } : {}) }
+    return {
+      id: input.id,
+      decision: input.decision,
+      casoId: 31,
+      phone: '5491100000008',
+      ...(input.decision === 'aprobar' ? { clienteId: 44 } : {}),
+    }
+  }
+
+  // Estado del prospecto para el reintento del aviso: solo el confirmado se avisa.
+  public prospectState: 'confirmado' | 'pendiente' = 'confirmado'
+  public readonly recordedProspectNotifications: Array<{ id: number; text: string }> = []
+
+  public async getProspectNotification(id: number) {
+    if (this.prospectState !== 'confirmado') {
+      throw new RequestManagementError(409, 'CONFLICT', 'El alta no está aprobada: no hay un aviso de aprobación para enviar.')
+    }
+    return { id, phone: '5491100000008' }
+  }
+
+  public async recordProspectNotification(id: number, text: string, _sentAt: Date): Promise<void> {
+    this.recordedProspectNotifications.push({ id, text })
   }
 
   public async decidePhoneChange(input: PhoneChangeDecisionInput) {
@@ -157,13 +193,26 @@ class FakeRequestRepository implements RequestManagementRepository {
     return { id: input.id, decision: input.decision, phone: '5491100000000' }
   }
 
+  public async decideDataChange(input: DataChangeDecisionInput) {
+    this.dataChangeDecisions.push(input)
+    return { id: input.id, decision: input.decision, phone: '5491100000000' }
+  }
+
   public async getPhoneChangeNotification(id: number) {
+    return { id, decision: 'aprobar' as const, phone: '5491100000000' }
+  }
+
+  public async getDataChangeNotification(id: number): Promise<DecisionNotification> {
     return { id, decision: 'aprobar' as const, phone: '5491100000000' }
   }
 
   public readonly recordedNotifications: Array<{ id: number; text: string }> = []
 
   public async recordPhoneChangeNotification(id: number, text: string, _sentAt: Date): Promise<void> {
+    this.recordedNotifications.push({ id, text })
+  }
+
+  public async recordDataChangeNotification(id: number, text: string, _sentAt: Date): Promise<void> {
     this.recordedNotifications.push({ id, text })
   }
 }
@@ -177,6 +226,7 @@ class FakeCustomerEditRepository implements CustomerEditRepository {
   public readonly linked: LinkPhoneInput[] = []
   public readonly unlinked: UnlinkPhoneInput[] = []
   public readonly createdPolicies: CreatePolicyInput[] = []
+  public readonly createdInstallments: PlannedInstallment[][] = []
   public readonly policyUpdates: UpdatePolicyInput[] = []
   public readonly coverageReplacements: ReplaceCoveragesInput[] = []
   // Devuelve el id 1 (Laura Gómez) para que la ficha se pueda recargar.
@@ -212,13 +262,14 @@ class FakeCustomerEditRepository implements CustomerEditRepository {
     this.unlinked.push(input)
   }
 
-  public async createPolicy(input: CreatePolicyInput): Promise<number> {
+  public async createPolicy(input: CreatePolicyInput, installments: PlannedInstallment[]): Promise<number> {
     this.throwIfConflict()
     // El repositorio real comprueba que el cliente exista y esté activo.
     if (input.customerId !== this.resultCustomerId) {
       throw new RequestManagementError(404, 'NOT_FOUND', 'No existe un cliente activo con ese identificador.')
     }
     this.createdPolicies.push(input)
+    this.createdInstallments.push(installments)
     return this.resultCustomerId
   }
 
@@ -327,7 +378,13 @@ describe('endpoints de trámites', () => {
     })
 
     expect(response.status).toBe(200)
-    await expect(response.json()).resolves.toEqual({ id: 8, decision: 'aprobar', casoId: 31, clienteId: 44 })
+    await expect(response.json()).resolves.toEqual({ id: 8, decision: 'aprobar', casoId: 31, clienteId: 44, notificationSent: true })
+    // El alta aprobada se avisa con el texto fijo y queda guardada en el caso (RF-ATE-05).
+    expect(whatsapp.sent).toEqual([{
+      to: '5491100000008',
+      text: 'Su alta como cliente de Seguros Castaño fue confirmada. Desde ahora puede consultarnos por este WhatsApp sobre sus pólizas.',
+    }])
+    expect(repository.recordedProspectNotifications.map((item) => item.id)).toEqual([8])
     expect(repository.prospectDecisions).toEqual([{
       id: 8,
       decision: 'aprobar',
@@ -346,6 +403,43 @@ describe('endpoints de trámites', () => {
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ id: 8, decision: 'rechazar', casoId: 31 })
+    // El rechazo no se avisa solo: lo explica el operador desde la bandeja.
+    expect(whatsapp.sent).toEqual([])
+  })
+
+  it('si el aviso del alta falla, el alta queda registrada y se puede reintentar', async () => {
+    whatsapp.fail = true
+    const response = await fetch(`${baseUrl}/api/tramites/prospectos/8/decision`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'aprobar', fundamento: 'Datos revisados', nombre: 'Laura', apellido: 'Díaz' }),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ id: 8, clienteId: 44, notificationSent: false })
+    expect(repository.prospectDecisions).toHaveLength(1)
+    expect(repository.recordedProspectNotifications).toEqual([])
+
+    const failedRetry = await fetch(`${baseUrl}/api/tramites/prospectos/8/notificacion`, { method: 'POST' })
+    await expect(failedRetry.json()).resolves.toMatchObject({ id: 8, notificationSent: false })
+
+    whatsapp.fail = false
+    const retry = await fetch(`${baseUrl}/api/tramites/prospectos/8/notificacion`, { method: 'POST' })
+    expect(retry.status).toBe(200)
+    await expect(retry.json()).resolves.toEqual({ id: 8, decision: 'aprobar', notificationSent: true })
+    expect(whatsapp.sent).toHaveLength(1)
+    expect(repository.recordedProspectNotifications.map((item) => item.id)).toEqual([8])
+    // El reintento no vuelve a aplicar la decisión.
+    expect(repository.prospectDecisions).toHaveLength(1)
+  })
+
+  it('no reintenta el aviso de un alta que no está aprobada', async () => {
+    repository.prospectState = 'pendiente'
+    const response = await fetch(`${baseUrl}/api/tramites/prospectos/8/notificacion`, { method: 'POST' })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'CONFLICT' } })
+    expect(whatsapp.sent).toEqual([])
   })
 
   it('no permite que el navegador elija el actor o rol de la decisión', async () => {
@@ -425,6 +519,66 @@ describe('endpoints de trámites', () => {
     expect(repository.recordedNotifications).toHaveLength(1)
     expect(repository.recordedNotifications[0]?.id).toBe(12)
   })
+
+  it('lista los cambios de datos pendientes con la paginación pedida', async () => {
+    repository.dataChanges = [{
+      id: 21,
+      caseId: 40,
+      customerName: 'Ana Ficticia',
+      customerDni: '99000001',
+      phone: '5491100000001',
+      field: 'apellido',
+      currentValue: 'Ficticia',
+      value: 'Gómez',
+      requestedAt: '2026-11-02T12:00:00.000Z',
+    }]
+
+    const response = await fetch(`${baseUrl}/api/tramites/cambios-datos?limit=10&offset=0`)
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ items: repository.dataChanges, limit: 10, offset: 0 })
+    expect(repository.dataChangePage).toEqual([{ limit: 10, offset: 0 }])
+  })
+
+  it('la decisión no acepta el dato en la petición: el cambio sale del detalle que guardó el servidor', async () => {
+    const response = await fetch(`${baseUrl}/api/tramites/cambios-datos/21/decision`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'aprobar', fundamento: 'Identidad verificada', field: 'dni', value: '11111111' }),
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ error: { code: 'VALIDATION_ERROR' } })
+    expect(repository.dataChangeDecisions).toEqual([])
+  })
+
+  it('aprueba el cambio de datos, avisa por WhatsApp y reintenta el aviso si el envío falla', async () => {
+    const request = () => fetch(`${baseUrl}/api/tramites/cambios-datos/21/decision`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'aprobar', fundamento: 'Identidad verificada' }),
+    })
+
+    const response = await request()
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ id: 21, decision: 'aprobar', notificationSent: true })
+    expect(repository.dataChangeDecisions).toEqual([{ id: 21, decision: 'aprobar', fundamento: 'Identidad verificada' }])
+    expect(whatsapp.sent[0]?.text).toContain('cambio de datos fue aprobada')
+    expect(repository.recordedNotifications).toEqual([{ id: 21, text: whatsapp.sent[0]?.text }])
+
+    whatsapp.fail = true
+    const failed = await request()
+    await expect(failed.json()).resolves.toMatchObject({
+      id: 21,
+      decision: 'aprobar',
+      notificationSent: false,
+      warning: expect.any(String),
+    })
+
+    whatsapp.fail = false
+    const retry = await fetch(`${baseUrl}/api/tramites/cambios-datos/21/notificacion`, { method: 'POST' })
+    await expect(retry.json()).resolves.toEqual({ id: 21, decision: 'aprobar', notificationSent: true })
+  })
 })
 
 describe('endpoints de clientes', () => {
@@ -449,10 +603,11 @@ describe('endpoints de clientes', () => {
         dni: '30111222',
         firstName: 'Laura',
         lastName: 'Gómez',
+        active: true,
         policies: [policy('POL-00123', '2026-06-20')],
       },
-      { id: 2, dni: '28111222', firstName: 'Ramiro', lastName: 'Pérez', policies: [] },
-      { id: 3, dni: '40111222', firstName: 'Sofía', lastName: 'Benítez', policies: [] },
+      { id: 2, dni: '28111222', firstName: 'Ramiro', lastName: 'Pérez', active: true, policies: [] },
+      { id: 3, dni: '40111222', firstName: 'Sofía', lastName: 'Benítez', active: true, policies: [] },
     ])
     // Un mismo teléfono vinculado a dos clientes (RF-CAR-03).
     customers.addPhoneLink(1, 17, '5491155551001')
@@ -467,7 +622,8 @@ describe('endpoints de clientes', () => {
       { secret: 'test', findPhoneByLid: async () => null },
       new ManageRequests(new FakeRequestRepository(), whatsapp),
       new ManageCustomers(customers),
-      new ManageCustomerEdits(edits, customers),
+      // Mismo día que el inicio de las altas de prueba: ninguna cuota vencida.
+      new ManageCustomerEdits(edits, customers, () => new Date('2026-10-01T15:00:00Z')),
       new ManageInbox(new FakeInbox(), whatsapp),
       panelActor,
     )
@@ -789,6 +945,7 @@ describe('endpoints de clientes', () => {
         currency: 'ARS',
         startDate: '2026-10-01',
         expirationDate: '2027-10-01',
+        premiumCents: 12_500_00,
         coverages: [{ planId: 2, description: null, insuredSumCents: null }],
       }),
     })
@@ -802,8 +959,53 @@ describe('endpoints de clientes', () => {
       currency: 'ARS',
       startDate: '2026-10-01',
       expirationDate: '2027-10-01',
+      premiumCents: 12_500_00,
       coverages: [{ planId: 2, description: null, insuredSumCents: null }],
     }])
+    // El plan de cuotas sale con el alta: 12 cuotas por la prima, todas sin pagar.
+    expect(edits.createdInstallments[0]).toHaveLength(12)
+    expect(edits.createdInstallments[0]?.every((item) => !item.paid && item.amountCents === 12_500_00)).toBe(true)
+  })
+
+  it('rechaza un alta de póliza sin prima mensual', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/1/polizas`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ramo: 'auto',
+        status: 'activa',
+        currency: 'ARS',
+        startDate: '2026-10-01',
+        expirationDate: '2027-10-01',
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { message: 'La prima mensual es obligatoria para dar de alta una póliza.' },
+    })
+    expect(edits.createdPolicies).toEqual([])
+  })
+
+  it('rechaza un alta de póliza con cuotas vencidas sin declarar las pagas', async () => {
+    const response = await fetch(`${baseUrl}/api/clientes/1/polizas`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ramo: 'auto',
+        status: 'activa',
+        currency: 'ARS',
+        startDate: '2026-07-01',
+        expirationDate: '2027-07-01',
+        premiumCents: 12_500_00,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { message: 'Indique cuántas de las 3 cuotas ya vencidas están pagas.' },
+    })
+    expect(edits.createdPolicies).toEqual([])
   })
 
   it('no permite que el navegador meta campos de más en un alta de póliza', async () => {
@@ -816,6 +1018,7 @@ describe('endpoints de clientes', () => {
         currency: 'ARS',
         startDate: '2026-10-01',
         expirationDate: '2027-10-01',
+        premiumCents: 12_500_00,
         actor: 'operador',
       }),
     })
@@ -835,6 +1038,7 @@ describe('endpoints de clientes', () => {
         currency: 'ARS',
         startDate: '2026-10-01',
         expirationDate: '2027-10-01',
+        premiumCents: 12_500_00,
       }),
     })
 
@@ -871,6 +1075,7 @@ describe('endpoints de clientes', () => {
         currency: 'ARS',
         startDate: '2026-10-01',
         expirationDate: '2027-10-01',
+        premiumCents: 12_500_00,
       }),
     })
 
@@ -888,6 +1093,7 @@ describe('endpoints de clientes', () => {
         currency: 'ARS',
         startDate: '2026-10-01',
         expirationDate: '2027-10-01',
+        premiumCents: 12_500_00,
       }),
     })
 
@@ -906,6 +1112,7 @@ describe('endpoints de clientes', () => {
         currency: 'ARS',
         startDate: '2026-10-01',
         expirationDate: '2027-10-01',
+        premiumCents: 12_500_00,
       }),
     })
 
@@ -945,6 +1152,7 @@ describe('Bandeja de Atención', () => {
     assignee: null,
     prospectState: null,
     pendingPhoneChangeAt: null,
+    pendingDataChangeAt: null,
     lastMessage: { text: 'me cobraron de más', origin: 'cliente', at: new Date('2026-10-15T13:00:00.000Z') },
   }
   let inbox: FakeInbox

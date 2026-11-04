@@ -13,6 +13,7 @@ import {
   type SavedConversation,
   type Settings,
 } from '../domain/conversation.js'
+import { dataChangeDetalle } from '../domain/data-change.js'
 import { isIntent } from '../domain/intent.js'
 import type { RiskLevel } from '../domain/risk-level.js'
 
@@ -115,6 +116,23 @@ export class PrismaConversationStore implements ConversationStore {
       throw storeError('leer los parámetros de', error)
     }
     return parseSettings(rows)
+  }
+
+  // La misma búsqueda que evita duplicar la solicitud al guardarla.
+  public async hasPendingPhoneChange(phone: string, customerId: number): Promise<boolean> {
+    try {
+      const request = await this.prisma.solicitud_accion.findFirst({
+        where: {
+          tipo_accion: { is: { nombre: 'cambio de teléfono' } },
+          estado_solicitud: { is: { nombre: 'pendiente' } },
+          caso: { is: { conversacion: { is: { id_cliente: customerId, telefono: { is: { numero: phone } } } } } },
+        },
+        select: { id_solicitud: true },
+      })
+      return request !== null
+    } catch (error) {
+      throw storeError('leer las solicitudes de', error)
+    }
   }
 
   public async save(changes: ConversationChanges, send: () => Promise<void>): Promise<SavedConversation> {
@@ -308,6 +326,35 @@ async function write(tx: Prisma.TransactionClient, changes: ConversationChanges)
     }
   }
 
+  if (changes.dataChangeRequest) {
+    const { case: ref, customerId, field, value, riskLevel } = changes.dataChangeRequest
+    const dataChange = await catalogs.dataChangeAction()
+    const pending = await catalogs.pendingRequest()
+    // Una sola solicitud pendiente por cliente y por dato (change cambio-datos-cliente):
+    // el detalle tiene el campo en su primera línea, con un formato fijo.
+    const existing = await tx.solicitud_accion.findFirst({
+      where: {
+        id_tipo_accion: dataChange,
+        id_estado_solicitud: pending,
+        detalle: { startsWith: `Cambio de ${field} a ` },
+        caso: { is: { conversacion: { is: { id_cliente: customerId } } } },
+      },
+      select: { id_solicitud: true },
+    })
+    if (!existing) {
+      await tx.caso.update({ where: { id_caso: caseId(ref) }, data: { id_nivel_riesgo: await catalogs.riskLevel(riskLevel) } })
+      await tx.solicitud_accion.create({
+        data: {
+          id_caso: caseId(ref),
+          id_tipo_accion: dataChange,
+          id_estado_solicitud: pending,
+          detalle: dataChangeDetalle(field, value),
+          fecha_solicitud: at,
+        },
+      })
+    }
+  }
+
   return { conversationId, incomingMessageId: incoming.id_mensaje }
 }
 
@@ -338,5 +385,8 @@ async function catalogIds(tx: Prisma.TransactionClient) {
     phoneChangeAction: async () => required((await tx.tipo_accion.findUnique({
       where: { nombre: 'cambio de teléfono' }, select: { id_tipo_accion: true },
     }))?.id_tipo_accion, 'tipo de acción cambio de teléfono'),
+    dataChangeAction: async () => required((await tx.tipo_accion.findUnique({
+      where: { nombre: 'cambio de datos' }, select: { id_tipo_accion: true },
+    }))?.id_tipo_accion, 'tipo de acción cambio de datos'),
   }
 }

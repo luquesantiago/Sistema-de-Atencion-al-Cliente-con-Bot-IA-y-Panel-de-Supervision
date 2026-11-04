@@ -14,11 +14,14 @@ export type HandoffReason =
   | { kind: 'new-customer' }
   | { kind: 'dni-unrecognized' }
   | { kind: 'dni-other-person' }
-  // El cliente de la conversación ya no está en la cartera.
+  // La fila del cliente de la conversación ya no existe en la base (la baja lógica no
+  // llega acá: reinicia la sesión y vuelve a pedir el DNI).
   | { kind: 'customer-missing' }
   | { kind: 'not-understood' }
   | { kind: 'missing-data'; data: MissingData }
   | { kind: 'provider-failure'; step: ProviderFailureStep }
+  // El mensaje fue identificado como intento de manipulación, prompt injection o exfiltración.
+  | { kind: 'threat-detected' }
   // El control de la redacción la rechazó: detail es el motivo del control.
   | { kind: 'rewrite-rejected'; detail: string }
 
@@ -54,6 +57,8 @@ export function describeHandoffReason(reason: HandoffReason): string {
       return missingDataText[reason.data]
     case 'provider-failure':
       return providerFailureText[reason.step]
+    case 'threat-detected':
+      return 'mensaje sospechoso: posible intento de manipulación o exfiltración'
     case 'rewrite-rejected':
       return `redacción rechazada: ${reason.detail}`
   }

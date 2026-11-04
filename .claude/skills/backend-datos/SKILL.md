@@ -55,7 +55,8 @@ docker compose exec backend npx prisma generate
 - Cliente y teléfono son N:M. Puede haber clientes persona (DNI + apellido + nombre) o empresa (CUIT + razón social) en la misma tabla.
 - Una moneda por póliza, solo pesos o dólares.
 - El borrador retenido, la respuesta enviada y la corrección se guardan por separado.
-- Una baja aprobada pone la póliza en "dada de baja". `activo = false` marca solo registros cargados por error. La cartera activa son las pólizas en estado "activa", no vencidas y con `activo = true`.
+- Una baja aprobada pone la póliza en "dada de baja". En `policia`, `activo = false` marca solo registros cargados por error. La cartera activa son las pólizas en estado "activa", no vencidas y con `activo = true`.
+- En `cliente`, `activo = false` es la baja lógica: la fila se conserva. `findByDni` y `findById` la devuelven marcada con `active: false` (el asistente la revalida por DNI); `linkedCustomerIds` la excluye de la identificación por número; el vínculo de `cliente_telefono` no se modifica (`isPhoneLinkedTo` no depende del estado). Si la baja ocurre con una sesión identificada abierta, el asistente cierra la conversación con `endByDeactivation` y el próximo mensaje arranca un chat nuevo.
 
 ## API
 
@@ -81,4 +82,6 @@ docker compose exec backend npx prisma generate
 - Los CHECK de la base no aparecen en `schema.prisma` (Prisma no los representa): los sigue controlando MySQL.
 - Toda migración debe ser revisable y compatible con datos existentes o acompañarse de una estrategia de importación.
 - La importación histórica sigue `docs/migracion.md` y no modifica la planilla original. El Excel limpio está en `backend/planilla/`; el script lo lee desde ahí, dentro de `backend/`, porque el contenedor solo monta `./backend`. Los registros irresolubles (columna «migrar» = No, como las pólizas POL-00126 y POL-00131 del VW Gol) se omiten y quedan en la hoja Pendientes para carga manual.
+- La carga de la demo (`npm run cargar-demo -- --confirmar`, `backend/scripts/cargar-demo.ts`) borra la cartera y las conversaciones y carga clientes ficticios (`scripts/datos-demo.ts`); es una herramienta de demostración, no una baja de datos operativos. Los números de WhatsApp de la demo van por entorno (`DEMO_TELEFONO_CLIENTE`, `DEMO_TELEFONO_COMPARTIDO`), nunca en el repo. Cómo volver a la planilla: `docs/migracion.md`.
+- La regla del plan de cuotas está una sola vez, en `src/domain/installments.ts`: la usan el alta de póliza, las cuotas de ejemplo y la demo.
 - No almacenar secretos ni datos reales de clientes en fixtures, logs de desarrollo o migraciones.

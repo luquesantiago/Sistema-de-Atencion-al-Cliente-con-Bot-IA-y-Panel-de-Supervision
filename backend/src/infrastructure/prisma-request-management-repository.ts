@@ -1,8 +1,14 @@
 import { Prisma, type PrismaClient } from '../generated/prisma/client.js'
+import { parseDataChangeDetalle } from '../domain/data-change.js'
 import {
   RequestManagementError,
+  type DataChangeDecisionInput,
+  type DataChangeDecisionResult,
+  type DecisionNotification,
   type PageRequest,
+  type PendingDataChange,
   type PhoneChangeNotification,
+  type ProspectNotification,
   type PendingPhoneChange,
   type PendingProspect,
   type PhoneChangeDecisionInput,
@@ -116,6 +122,65 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
     })
   }
 
+  public async listPendingDataChanges(page: PageRequest): Promise<PendingDataChange[]> {
+    const requests = await this.prisma.solicitud_accion.findMany({
+      where: {
+        tipo_accion: { is: { nombre: 'cambio de datos' } },
+        estado_solicitud: { is: { nombre: 'pendiente' } },
+        caso: {
+          is: {
+            fecha_cierre: null,
+            conversacion: { is: { id_cliente: { not: null } } },
+          },
+        },
+      },
+      orderBy: [{ fecha_solicitud: 'asc' }, { id_solicitud: 'asc' }],
+      skip: page.offset,
+      take: page.limit,
+      select: {
+        id_solicitud: true,
+        fecha_solicitud: true,
+        detalle: true,
+        caso: {
+          select: {
+            id_caso: true,
+            conversacion: {
+              select: {
+                telefono: { select: { numero: true } },
+                cliente: { select: { dni: true, nombre: true, apellido: true } },
+              },
+            },
+          },
+        },
+      },
+    })
+    return requests.flatMap((request) => {
+      const customer = request.caso.conversacion.cliente
+      if (!customer?.dni || !customer.nombre || !customer.apellido) {
+        throw new Error(`La solicitud ${request.id_solicitud} no tiene datos completos del cliente.`)
+      }
+      const parsed = parseDataChangeDetalle(request.detalle)
+      if (!parsed) {
+        throw new Error(`La solicitud ${request.id_solicitud} no identifica el dato solicitado.`)
+      }
+      const currentValue = parsed.field === 'nombre' ? customer.nombre : customer.apellido
+      if (!currentValue) {
+        throw new Error(`La solicitud ${request.id_solicitud} no tiene el valor actual del dato.`)
+      }
+      return [{
+        id: request.id_solicitud,
+        caseId: request.caso.id_caso,
+        customerName: `${customer.nombre} ${customer.apellido}`,
+        customerDni: customer.dni,
+        phone: request.caso.conversacion.telefono.numero,
+        field: parsed.field,
+        currentValue,
+        value: parsed.value,
+        requestedAt: request.fecha_solicitud.toISOString(),
+      }]
+    })
+  }
+
   public async decideProspect(input: ProspectDecisionInput): Promise<ProspectDecisionResult> {
     return this.prisma.$transaction(async (transaction) => {
       const prospect = await transaction.prospecto.findUnique({
@@ -134,7 +199,7 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
               id_usuario_asignado: true,
               fecha_toma: true,
               id_conversacion: true,
-              conversacion: { select: { telefono: { select: { id_telefono: true } } } },
+              conversacion: { select: { telefono: { select: { id_telefono: true, numero: true } } } },
             },
           },
         },
@@ -228,6 +293,7 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
         id: prospect.id_prospecto,
         decision: input.decision,
         casoId: prospect.caso.id_caso,
+        phone: prospect.caso.conversacion.telefono.numero,
         ...(customerId ? { clienteId: customerId } : {}),
       }
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
@@ -346,27 +412,118 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   }
 
+  public async decideDataChange(input: DataChangeDecisionInput): Promise<DataChangeDecisionResult> {
+    return this.prisma.$transaction(async (transaction) => {
+      const request = await transaction.solicitud_accion.findUnique({
+        where: { id_solicitud: input.id },
+        select: {
+          id_solicitud: true,
+          id_estado_solicitud: true,
+          detalle: true,
+          estado_solicitud: { select: { nombre: true } },
+          tipo_accion: { select: { nombre: true } },
+          caso: {
+            select: {
+              id_caso: true,
+              fecha_cierre: true,
+              id_usuario_asignado: true,
+              fecha_toma: true,
+              id_conversacion: true,
+              conversacion: {
+                select: { id_cliente: true, telefono: { select: { numero: true } } },
+              },
+            },
+          },
+        },
+      })
+      if (!request || request.tipo_accion.nombre !== 'cambio de datos') {
+        throw new RequestManagementError(404, 'NOT_FOUND', 'No se encontró la solicitud de cambio de datos.')
+      }
+      if (request.estado_solicitud.nombre !== 'pendiente' || request.caso.fecha_cierre) {
+        throw new RequestManagementError(409, 'CONFLICT', 'La solicitud ya no está pendiente.')
+      }
+      const customerId = request.caso.conversacion.id_cliente
+      if (!customerId) {
+        throw new RequestManagementError(409, 'CONFLICT', 'La solicitud no tiene un cliente asociado.')
+      }
+      // El dato a cambiar sale del detalle: el campo y el valor no se aceptan de la petición,
+      // para que la decisión no pueda cambiar un dato distinto del pedido por WhatsApp.
+      const parsed = parseDataChangeDetalle(request.detalle)
+      if (!parsed) {
+        throw new RequestManagementError(409, 'CONFLICT', 'La solicitud no tiene un dato válido para decidir.')
+      }
+      const operatorId = await findTestOperatorId(transaction)
+      const state = await transaction.estado_solicitud.findUnique({
+        where: { nombre: input.decision === 'aprobar' ? 'aprobada' : 'rechazada' },
+        select: { id_estado_solicitud: true },
+      })
+      if (!state) throw new Error(`Falta el estado de solicitud requerido para ${input.decision}.`)
+      const decidedAt = new Date()
+
+      const decisionDetail = input.decision === 'aprobar'
+        ? `Decisión aprobada. Dato actualizado: ${parsed.field} = ${parsed.value}.`
+        : 'Decisión rechazada. No se modificó el dato del cliente.'
+      const claim = await transaction.solicitud_accion.updateMany({
+        where: {
+          id_solicitud: request.id_solicitud,
+          id_estado_solicitud: request.id_estado_solicitud,
+        },
+        data: {
+          id_estado_solicitud: state.id_estado_solicitud,
+          id_usuario_decision: operatorId,
+          fecha_decision: decidedAt,
+          fundamento: input.fundamento.trim(),
+          detalle: `${request.detalle ?? ''}\n${decisionDetail}`.trim(),
+        },
+      })
+      if (claim.count !== 1) {
+        throw new RequestManagementError(409, 'CONFLICT', 'La solicitud ya fue decidida por otro operador.')
+      }
+
+      if (input.decision === 'aprobar') {
+        await transaction.cliente.update({
+          where: { id_cliente: customerId },
+          data: parsed.field === 'nombre' ? { nombre: parsed.value } : { apellido: parsed.value },
+        })
+      }
+
+      // Como el cambio de teléfono: la decisión cierra el caso y saca la conversación del
+      // silencio (RF-CAR-05 / regla 9 del change).
+      await closeCase(transaction, request.caso, operatorId, decidedAt)
+      await releaseSilence(transaction, request.caso.id_conversacion)
+      return { id: request.id_solicitud, decision: input.decision, phone: request.caso.conversacion.telefono.numero }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+  }
+
   // El aviso de la decisión que salió por WhatsApp queda en el caso de la solicitud, como
   // mensaje del asistente. No lleva respuesta: no contesta un mensaje del cliente.
   public async recordPhoneChangeNotification(id: number, text: string, sentAt: Date): Promise<void> {
-    await this.prisma.$transaction(async (transaction) => {
-      const request = await transaction.solicitud_accion.findUnique({
-        where: { id_solicitud: id },
-        select: { id_caso: true },
-      })
-      if (!request) throw new RequestManagementError(404, 'NOT_FOUND', 'No se encontró la solicitud de cambio de teléfono.')
-      const origin = await transaction.origen_mensaje.findUnique({
-        where: { nombre: 'asistente' },
-        select: { id_origen_mensaje: true },
-      })
-      if (!origin) throw new Error('Falta el origen de mensaje asistente.')
-      await transaction.mensaje.create({
-        data: { id_caso: request.id_caso, id_origen_mensaje: origin.id_origen_mensaje, contenido: text, fecha_hora: sentAt },
-      })
-    })
+    await this.recordDecisionNotification(id, 'cambio de teléfono', text, sentAt)
+  }
+
+  public async recordDataChangeNotification(id: number, text: string, sentAt: Date): Promise<void> {
+    await this.recordDecisionNotification(id, 'cambio de datos', text, sentAt)
   }
 
   public async getPhoneChangeNotification(id: number): Promise<PhoneChangeNotification> {
+    const request = await this.getDecisionRequest(id, 'cambio de teléfono')
+    return {
+      id: request.id,
+      phone: request.phone,
+      decision: request.decision,
+    }
+  }
+
+  public async getDataChangeNotification(id: number): Promise<DecisionNotification> {
+    const request = await this.getDecisionRequest(id, 'cambio de datos')
+    return {
+      id: request.id,
+      phone: request.phone,
+      decision: request.decision,
+    }
+  }
+
+  private async getDecisionRequest(id: number, requestType: string): Promise<{ id: number; phone: string; decision: 'aprobar' | 'rechazar' }> {
     const request = await this.prisma.solicitud_accion.findUnique({
       where: { id_solicitud: id },
       select: {
@@ -376,8 +533,8 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
         caso: { select: { conversacion: { select: { telefono: { select: { numero: true } } } } } },
       },
     })
-    if (!request || request.tipo_accion.nombre !== 'cambio de teléfono') {
-      throw new RequestManagementError(404, 'NOT_FOUND', 'No se encontró la solicitud de cambio de teléfono.')
+    if (!request || request.tipo_accion.nombre !== requestType) {
+      throw new RequestManagementError(404, 'NOT_FOUND', `No se encontró la solicitud de ${requestType}.`)
     }
     if (request.estado_solicitud.nombre !== 'aprobada' && request.estado_solicitud.nombre !== 'rechazada') {
       throw new RequestManagementError(409, 'CONFLICT', 'La solicitud todavía no tiene una decisión para notificar.')
@@ -387,5 +544,65 @@ export class PrismaRequestManagementRepository implements RequestManagementRepos
       phone: request.caso.conversacion.telefono.numero,
       decision: request.estado_solicitud.nombre === 'aprobada' ? 'aprobar' : 'rechazar',
     }
+  }
+
+private async recordDecisionNotification(id: number, requestType: string, text: string, sentAt: Date): Promise<void> {
+    await this.prisma.$transaction(async (transaction) => {
+      const request = await transaction.solicitud_accion.findUnique({
+        where: { id_solicitud: id },
+        select: { id_caso: true, tipo_accion: { select: { nombre: true } } },
+      })
+      if (!request || request.tipo_accion.nombre !== requestType) {
+        throw new RequestManagementError(404, 'NOT_FOUND', `No se encontró la solicitud de ${requestType}.`)
+      }
+      
+      const origin = await transaction.origen_mensaje.findUnique({
+        where: { nombre: 'asistente' },
+        select: { id_origen_mensaje: true },
+      })
+      if (!origin) throw new Error('Falta el origen de mensaje asistente.')
+      
+      await transaction.mensaje.create({
+        data: { id_caso: request.id_caso, id_origen_mensaje: origin.id_origen_mensaje, contenido: text, fecha_hora: sentAt },
+      })
+    })
+  }
+
+  // El aviso del alta aprobada queda en el caso del alta, como mensaje del asistente
+  // (RF-ATE-05), igual que el del cambio de teléfono.
+  public async recordProspectNotification(id: number, text: string, sentAt: Date): Promise<void> {
+    await this.prisma.$transaction(async (transaction) => {
+      const prospect = await transaction.prospecto.findUnique({
+        where: { id_prospecto: id },
+        select: { id_caso: true },
+      })
+      if (!prospect) throw new RequestManagementError(404, 'NOT_FOUND', 'No se encontró el prospecto.')
+
+      const origin = await transaction.origen_mensaje.findUnique({
+        where: { nombre: 'asistente' },
+        select: { id_origen_mensaje: true },
+      })
+      if (!origin) throw new Error('Falta el origen de mensaje asistente.')
+
+      await transaction.mensaje.create({
+        data: { id_caso: prospect.id_caso, id_origen_mensaje: origin.id_origen_mensaje, contenido: text, fecha_hora: sentAt },
+      })
+    })
+  }
+
+  public async getProspectNotification(id: number): Promise<ProspectNotification> {
+    const prospect = await this.prisma.prospecto.findUnique({
+      where: { id_prospecto: id },
+      select: {
+        id_prospecto: true,
+        estado_prospecto: { select: { nombre: true } },
+        caso: { select: { conversacion: { select: { telefono: { select: { numero: true } } } } } },
+      },
+    })
+    if (!prospect) throw new RequestManagementError(404, 'NOT_FOUND', 'No se encontró el prospecto.')
+    if (prospect.estado_prospecto.nombre !== 'confirmado') {
+      throw new RequestManagementError(409, 'CONFLICT', 'El alta no está aprobada: no hay un aviso de aprobación para enviar.')
+    }
+    return { id: prospect.id_prospecto, phone: prospect.caso.conversacion.telefono.numero }
   }
 }
