@@ -3144,18 +3144,24 @@ textarea:not([disabled]) {
   body,
   #root {
     width: 100%;
-    height: 100%;
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
     min-height: 0;
+    overflow-x: hidden;
   }
 
   /* Una columna por vez: la lista o la conversación elegida */
   .panel {
+    width: 100%;
+    max-width: 100vw;
     height: 100vh;
     height: 100dvh;
     min-height: 0;
     display: flex;
     flex-direction: column;
     grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
   }
 
   .topbar {
@@ -3164,6 +3170,8 @@ textarea:not([disabled]) {
 
   .panel__principal {
     flex: 1 1 auto;
+    width: 100%;
+    max-width: 100vw;
     height: auto;
     min-height: 0;
     overflow: hidden;
@@ -3171,8 +3179,11 @@ textarea:not([disabled]) {
 
   .bandeja-container {
     flex-direction: column;
+    width: 100%;
+    max-width: 100vw;
     height: 100%;
     min-height: 0;
+    overflow: hidden;
   }
 
   .bandeja-container--con-caso .bandeja-lista-panel,
@@ -3183,6 +3194,7 @@ textarea:not([disabled]) {
   .bandeja-lista-panel {
     flex: 1 1 auto;
     width: 100%;
+    max-width: 100vw;
     height: 100%;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -3190,8 +3202,28 @@ textarea:not([disabled]) {
     border-right: 0;
   }
 
+  .bandeja__lista-encabezado {
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
+  }
+
+  .bandeja__busqueda,
+  .bandeja__pestanas {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .bandeja__pestana {
+    min-width: 0;
+    padding-inline: 8px;
+  }
+
   .bandeja-detalle-panel {
     flex: 1;
+    width: 100%;
+    max-width: 100vw;
     height: 100%;
   }
 
@@ -3208,15 +3240,22 @@ textarea:not([disabled]) {
   .conversacion {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
+    width: 100%;
+    max-width: 100vw;
     overflow: hidden;
   }
 
   .chat-header {
     position: relative;
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
     z-index: 20;
   }
 
   .chat-body {
+    width: 100%;
+    max-width: 100vw;
     overflow-y: auto;
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
@@ -3224,6 +3263,9 @@ textarea:not([disabled]) {
   }
 
   .chat-header__principal {
+    width: 100%;
+    max-width: 100vw;
+    min-width: 0;
     background: var(--color-bg);
     align-items: flex-start;
     padding-inline: 12px;
@@ -3250,7 +3292,14 @@ textarea:not([disabled]) {
   }
 
   .respuesta {
-    margin-bottom: max(16px, env(safe-area-inset-bottom));
+    width: auto;
+    max-width: calc(100vw - 24px);
+    min-width: 0;
+    margin: 8px 12px max(8px, env(safe-area-inset-bottom));
+  }
+
+  .respuesta__texto {
+    min-width: 0;
   }
 
   .mensaje-bubble {
