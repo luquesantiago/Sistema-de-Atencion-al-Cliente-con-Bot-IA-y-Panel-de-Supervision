@@ -3,6 +3,8 @@ import type { Customer } from './customer.js'
 import {
   anotherQueryQuestion,
   approvalNotice,
+  assistanceMessage,
+  paymentMethodsMessage,
   argentinaToday,
   clarificationRequestFor,
   clarificationRequests,
@@ -184,5 +186,19 @@ describe('pólizas del cliente', () => {
   it('avisa a quien pregunta por sus pólizas sin haberse identificado', () => {
     expect(notIdentifiedPoliciesNotice).toContain('no se identificó')
     expect(notIdentifiedPoliciesNotice).toContain('sus pólizas')
+  })
+})
+
+describe('textos fijos de grúa y medios de pago', () => {
+  it('la grúa da el teléfono tal cual y avisa la derivación en el mismo mensaje', () => {
+    expect(assistanceMessage('0800 555 0000')).toBe(
+      'Para una grúa o asistencia mecánica, comuníquese al 0800 555 0000. Además, su pedido será derivado a un miembro de nuestro equipo, quien hará el seguimiento.',
+    )
+  })
+
+  it('los medios de pago salen tal cual los cargó el administrador', () => {
+    expect(paymentMethodsMessage('Transferencia\nAlias: EJEMPLO.ALIAS')).toBe(
+      'Estos son los medios de pago de Seguros Castaño: Transferencia\nAlias: EJEMPLO.ALIAS',
+    )
   })
 })

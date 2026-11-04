@@ -2,6 +2,7 @@ import type { WhatsAppClient } from '../domain/whatsapp-client.js'
 import {
   RequestManagementError,
   type DataChangeDecisionInput,
+  type DecisionActor,
   type PageRequest,
   type PendingDataChange,
   type PendingPhoneChange,
@@ -41,13 +42,13 @@ public listPendingDataChanges(page: PageRequest): Promise<PendingDataChange[]> {
     return this.repository.listPendingDataChanges(page)
   }
 
-  public async decideProspect(input: ProspectDecisionInput): Promise<Omit<ProspectDecisionResult, 'phone'> & { notificationSent?: boolean }> {
+  public async decideProspect(input: ProspectDecisionInput, actor: DecisionActor): Promise<Omit<ProspectDecisionResult, 'phone'> & { notificationSent?: boolean }> {
     validateDecision(input.id, input.decision, input.fundamento)
     if (input.decision === 'aprobar') {
       validateName(input.nombre, 'nombre')
       validateName(input.apellido, 'apellido')
     }
-    const { phone, ...result } = await this.repository.decideProspect(input)
+    const { phone, ...result } = await this.repository.decideProspect(input, actor)
     // El rechazo no se avisa solo: el operador se lo explica desde la bandeja.
     if (result.decision !== 'aprobar') return result
     const notificationSent = await this.sendProspectNotification(result.id, phone)
@@ -63,7 +64,7 @@ public listPendingDataChanges(page: PageRequest): Promise<PendingDataChange[]> {
     return { id: notification.id, decision: 'aprobar' as const, notificationSent }
   }
 
-  public async decidePhoneChange(input: PhoneChangeDecisionInput) {
+  public async decidePhoneChange(input: PhoneChangeDecisionInput, actor: DecisionActor) {
     validateDecision(input.id, input.decision, input.fundamento)
     if (!Array.isArray(input.telefonosADesvincular) ||
       input.telefonosADesvincular.some((id) => !isValidId(id)) ||
@@ -74,14 +75,14 @@ public listPendingDataChanges(page: PageRequest): Promise<PendingDataChange[]> {
       throw new RequestManagementError(400, 'VALIDATION_ERROR', 'No se pueden desvincular teléfonos al rechazar una solicitud.')
     }
 
-    const result = await this.repository.decidePhoneChange(input)
+    const result = await this.repository.decidePhoneChange(input, actor)
     const notificationSent = await this.sendPhoneChangeNotification(result.id, result.phone, result.decision)
     return { id: result.id, decision: result.decision, notificationSent }
   }
 
-  public async decideDataChange(input: DataChangeDecisionInput) {
+  public async decideDataChange(input: DataChangeDecisionInput, actor: DecisionActor) {
     validateDecision(input.id, input.decision, input.fundamento)
-    const result = await this.repository.decideDataChange(input)
+    const result = await this.repository.decideDataChange(input, actor)
     const notificationSent = await this.sendDataChangeNotification(result.id, result.phone, result.decision)
     return { id: result.id, decision: result.decision, notificationSent }
   }

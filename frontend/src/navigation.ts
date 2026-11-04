@@ -3,6 +3,7 @@ export type ModuloPanel =
   | 'bandeja'
   | 'tramites'
   | 'clientes'
+  | 'configuracion'
 
 /** Lo que se abre al llegar a la Bandeja: un caso puntual o los casos de un cliente. */
 export type DestinoBandeja = {
@@ -50,4 +51,13 @@ export const MODULOS: readonly Modulo[] = [
     nombre: 'Base de Clientes',
     descripcion: 'Clientes, teléfonos, pólizas, coberturas y vencimientos.',
   },
+  {
+    id: 'configuracion',
+    nombre: 'Configuración',
+    descripcion:
+      'Datos de la agencia que informa el asistente: contacto, grúa, medios de pago, horario, seguros y planes.',
+  },
 ]
+
+/** Módulos que solo ve el administrador. El backend también lo controla (403). */
+export const MODULOS_ADMINISTRADOR: readonly ModuloPanel[] = ['dashboard', 'configuracion']

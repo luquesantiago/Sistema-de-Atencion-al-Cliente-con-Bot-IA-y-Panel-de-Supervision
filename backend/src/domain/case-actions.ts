@@ -2,7 +2,7 @@
 // RF-SUP-04; change bandeja-atender-casos, decisión 2). Reglas puras: el repositorio lee el
 // estado del caso y aplica el plan que sale de acá.
 
-// Quién actúa desde el panel. Mientras no haya autenticación, el usuario de prueba operador.
+// Quién actúa desde el panel: el usuario con la sesión iniciada (change acceso-por-rol).
 export type PanelActor = { userId: number }
 
 export type ProspectState = 'pendiente' | 'descartado'

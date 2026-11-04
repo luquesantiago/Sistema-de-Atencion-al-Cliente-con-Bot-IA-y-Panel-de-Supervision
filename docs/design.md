@@ -307,6 +307,13 @@ Dos variantes según el contenido:
 - Mostrar errores cerca del campo, con texto que explique cómo corregirlos.
 - No depender únicamente del color para indicar errores o validaciones.
 
+#### Formulario con vista previa (Configuración)
+
+La Configuración de la agencia agrupa los campos en `fieldset.formulario__grupo` por tema y muestra al costado, en `≥1024px`, una vista previa fija (`.configuracion__vista-previa`, panel sólido, sin cristal) con los mensajes tal como los recibe el cliente (`.configuracion__mensaje`, con sus renglones). En pantallas chicas la vista previa va después del formulario.
+
+- El estado de cada dato va junto a su etiqueta con un `badge` con icono y texto: «Dato de ejemplo» (`badge--warning`) o «Sin cargar» (`badge--neutro`), más una ayuda que explica qué hace el asistente mientras tanto.
+- El guardado siempre pasa por `ConfirmarCambio`, con cada dato en su valor actual y el nuevo.
+
 ### Tablas y datos
 
 Los listados de cartera usan **una fila por tarjeta**: cada fila es una superficie independiente con su borde y esquinas redondeadas, separada de la siguiente. El encabezado es una etiqueta tenue en versalitas, sin fondo.

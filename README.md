@@ -36,6 +36,10 @@ cp .env.example .env          # y cambiar las contraseñas de ejemplo
 docker compose up -d --build
 ```
 
+En el `.env`, `PANEL_SESSION_SECRET` firma las sesiones del panel. Necesita un valor al azar, por ejemplo el de `openssl rand -hex 32`: sin ella, el backend no arranca.
+
+Para entrar al panel están los usuarios de prueba `admin` (administrador) y `operador`, con clave `1234`. Ver [`migracion.md`](docs/migracion.md), «Usuarios».
+
 | Servicio | Dirección |
 |---|---|
 | Frontend | http://localhost:5173 |
