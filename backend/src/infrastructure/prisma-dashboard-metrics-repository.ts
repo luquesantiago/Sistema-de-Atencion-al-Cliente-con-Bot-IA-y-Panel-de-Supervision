@@ -3,6 +3,8 @@ import {
   type DashboardHourlyVolume,
   type DashboardMetricsRepository,
   type DashboardOperationalSummary,
+  type DashboardResponseDistribution,
+  type DashboardResponsePeriod,
 } from '../domain/dashboard-metrics.js'
 
 type PendingStateFilter = {
@@ -51,6 +53,7 @@ type CaseModel = {
       fecha_derivacion?: { not: null }
       id_usuario_asignado?: null
       fecha_toma?: null
+      fecha_apertura?: { gte: Date; lt: Date }
       OR?: [
         { fecha_apertura: { gte: Date; lt: Date } },
         { fecha_cierre: { gte: Date; lt: Date } },
@@ -86,6 +89,41 @@ function hourlyVolume(dates: Date[]): DashboardHourlyVolume[] {
     if (current !== undefined) counts.set(hora, current + 1)
   }
   return HOURS_OF_DAY.map((hora) => ({ hora, cantidad: counts.get(hora) ?? 0 }))
+}
+
+function argentinaDateParts(now: Date): { year: number; month: number; day: number } {
+  const parts = argentinaHourDate.formatToParts(now)
+  const year = Number(parts.find((part) => part.type === 'year')?.value)
+  const month = Number(parts.find((part) => part.type === 'month')?.value)
+  const day = Number(parts.find((part) => part.type === 'day')?.value)
+  return { year, month, day }
+}
+
+const argentinaHourDate = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Argentina/Buenos_Aires',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+function argentinaPeriodRange(now: Date, period: DashboardResponsePeriod): { start: Date; end: Date } {
+  const { year, month, day } = argentinaDateParts(now)
+  if (period === 'mensual') {
+    const start = new Date(`${year}-${String(month).padStart(2, '0')}-01T00:00:00-03:00`)
+    const nextMonth = month === 12
+      ? new Date(`${year + 1}-01-01T00:00:00-03:00`)
+      : new Date(`${year}-${String(month + 1).padStart(2, '0')}-01T00:00:00-03:00`)
+    return { start, end: nextMonth }
+  }
+
+  const start = new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00-03:00`)
+  start.setUTCDate(start.getUTCDate() - 6)
+  const end = new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00-03:00`)
+  end.setUTCDate(end.getUTCDate() + 1)
+  return {
+    start,
+    end,
+  }
 }
 
 export class PrismaDashboardMetricsRepository implements DashboardMetricsRepository {
@@ -167,6 +205,31 @@ export class PrismaDashboardMetricsRepository implements DashboardMetricsReposit
       resueltosPorBot,
       tasaAutomatizacion,
       volumenPorHora: hourlyVolume(createdToday.map((item) => item.fecha_apertura)),
+    }
+  }
+
+  public async getResponseDistribution(
+    now: Date,
+    period: DashboardResponsePeriod,
+  ): Promise<DashboardResponseDistribution> {
+    const { start, end } = argentinaPeriodRange(now, period)
+    const cases = await this.dataSource.caso.findMany({
+      where: { fecha_apertura: { gte: start, lt: end } },
+      select: { fecha_apertura: true, fecha_derivacion: true },
+    })
+
+    const resueltasPorIA = cases.filter((item) => item.fecha_derivacion === null).length
+    const derivadasOperador = cases.length - resueltasPorIA
+    const porcentajeIA = cases.length === 0 ? 0 : Math.round((resueltasPorIA / cases.length) * 100)
+
+    return {
+      resueltasPorIA,
+      derivadasOperador,
+      porcentajes: {
+        IA: porcentajeIA,
+        operador: cases.length === 0 ? 0 : 100 - porcentajeIA,
+      },
+      total: cases.length,
     }
   }
 }

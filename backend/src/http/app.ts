@@ -15,7 +15,7 @@ import {
 import { sessionDurationMs, type PanelRole, type PanelUser } from '../domain/session.js'
 import { KeyedQueue } from '../infrastructure/keyed-queue.js'
 import { isValidWebhookSecret, maskPhoneForLog, messageKeyForLog, parseWahaWebhook } from '../infrastructure/waha-webhook.js'
-import type { DashboardMetricsRepository } from '../domain/dashboard-metrics.js'
+import type { DashboardMetricsRepository, DashboardResponsePeriod } from '../domain/dashboard-metrics.js'
 
 export type WhatsAppWebhookOptions = {
   secret: string
@@ -321,7 +321,7 @@ export function createApp(
     }
   })
   // Las métricas son solo del administrador (RF-SUP-07, change acceso-por-rol).
-  app.get('/api/dashboard/metrics', requireRole('administrador'), async (_request, response, next) => {
+  app.get('/api/dashboard/metrics', requireRole('administrador'), async (request, response, next) => {
     try {
       if (!dashboardMetricsRepository) {
         response.status(503).json({
@@ -329,15 +329,21 @@ export function createApp(
         })
         return
       }
+      const periodValue = request.query.periodo
+      if (periodValue !== undefined && periodValue !== 'semanal' && periodValue !== 'mensual') {
+        throw new RequestManagementError(400, 'VALIDATION_ERROR', 'El período debe ser semanal o mensual.')
+      }
+      const periodo: DashboardResponsePeriod = periodValue === 'mensual' ? 'mensual' : 'semanal'
       const tramitesPorAprobar = await dashboardMetricsRepository.countPendingProcedures()
       const alertasRiesgoAbiertas = await dashboardMetricsRepository.countOpenRiskAlerts()
       const casosDerivadosSinTomar = await dashboardMetricsRepository.countUnattendedHandoffs()
       const resumenOperativo = await dashboardMetricsRepository.getOperationalSummary(new Date())
+      const distribucionRespuestas = await dashboardMetricsRepository.getResponseDistribution(new Date(), periodo)
       response.status(200).json({
         casosDerivadosSinTomar,
-        respuestasRetenidas: 0,
         tramitesPorAprobar,
         alertasRiesgoAbiertas,
+        distribucionRespuestas,
         ...resumenOperativo,
       })
     } catch (error) {

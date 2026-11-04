@@ -9,7 +9,11 @@ import {
   IconoIrBandeja,
   IconoPausa,
 } from '../components/iconos'
-import type { DashboardHourlyVolume, DashboardMetrics } from '../api/dashboard'
+import type {
+  DashboardHourlyVolume,
+  DashboardMetrics,
+  DashboardResponsePeriod,
+} from '../api/dashboard'
 
 const GRAFICO_ANCHO = 500
 const GRAFICO_ALTO = 150
@@ -73,6 +77,8 @@ interface DashboardProps {
   metricas: DashboardMetrics | null
   cargandoMetricas: boolean
   errorMetricas: string | null
+  periodoRespuestas: DashboardResponsePeriod
+  onCambiarPeriodoRespuestas: (periodo: DashboardResponsePeriod) => void
 }
 
 export default function Dashboard({
@@ -82,6 +88,8 @@ export default function Dashboard({
   metricas,
   cargandoMetricas,
   errorMetricas,
+  periodoRespuestas,
+  onCambiarPeriodoRespuestas,
 }: DashboardProps) {
   if (rol === 'operador') {
     return (
@@ -125,6 +133,9 @@ export default function Dashboard({
   const resueltosPorBot = metricas?.resueltosPorBot ?? '—'
   const tasaAutomatizacion = Math.round(metricas?.tasaAutomatizacion ?? 0)
   const estadoAutomatizacion = tasaAutomatizacion >= 60 ? 'Óptimo' : 'Moderado'
+  const distribucion = metricas?.distribucionRespuestas
+  const porcentajeIA = distribucion?.porcentajes.IA ?? 0
+  const porcentajeOperador = distribucion?.porcentajes.operador ?? 0
 
   return (
     <div className="pagina">
@@ -156,9 +167,56 @@ export default function Dashboard({
             <span className="tarjeta__icono tarjeta__icono--pink" aria-hidden="true">
               <IconoPausa />
             </span>
-            <span className="tarjeta__etiqueta">Respuestas retenidas</span>
-            <span className="tarjeta__valor tarjeta__valor--kpi">—</span>
-            <span className="tarjeta__nota">Se retienen y derivan, nunca se envían.</span>
+            <span className="tarjeta__etiqueta">Distribución de respuestas</span>
+            <div className="kpi-respuestas__periodos" role="group" aria-label="Período de distribución">
+              <button
+                className={periodoRespuestas === 'semanal' ? 'kpi-respuestas__periodo kpi-respuestas__periodo--activo' : 'kpi-respuestas__periodo'}
+                type="button"
+                aria-pressed={periodoRespuestas === 'semanal'}
+                onClick={() => onCambiarPeriodoRespuestas('semanal')}
+              >
+                Semanal
+              </button>
+              <button
+                className={periodoRespuestas === 'mensual' ? 'kpi-respuestas__periodo kpi-respuestas__periodo--activo' : 'kpi-respuestas__periodo'}
+                type="button"
+                aria-pressed={periodoRespuestas === 'mensual'}
+                onClick={() => onCambiarPeriodoRespuestas('mensual')}
+              >
+                Mensual
+              </button>
+            </div>
+            {cargandoMetricas ? (
+              <span className="tarjeta__nota">Cargando distribución…</span>
+            ) : distribucion?.total ? (
+              <div className="kpi-respuestas__contenido">
+                <div
+                  className="kpi-respuestas__dona"
+                  role="img"
+                  aria-label={`${porcentajeIA}% resuelta por IA y ${porcentajeOperador}% derivada al operador`}
+                  style={{
+                    background: `conic-gradient(var(--color-success-text) 0 ${porcentajeIA}%, var(--color-secondary) ${porcentajeIA}% 100%)`,
+                  }}
+                >
+                  <div className="kpi-respuestas__centro">
+                    <strong>{porcentajeIA}%</strong>
+                    <span>IA</span>
+                  </div>
+                </div>
+                <dl className="kpi-respuestas__leyenda">
+                  <div>
+                    <dt><span className="kpi-respuestas__punto kpi-respuestas__punto--ia" />IA</dt>
+                    <dd>{porcentajeIA}% · {distribucion.resueltasPorIA}</dd>
+                  </div>
+                  <div>
+                    <dt><span className="kpi-respuestas__punto kpi-respuestas__punto--operador" />Operador</dt>
+                    <dd>{porcentajeOperador}% · {distribucion.derivadasOperador}</dd>
+                  </div>
+                </dl>
+              </div>
+            ) : (
+              <span className="tarjeta__nota">Sin respuestas registradas en este período.</span>
+            )}
           </article>
 
           <article className="tarjeta tarjeta--kpi">

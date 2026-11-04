@@ -7,7 +7,11 @@ import BaseClientes from './pages/BaseClientes'
 import Configuracion from './pages/Configuracion'
 import Login from './pages/Login'
 import { listarBandeja } from './api/bandeja'
-import { obtenerMetricasDashboard, type DashboardMetrics } from './api/dashboard'
+import {
+  obtenerMetricasDashboard,
+  type DashboardMetrics,
+  type DashboardResponsePeriod,
+} from './api/dashboard'
 import { EVENTO_SESION_VENCIDA } from './api/respuesta'
 import { cerrarSesion, obtenerSesion } from './api/sesion'
 import {
@@ -49,6 +53,7 @@ function App() {
   const [cargandoMetricas, setCargandoMetricas] = useState(true)
   const [errorMetricas, setErrorMetricas] = useState<string | null>(null)
   const [casosPendientes, setCasosPendientes] = useState<number | null>(null)
+  const [periodoRespuestas, setPeriodoRespuestas] = useState<DashboardResponsePeriod>('semanal')
   // Al cargar, el panel pregunta al backend si ya hay una sesión abierta (cookie httpOnly).
   const [verificando, setVerificando] = useState(true)
   const [sesionVencida, setSesionVencida] = useState(false)
@@ -65,7 +70,7 @@ function App() {
       const actual = new AbortController()
       controlador = actual
       const [resultadoMetricas, resultadoBandeja] = await Promise.allSettled([
-        obtenerMetricasDashboard(actual.signal),
+        obtenerMetricasDashboard(periodoRespuestas, actual.signal),
         listarBandeja({ limit: 1, offset: 0 }, actual.signal),
       ])
       if (!vigente || actual.signal.aborted) return
@@ -96,7 +101,7 @@ function App() {
       if (temporizador !== undefined) clearTimeout(temporizador)
       controlador?.abort()
     }
-  }, [usuario])
+  }, [usuario, periodoRespuestas])
 
   // El destino de la bandeja o de la base de clientes viaja con la navegación
   // y se descarta al salir de ese módulo.
@@ -204,6 +209,8 @@ function App() {
                 metricas={metricas}
                 cargandoMetricas={cargandoMetricas}
                 errorMetricas={errorMetricas}
+                periodoRespuestas={periodoRespuestas}
+                onCambiarPeriodoRespuestas={setPeriodoRespuestas}
               />
             )
             : (
