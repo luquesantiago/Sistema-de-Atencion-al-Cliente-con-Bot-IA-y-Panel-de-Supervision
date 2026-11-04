@@ -64,7 +64,26 @@
   --shadow-soft: 0 2px 8px rgba(43, 18, 24, 0.08);
   --sidebar-width: 18rem;
 
-
+  /* Aliases de la paleta para los estilos de la Bandeja, los diálogos y
+     los avisos del asistente: sin estos tokens las declaraciones se invalidan
+     y desaparecen bordes, radios y fondos. */
+  --borde: var(--color-accent-light);
+  --borde-fuerte: var(--color-secondary);
+  --radio: var(--radius-lg);
+  --radio-chico: calc(var(--radius-md) - 3px);
+  --superficie: var(--color-surface);
+  --superficie-alterna: var(--color-surface-alt);
+  --texto: var(--color-text);
+  --texto-suave: var(--color-text-muted);
+  --texto-tenue: var(--color-text-faint);
+  --primario: var(--color-primary);
+  --primario-suave: var(--color-accent-light);
+  --riesgo: var(--color-danger-text);
+  --riesgo-suave: var(--color-danger-bg);
+  --exito: var(--color-success-text);
+  --exito-suave: var(--color-success-bg);
+  --alerta: var(--color-warning-text);
+  --alerta-suave: var(--color-warning-bg);
 }
 
 *,
