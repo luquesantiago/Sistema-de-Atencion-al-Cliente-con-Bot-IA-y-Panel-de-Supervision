@@ -154,19 +154,19 @@ export default function Dashboard({
                 <dl className="kpi-resumen">
                   <div>
                     <dt>Consultas</dt>
-                    <dd>{consultasHoy}</dd>
+                    <dd key={`consultas-${consultasHoy}`}>{consultasHoy}</dd>
                   </div>
                   <div>
                     <dt>Cerrados</dt>
-                    <dd>{casosCerrados}</dd>
+                    <dd key={`cerrados-${casosCerrados}`}>{casosCerrados}</dd>
                   </div>
                   <div>
                     <dt>Resueltos por IA</dt>
-                    <dd>{resueltosPorBot}</dd>
+                    <dd key={`ia-${resueltosPorBot}`}>{resueltosPorBot}</dd>
                   </div>
                   <div>
                     <dt>Automatización</dt>
-                    <dd>{tasaAutomatizacion}%</dd>
+                    <dd key={`automatizacion-${tasaAutomatizacion}`}>{tasaAutomatizacion}%</dd>
                   </div>
                 </dl>
                 <div className="kpi-resumen__barra" aria-label={`Automatización ${tasaAutomatizacion}%`}>
@@ -190,7 +190,7 @@ export default function Dashboard({
               <IconoIrBandeja />
             </button>
             <span className="tarjeta__etiqueta">Casos derivados sin tomar</span>
-            <span className="tarjeta__valor tarjeta__valor--kpi">
+            <span key={`sin-tomar-${metricas?.casosDerivadosSinTomar ?? 'cargando'}`} className="tarjeta__valor tarjeta__valor--kpi">
               {cargandoMetricas ? '…' : (metricas?.casosDerivadosSinTomar ?? '—')}
             </span>
             <span className="tarjeta__nota tarjeta__nota--pie">Casos derivados abiertos sin responsable.</span>
@@ -201,7 +201,7 @@ export default function Dashboard({
               <IconoArchivoCheck />
             </span>
             <span className="tarjeta__etiqueta">Trámites por aprobar</span>
-            <span className="tarjeta__valor tarjeta__valor--kpi">
+            <span key={`tramites-${metricas?.tramitesPorAprobar ?? 'cargando'}`} className="tarjeta__valor tarjeta__valor--kpi">
               {cargandoMetricas ? '…' : (metricas?.tramitesPorAprobar ?? '—')}
             </span>
             <span className="tarjeta__nota tarjeta__nota--pie">Bajas, contrato y alta de conductor.</span>
@@ -212,7 +212,7 @@ export default function Dashboard({
               <IconoAlerta />
             </span>
             <span className="tarjeta__etiqueta">Alertas de riesgo abiertas</span>
-            <span className="tarjeta__valor tarjeta__valor--kpi">
+            <span key={`alertas-${metricas?.alertasRiesgoAbiertas ?? 'cargando'}`} className="tarjeta__valor tarjeta__valor--kpi">
               {cargandoMetricas ? '…' : (metricas?.alertasRiesgoAbiertas ?? '—')}
             </span>
             <span className="tarjeta__nota tarjeta__nota--pie">Gravedad y motivo, no solo color.</span>
@@ -320,7 +320,10 @@ export default function Dashboard({
             </div>
 
             {distribucion?.total ? (
-              <div className="panel-respuestas__contenido">
+              <div
+                key={`${periodoRespuestas}-${distribucion.total}-${distribucion.resueltasPorIA}-${distribucion.derivadasOperador}`}
+                className="panel-respuestas__contenido"
+              >
                 <div
                   className="panel-respuestas__dona"
                   role="img"

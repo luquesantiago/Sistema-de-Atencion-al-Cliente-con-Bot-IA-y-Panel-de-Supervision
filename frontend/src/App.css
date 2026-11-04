@@ -234,11 +234,16 @@
   font-size: 0.9rem;
   text-align: left;
   cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .nav__item:hover {
   background: linear-gradient(180deg, rgba(247, 244, 239, 0.18), rgba(247, 244, 239, 0.1));
   color: var(--color-sidebar-text);
+}
+
+.nav__item:active {
+  transform: scale(0.985);
 }
 
 /* Ítem activo: pastilla de vidrio crema + barra vino (design.md §5) */
@@ -402,6 +407,13 @@
   background: #fdf9fa;
 }
 
+.boton[disabled],
+.boton[aria-busy='true'] {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+}
+
 .pagina {
   width: 100%;
   max-width: 1180px;
@@ -436,6 +448,21 @@
 
 /* Controles (design.md §5) */
 
+button:not([disabled]),
+input:not([disabled]),
+select:not([disabled]),
+textarea:not([disabled]) {
+  transition-property: background-color, border-color, color, box-shadow, opacity, transform;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+input:not([disabled]),
+select:not([disabled]),
+textarea:not([disabled]) {
+  transition-duration: 160ms;
+}
+
 .boton {
   display: inline-flex;
   align-items: center;
@@ -450,11 +477,20 @@
   font: inherit;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s, box-shadow 0.2s;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .boton:hover {
   background: var(--color-accent-light);
+}
+
+.boton:active:not([disabled]):not([aria-busy='true']) {
+  transform: translate3d(0, 1px, 0) scale(0.94);
 }
 
 .boton--primario {
@@ -995,12 +1031,17 @@
   font-size: 0.75rem;
   font-weight: 650;
   cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .panel-respuestas__periodo--activo {
   background: var(--color-surface);
   color: var(--color-primary);
   box-shadow: var(--shadow-soft);
+}
+
+.panel-respuestas__periodo:active {
+  transform: scale(0.96);
 }
 
 .panel-respuestas__periodo:focus-visible {
@@ -4073,6 +4114,32 @@
   transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .boton:hover:not([disabled]):not([aria-busy='true']) {
+    transform: translate3d(0, -2px, 0);
+    box-shadow: 0 7px 16px rgba(43, 18, 24, 0.16);
+  }
+
+  .nav__item:hover:not([aria-current='page']) {
+    transform: translate3d(2px, 0, 0);
+  }
+
+  button:not(.boton):not([disabled]):hover {
+    transform: translate3d(0, -1px, 0);
+    box-shadow: 0 5px 12px rgba(43, 18, 24, 0.12);
+  }
+
+  input:not([disabled]):hover,
+  select:not([disabled]):hover,
+  textarea:not([disabled]):hover {
+    border-color: var(--color-primary-hover);
+  }
+}
+
+button:not(.boton):not([disabled]):active {
+  transform: translate3d(0, 1px, 0) scale(0.94);
+}
+
 /* Configuración de la agencia (change configuracion-agencia): formulario por secciones y
    vista previa al costado. Panel de datos sólido, sin cristal (design.md §5). */
 
@@ -4191,9 +4258,31 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .panel__principal {
+    animation: vista-entrada 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .panel__principal--saliendo {
+    animation: vista-salida 90ms ease-in both;
+  }
+
   /* El listado entra como listado: opacidad con escalonado corto y acotado. */
   .tabla__fila {
-    animation: fila-entrada 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: fila-entrada 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .tabla__fila:nth-child(1) { animation-delay: 0ms; }
+  .tabla__fila:nth-child(2) { animation-delay: 24ms; }
+  .tabla__fila:nth-child(3) { animation-delay: 48ms; }
+  .tabla__fila:nth-child(4) { animation-delay: 72ms; }
+  .tabla__fila:nth-child(5) { animation-delay: 96ms; }
+  .tabla__fila:nth-child(6) { animation-delay: 120ms; }
+
+  .tarjeta,
+  .estado,
+  .panel-dashboard__seccion,
+  .detalle-panel__poliza {
+    animation: tarjeta-entrada 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   /* Momento focal: la ficha se asienta al costado de la fila elegida. */
@@ -4203,11 +4292,26 @@
 
   /* Diálogos: el velo aparece y el panel se asienta sin desplazar el fondo. */
   .modal__atras {
-    animation: velo-entrada 180ms ease-out both;
+    animation: velo-entrada 220ms ease-out both;
   }
 
   .modal {
-    animation: modal-entrada 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: modal-entrada 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .dialogo[open] {
+    animation: modal-entrada 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .dialogo[open]::backdrop {
+    animation: velo-entrada 220ms ease-out both;
+  }
+
+  .estado,
+  .tarjeta__valor--kpi,
+  .kpi-resumen dd,
+  .panel-respuestas__contenido {
+    animation: dato-entrada 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   /* Confirmaciones de una edición, con texto (nunca solo color). */
@@ -4216,9 +4320,48 @@
     animation: aviso-entrada 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
+  @keyframes vista-entrada {
+    from {
+      opacity: 0;
+      transform: translate3d(12px, 0, 0) scale(0.995);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes vista-salida {
+    from {
+      opacity: 1;
+      transform: none;
+    }
+    to {
+      opacity: 0;
+      transform: translate3d(-8px, 0, 0) scale(0.995);
+    }
+  }
+
   @keyframes fila-entrada {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+      transform: translate3d(0, 4px, 0);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes tarjeta-entrada {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 6px, 0) scale(0.995);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 
   @keyframes ficha-entrada {
@@ -4240,7 +4383,18 @@
   @keyframes modal-entrada {
     from {
       opacity: 0;
-      transform: translate3d(0, 8px, 0) scale(0.985);
+      transform: translate3d(0, 12px, 0) scale(0.94);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes dato-entrada {
+    from {
+      opacity: 0.55;
+      transform: translate3d(0, 2px, 0);
     }
     to {
       opacity: 1;
