@@ -496,7 +496,7 @@ El panel es una superficie **Operate**: el movimiento confirma estado, continuid
 | Avisos de éxito y riesgo | Aparecen desde −4 px con opacidad | 180 ms |
 | Hover y selección de filas | Transición de fondo y borde; la barra interior de selección crece | 160 ms / 240 ms |
 | Navegación entre paneles | Salida 90 ms; cambio suave del contenido tras un mínimo delay; entrada global con opacidad, traslación horizontal 12 px y escala 0,995 → 1 | 90 ms + 280 ms, `cubic-bezier(0.16, 1, 0.3, 1)`; sin delay con movimiento reducido |
-| Modales y formularios | Velo con opacidad; panel sólido desde 0,94 y traslación 12 px | 220 ms / 260 ms, `cubic-bezier(0.16, 1, 0.3, 1)` |
+| Modales y formularios | Velo con opacidad; panel sólido nace desde el centro con escala 0,92 → 1 | 180 ms / 240 ms, `cubic-bezier(0.16, 1, 0.3, 1)` |
 | Botones | Hover con elevación visible; `active` desplaza 1 px y reduce la escala a 0,94 | 160–180 ms |
 | Listados y tarjetas | Entrada escalonada de filas; tarjetas y estados ascienden 6 px | 220–260 ms |
 | KPI, dona y estados de carga | Entrada breve con opacidad y 2–6 px de traslación al actualizar | 180–260 ms |
