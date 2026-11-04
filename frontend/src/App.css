@@ -3146,7 +3146,6 @@ textarea:not([disabled]) {
     width: 100%;
     height: 100%;
     min-height: 0;
-    overflow: hidden;
   }
 
   /* Una columna por vez: la lista o la conversación elegida */
@@ -3167,6 +3166,7 @@ textarea:not([disabled]) {
     flex: 1 1 auto;
     height: auto;
     min-height: 0;
+    overflow: hidden;
   }
 
   .bandeja-container {
@@ -3183,6 +3183,10 @@ textarea:not([disabled]) {
   .bandeja-lista-panel {
     flex: 1 1 auto;
     width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     border-right: 0;
   }
 
@@ -3210,6 +3214,13 @@ textarea:not([disabled]) {
   .chat-header {
     position: relative;
     z-index: 20;
+  }
+
+  .chat-body {
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
 
   .chat-header__principal {
